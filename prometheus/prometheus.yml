@@ -1,17 +1,31 @@
 global:
-  scrape_interval:     15s # How frequently to scrape targets by default.
-  evaluation_interval: 15s # How frequently to evaluate rules.
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  # retention: 48h
+
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets: ['alertmanager:9093']
+
+rule_files:
+  - 'alertrule.yml'  # Ensure this file exists and is correctly named
 
 scrape_configs:
-  - job_name: 'prometheus'
-    static_configs:
-      - targets: ['localhost:9090']  # The Prometheus server itself
-
   - job_name: 'node_exporter'
+    scrape_interval: 5s
     static_configs:
-      - targets: ['your_node_exporter_host:9100']  # Replace 'your_node_exporter_host' with the actual hostname or IP address where Node Exporter is running.
+    - targets: ['node_exporter:9100']
+      labels:
+          instance: test_Server
+    
+  - job_name: 'ALPHA-EQUIPO'
+    scrape_interval: 5s
+    static_configs:
+    - targets: ['35.89.17.180:9100']
+      labels:
+          instance: ALPHA-ADMIN-PANEL-API
 
-  # Additional scrape configurations can be added here for other exporters or targets.
-
-# Additional configuration settings, rules, alerting rules, etc., can be added as needed.
-
+  - job_name: 'alertmanager'
+    static_configs:
+    - targets: ['alertmanager:9093']
