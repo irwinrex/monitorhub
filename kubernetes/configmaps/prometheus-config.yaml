@@ -1,0 +1,32 @@
+# prometheus-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      # retention: 48h
+
+    alerting:
+      alertmanagers:
+      - static_configs:
+        - targets: ['alertmanager-service.default.svc.cluster.local:9093']
+
+    rule_files:
+      - 'alert-rules.yml'  # Ensure this file exists and is correctly named
+
+    scrape_configs:
+      - job_name: 'node_exporter'
+        scrape_interval: 5s
+        static_configs:
+        - targets: ['node-exporter.default.svc.cluster.local:9100']
+          labels:
+              instance: prom-server
+
+      - job_name: 'alertmanager'
+        static_configs:
+        - targets: ['alertmanager-service.default.svc.cluster.local:9093']
+
