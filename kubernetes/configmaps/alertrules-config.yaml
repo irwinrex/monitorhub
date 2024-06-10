@@ -33,7 +33,7 @@ data:
         labels:
           severity: warning
         annotations:
-          summary: High Storage Usage on {{ $labels.instance }}
+          summary: High Storage Usage on EC2 instance
           description: 'The {{ $labels.instance }} host is experiencing high storage usage.'
 
       - alert: InstanceAlert
@@ -43,4 +43,5 @@ data:
           severity: critical
         annotations:
           title: "Instance {{ $labels.instance }} is down"
+          summary: Instance is down or up alert
           description: "Instance {{ $labels.instance }} is down for more than 1 minutes."
