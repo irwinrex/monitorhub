@@ -18,13 +18,6 @@ spec:
             name: grafana-service
             port:
               name: grafana
-      - path: /loki
-        pathType: Prefix
-        backend:
-          service:
-            name: loki-service
-            port:
-              name: loki
     
   
   

@@ -25,13 +25,11 @@ spec:
             - containerPort: 9096
               name: grpc
           args:
-            - -config.file=/etc/loki/loki.yaml
+            - -config.file=/etc/loki/loki.yaml 
           volumeMounts:
             - name: config-volume
               mountPath: /etc/loki/loki.yaml
               subPath: loki.yaml
-            - name: wal-volume
-              mountPath: /tmp/wal
           resources:
             requests:
               memory: "64Mi"
@@ -43,9 +41,6 @@ spec:
         - name: config-volume
           configMap:
             name: loki-config
-        - name: wal-volume
-          persistentVolumeClaim:
-            claimName: loki-wal-pvc
 
 ---
 apiVersion: v1
@@ -55,18 +50,16 @@ metadata:
   labels:
     app: loki
 spec:
-  type: NodePort
+  type: LoadBalancer
   ports:
     - name: lokihttp
       protocol: TCP
       targetPort: http
       port: 3100
-      nodePort: 31000
     - name: lokigrpc
       protocol: TCP
       targetPort: grpc
       port: 9096
-      nodePort: 32000
   selector:
     app: loki
 
