@@ -33,6 +33,8 @@ spec:
             - name: alertrules-volume
               mountPath: /etc/prometheus/alert-rules.yml
               subPath: alert-rules.yml
+            - name: prometheus-storage
+              mountPath: /etc/prometheus
           resources:
             requests:
               memory: "64Mi"
@@ -47,6 +49,9 @@ spec:
         - name: alertrules-volume
           configMap:
             name: alertrules-config
+        - name: prometheus-storage
+          persistentVolumeClaim:
+            claimName: prometheus-pvc
 
 ---
 apiVersion: v1

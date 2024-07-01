@@ -8,7 +8,7 @@ spec:
   accessModes:
     - ReadWriteOnce
   capacity:
-    storage: 5Gi
+    storage: 1Gi
   hostPath:
     path: /mnt/grafana
 ---
@@ -19,6 +19,6 @@ metadata:
 spec:
   resources:
     requests:
-      storage: 5Gi  # Define the desired storage capacity
+      storage: 1Gi  # Define the desired storage capacity
   accessModes:
     - ReadWriteOnce
