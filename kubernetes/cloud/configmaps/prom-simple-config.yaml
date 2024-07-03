@@ -2,6 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: prometheus-config
+  namespace: monitoring
 data:
   prometheus.yml: |
     global:
@@ -11,7 +12,7 @@ data:
     alerting:
       alertmanagers:
       - static_configs:
-        - targets: ['alertmanager-service.default.svc.cluster.local:9093']
+        - targets: ['alertmanager-service.monitoring.svc.cluster.local:9093']
 
     rule_files:
       - 'alert-rules.yml'  # Ensure this file exists and is correctly named
@@ -97,4 +98,4 @@ data:
 
       - job_name: 'alertmanager'
         static_configs:
-        - targets: ['alertmanager-service.default.svc.cluster.local:9093']
+        - targets: ['alertmanager-service.monitoring.svc.cluster.local:9093']
