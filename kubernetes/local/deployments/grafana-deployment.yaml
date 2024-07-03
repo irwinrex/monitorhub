@@ -3,6 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: grafana-deployment
+  namespace: monitoring
   labels:
     app: grafana
 spec:
@@ -18,7 +19,7 @@ spec:
       initContainers:
         - name: setup-permissions
           image: busybox
-          command: ["sh", "-c", "chmod 777 -R /var/lib/grafana"]
+          command: ["sh", "-c", "chmod 0777 -R /var/lib/grafana"]
           volumeMounts:
             - name: grafana-storage
               mountPath: /var/lib/grafana
@@ -49,6 +50,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: grafana-service
+  namespace: monitoring
   labels:
     app: grafana
 spec:

@@ -3,6 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: prometheus-deployment
+  namespace: monitoring
   labels:
     app: prometheus
 spec:
@@ -15,13 +16,15 @@ spec:
       labels:
         app: prometheus
     spec:
-      serviceAccountName: prometheus
+      # serviceAccountName: prometheus
       containers:
         - name: prometheus
           image: prom/prometheus:latest
           args:
             - --config.file=/etc/prometheus/prometheus.yml
             - --storage.tsdb.path=/prometheus
+            - --storage.tsdb.retention.time=15d
+            - --storage.tsdb.retention.size=1GB
           imagePullPolicy: Always
           ports:
             - name: prometheus
@@ -34,7 +37,7 @@ spec:
               mountPath: /etc/prometheus/alert-rules.yml
               subPath: alert-rules.yml
             - name: prometheus-storage
-              mountPath: /etc/prometheus
+              mountPath: /prometheus
           resources:
             requests:
               memory: "64Mi"

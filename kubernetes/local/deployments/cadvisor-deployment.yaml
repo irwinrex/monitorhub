@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: cadvisor
+  namespace: kube-system
+  labels:
+    k8s-app: cadvisor
+spec:
+  selector:
+    matchLabels:
+      k8s-app: cadvisor
+  template:
+    metadata:
+      labels:
+        k8s-app: cadvisor
+    spec:
+      containers:
+      - name: cadvisor
+        image: gcr.io/cadvisor/cadvisor:v0.47.0  # Replace with the desired version
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 200m
+            memory: 200Mi
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        volumeMounts:
+        - name: rootfs
+          mountPath: /rootfs
+          readOnly: true
+        - name: var-run
+          mountPath: /var/run
+          mountPropagation: HostToContainer
+        - name: sys
+          mountPath: /sys
+          readOnly: true
+        - name: docker
+          mountPath: /var/lib/docker
+          readOnly: true
+      volumes:
+      - name: rootfs
+        hostPath:
+          path: /
+      - name: var-run
+        hostPath:
+          path: /var/run
+      - name: sys
+        hostPath:
+          path: /sys
+      - name: docker
+        hostPath:
+          path: /var/lib/docker
+
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cadvisor
+  namespace: kube-system
+spec:
+  selector:
+    k8s-app: cadvisor
+  ports:
+  - port: 8080
+    protocol: TCP
+    targetPort: 8080
