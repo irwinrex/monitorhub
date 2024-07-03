@@ -1,0 +1,32 @@
+# prometheus-values.yaml
+prometheus:
+  prometheusSpec:
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp2
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 50Gi
+    additionalScrapeConfigs:
+      - job_name: 'cadvisor'
+        kubernetes_sd_configs:
+        - role: endpoints
+          namespaces:
+            names:
+            - kube-system
+        relabel_configs:
+        - source_labels: [__meta_kubernetes_service_label_k8s_app]
+          action: keep
+          regex: cadvisor
+        - source_labels: [__meta_kubernetes_endpoint_port_name]
+          action: keep
+          regex: metrics
+
+# If you want to include kube-state-metrics and node-exporter specifically
+kube-state-metrics:
+  enabled: true
+
+node-exporter:
+  enabled: true

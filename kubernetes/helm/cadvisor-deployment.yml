@@ -1,3 +1,4 @@
+# cadvisor-deployment.yaml
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -53,8 +54,6 @@ spec:
       - name: docker
         hostPath:
           path: /var/lib/docker
-
-
 
 ---
 apiVersion: v1
