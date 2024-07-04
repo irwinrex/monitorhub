@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: loki-config
-  namespace: monitoring
+  namespace: default
 data:
   loki.yaml: |
     auth_enabled: false
@@ -11,7 +11,7 @@ data:
       grpc_listen_port: 9096
     common:
       ring:
-        instance_addr: loki-service.monitoring.svc.cluster.local
+        instance_addr: loki-service.default.svc.cluster.local
         kvstore:
           store: inmemory
       replication_factor: 1
@@ -22,11 +22,11 @@ data:
         active_index_directory: /loki/index
         cache_location: /loki/index_cache
       aws:
-        bucketnames: ebs-monitoring-logs
-        endpoint: s3.us-west-2.amazonaws.com
+        bucketnames: monitoring-logs
+        endpoint: s3.us-west-1.amazonaws.com
         region: us-west-2
-        access_key_id: access-key-id
-        secret_access_key: access-secret-key-id
+        access_key_id: aws_access_key
+        secret_access_key: aws_secret_access_key
         insecure: false
         http_config:
           idle_conn_timeout: 90s
@@ -46,15 +46,14 @@ data:
 
     compactor:
       working_directory: /tmp/loki/compactor
-      shared_store: s3
 
     limits_config:
       reject_old_samples: true
       reject_old_samples_max_age: 168h
 
-    chunk_store_config:
-      max_look_back_period: 0s
+    chunk_store_config: {}
 
     table_manager:
       retention_deletes_enabled: false
       retention_period: 0s
+
