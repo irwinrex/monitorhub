@@ -17,12 +17,19 @@ spec:
         app: prometheus
     spec:
       # serviceAccountName: prometheus
+      initContainers:
+        - name: setup-permissions
+          image: busybox
+          command: ["sh", "-c", "chmod 777 -R /etc/prometheus"]
+          volumeMounts:
+            - name: prometheus-storage
+              mountPath: /etc/prometheus
       containers:
         - name: prometheus
           image: prom/prometheus:latest
           args:
             - --config.file=/etc/prometheus/prometheus.yml
-            - --storage.tsdb.path=/prometheus
+            - --storage.tsdb.path=/etc/prometheus
             - --storage.tsdb.retention.time=15d
             - --storage.tsdb.retention.size=1GB
           imagePullPolicy: Always
