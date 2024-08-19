@@ -11,14 +11,18 @@ spec:
     storage: 5Gi
   hostPath:
     path: /mnt/loki-wal
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: loki-wal-pvc
+  namespace: monitoring
 spec:
   resources:
     requests:
       storage: 5Gi  # Define the desired storage capacity
   accessModes:
     - ReadWriteOnce
+  storageClassName: manual

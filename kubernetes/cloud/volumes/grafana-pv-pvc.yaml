@@ -8,17 +8,21 @@ spec:
   accessModes:
     - ReadWriteOnce
   capacity:
-    storage: 5Gi
+    storage: 1Gi
   hostPath:
     path: /mnt/grafana
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: grafana-pvc
+  namespace: monitoring
 spec:
   resources:
     requests:
-      storage: 5Gi  # Define the desired storage capacity
+      storage: 1Gi  # Define the desired storage capacity
   accessModes:
     - ReadWriteOnce
+  storageClassName: manual

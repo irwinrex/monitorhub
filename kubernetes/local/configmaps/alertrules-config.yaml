@@ -1,0 +1,48 @@
+# alertrules-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertrules-config
+  namespace: monitoring
+data:
+  alert-rules.yml: |
+    groups:
+    - name: Server Alert
+      rules:
+
+      - alert: HighCpuUsage
+        expr: sum by(instance)(irate(node_cpu_seconds_total{mode="idle"}[2m])) * 100 < 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: High CPU usage detected
+          description: "CPU usage on instance {{ $labels.instance }} has been above 90% for the last 2 minute."
+
+      - alert: HighRamUsage
+        expr: node_memory_MemAvailable / node_memory_MemTotal * 100 < 10
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High RAM Usage Alert"
+          description: "RAM usage is less than 10% available on {{ $labels.instance }} for the last 2 minutes."
+
+      - alert: HighStorageUsage
+        expr: (node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes > 0.9
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: High Storage Usage on EC2 instance
+          description: 'The {{ $labels.instance }} host is experiencing high storage usage.'
+
+      - alert: InstanceAlert
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          title: "Instance {{ $labels.instance }} is down"
+          summary: Instance is down or up alert
+          description: "Instance {{ $labels.instance }} is down for more than 1 minutes."
