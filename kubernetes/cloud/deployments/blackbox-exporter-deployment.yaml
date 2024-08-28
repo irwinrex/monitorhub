@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blackbox-exporter-deployment
+  namespace: monitoring
+  labels:
+    app: blackbox-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: blackbox-exporter
+  template:
+    metadata:
+      labels:
+        app: blackbox-exporter
+    spec:
+      containers:
+        - name: blackbox-exporter
+          image: blackbox_exporter:latest
+          ports:
+            - name: blackbox
+              containerPort: 9115
+          volumeMounts:
+            - name: config-volume
+              mountPath: /config/blackbox.yml
+              subPath: blackbox.yml
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "128m"
+            limits:
+              memory: "128Mi"
+              cpu: "128m"
+      volumes:
+        - name: config-volume
+          configMap:
+            name: blackbox-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: blackbox-exporter-service
+  namespace: monitoring
+  labels:
+    app: blackbox-exporter
+spec:
+  type: ClusterIP
+  selector:
+    app: blackbox-exporter
+  ports:
+    - name: blackbox
+      protocol: TCP
+      port: 9115
+      targetPort: blackbox

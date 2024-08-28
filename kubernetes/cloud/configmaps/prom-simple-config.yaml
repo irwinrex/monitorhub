@@ -28,3 +28,18 @@ data:
       - job_name: 'alertmanager'
         static_configs:
         - targets: ['alertmanager-service.monitoring.svc.cluster.local:9093']
+
+      - job_name: 'blackbox'
+        metrics_path: /probe
+        params:
+          module: [http_2xx]
+        static_configs:
+          - targets:
+            - http://test.com/api/healthcheck
+        relabel_configs:
+          - source_labels: [__address__]
+            target_label: __param_target
+          - source_labels: [__param_target]
+            target_label: instance
+          - target_label: __address__
+            replacement: blackbox-exporter-service.monitoring.svc.cluster.local:9115  # The blackbox_exporter's address
