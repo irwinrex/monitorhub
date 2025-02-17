@@ -27,6 +27,9 @@ spec:
               name: grpc
           args:
             - -config.file=/etc/loki/loki.yaml 
+          envFrom:
+            - secretRef:
+                name: loki-secrets
           volumeMounts:
             - name: config-volume
               mountPath: /etc/loki/loki.yaml
