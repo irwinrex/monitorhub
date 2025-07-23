@@ -27,6 +27,10 @@ def allocate_ram(gb: int, duration: int):
     finally:
         del data
 
+@app.get("/healthcheck")
+def healthcheck():
+    return {"status": "ok"}
+
 @app.get("/stress/cpu")
 def stress_cpu(cores: int = Query(..., ge=1), duration: int = Query(30, ge=1)):
     Thread(target=burn_cpu, args=(cores, duration)).start()
