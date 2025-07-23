@@ -1,0 +1,10 @@
+services:
+  stress-api:
+    build: .
+    ports:
+      - "8000:8000"
+    deploy:
+      resources:
+        limits:
+          cpus: '2.00'
+          memory: 4G
