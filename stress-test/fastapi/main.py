@@ -27,7 +27,7 @@ def allocate_ram(gb: int, duration: int):
     finally:
         del data
 
-@app.get("/healthcheck")
+@app.get("stress/healthcheck")
 def healthcheck():
     return {"status": "ok"}
 
