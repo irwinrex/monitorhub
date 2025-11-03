@@ -15,6 +15,8 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/arch: arm64
+      securityContext:
+        fsGroup: 1000 # ✅ MOVED: Pod-level security context
       containers:
         - name: mimir
           image: grafana/mimir:3.0.0
@@ -26,7 +28,6 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /etc/mimir
-            # Mount data PVC with subPaths for different directories
             - name: data
               mountPath: /data/mimir/tsdb
               subPath: tsdb
@@ -43,7 +44,6 @@ spec:
           securityContext:
             runAsNonRoot: true
             runAsUser: 10001
-            fsGroup: 1000 # Important for PVC write access
             readOnlyRootFilesystem: false
           readinessProbe:
             httpGet:
