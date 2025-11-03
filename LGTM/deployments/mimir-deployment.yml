@@ -35,8 +35,6 @@ spec:
               mountPath: /etc/mimir
             - name: data
               mountPath: /data
-            - name: data
-              mountPath: /data/active-query-tracker
           resources:
             requests:
               memory: "384Mi"
@@ -68,8 +66,6 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: mimir-pvc
-        # - name: active-query-tracker
-        #   emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
