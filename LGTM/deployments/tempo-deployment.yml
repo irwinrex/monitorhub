@@ -25,6 +25,7 @@ spec:
           command: ["sh", "-c", "chown -R 10001:10001 /var/tempo"]
           securityContext:
             runAsUser: 0
+            runAsNonRoot: false
           volumeMounts:
             - name: wal
               mountPath: /var/tempo
