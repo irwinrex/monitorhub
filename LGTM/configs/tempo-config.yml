@@ -5,18 +5,30 @@ metadata:
   namespace: monitoring
 data:
   tempo.yaml: |
+    # Sets the HTTP port and adds the /tempo prefix to all endpoints.
     server:
       http_listen_port: 3200
       http_path_prefix: /tempo
 
+    # Enables Tempo to receive traces via OTLP (OpenTelemetry Protocol).
+    distributor:
+      receivers:
+        otlp:
+          protocols:
+            http:
+            grpc:
+
+    # Configures S3 as the long-term storage backend.
     storage:
       trace:
         backend: s3
+        # This line tells Tempo to store objects inside a "tempo/" folder in the bucket.
+        bucket_object_prefix: tempo
         s3:
-          bucket_name: ebs-monitoring-data
+          bucket: ebs-monitoring-data
           endpoint: s3.us-west-2.amazonaws.com
           region: us-west-2
-          path_style_access: true
-          prefix: tempo
+          s3_force_path_style: true
+        # Configures a local disk volume for the Write-Ahead Log (WAL) for recent traces.
         wal:
-          path: /var/tempo/wal                   # use dedicated dir instead of /tmp
+          path: /var/tempo/wal

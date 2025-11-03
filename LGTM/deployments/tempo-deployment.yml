@@ -15,19 +15,31 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/arch: arm64
+      # Pod-level security context ensures the user can write to the volume.
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        runAsNonRoot: true
       containers:
         - name: tempo
-          image: grafana/tempo:2.9.0 # confirm ARM64 support
+          image: grafana/tempo:2.9.0 # This version has ARM64 support.
           args:
             - -config.file=/etc/tempo/tempo.yaml
           ports:
-            - containerPort: 3200
-              name: tempo
+            - name: tempo
+              containerPort: 3200
+            - name: otlp-grpc
+              containerPort: 4317
+            - name: otlp-http
+              containerPort: 4318
           volumeMounts:
             - name: config
               mountPath: /etc/tempo
             - name: wal
-              mountPath: /var/tempo/wal
+              mountPath: /var/tempo
+            - name: tmp
+              mountPath: /tmp
           resources:
             requests:
               memory: "256Mi"
@@ -35,20 +47,22 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "500m"
+          # Container-level security for hardening.
           securityContext:
-            runAsNonRoot: true
-            runAsUser: 1000
             readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
           readinessProbe:
             httpGet:
-              path: /ready
-              port: 3200
+              path: /tempo/ready
+              port: tempo
             initialDelaySeconds: 30
-            periodSeconds: 10
+            periodSeconds: 15
           livenessProbe:
             httpGet:
-              path: /metrics
-              port: 3200
+              path: /tempo/metrics
+              port: tempo
             initialDelaySeconds: 60
             periodSeconds: 30
       volumes:
@@ -58,6 +72,8 @@ spec:
         - name: wal
           persistentVolumeClaim:
             claimName: tempo-pvc
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -69,6 +85,12 @@ spec:
   selector:
     app: tempo
   ports:
-    - port: 3200
-      targetPort: 3200
-      name: tempo
+    - name: tempo
+      port: 3200
+      targetPort: tempo
+    - name: otlp-grpc
+      port: 4317
+      targetPort: otlp-grpc
+    - name: otlp-http
+      port: 4318
+      targetPort: otlp-http
