@@ -12,7 +12,7 @@ data:
       grpc_listen_port: 9095
 
     common:
-      path_prefix: /data/loki  # On persistent volume
+      path_prefix: /loki
       replication_factor: 1
       ring:
         instance_addr: 0.0.0.0
@@ -23,10 +23,6 @@ data:
           s3: s3://us-west-2/ebs-monitoring-data/loki
           region: us-west-2
           s3forcepathstyle: true
-          http_config:
-            idle_conn_timeout: 90s
-          s3uploader:
-            part_size: 134217728
 
     schema_config:
       configs:
@@ -42,7 +38,6 @@ data:
       working_directory: /loki/compactor
       retention_enabled: true
       retention_delete_delay: 2h
-      deletion_mode: filter-only
       delete_request_store:
         store: s3
         s3:
@@ -60,11 +55,16 @@ data:
       wal:
         enabled: true
         dir: /loki/wal
-      max_transfer_retries: 0
+      # In 3.5.0, use lifecycler config instead of max_transfer_retries
+      lifecycler:
+        ring:
+          kvstore:
+            store: memberlist
+          replication_factor: 1
+        final_sleep: 0s
 
     querier:
       max_concurrent: 4
-      query_timeout: 5m
 
     query_range:
       results_cache:
