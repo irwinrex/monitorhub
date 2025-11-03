@@ -29,8 +29,20 @@ spec:
             - sh
             - -c
             - |
+              set -e
               mkdir -p /data/tsdb /data/active-query-tracker
-              chmod 777 /data /data/tsdb /data/active-query-tracker
+              chown -R 10001:10001 /data
+              chmod -R 755 /data
+              ls -la /data
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            allowPrivilegeEscalation: true
+            capabilities:
+              add: [DAC_OVERRIDE] # Allow overriding permissions
       containers:
         - name: mimir
           image: grafana/mimir:3.0.0
