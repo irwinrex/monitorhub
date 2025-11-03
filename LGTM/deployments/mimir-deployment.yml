@@ -26,8 +26,13 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /etc/mimir
+            # Mount data PVC with subPaths for different directories
             - name: data
-              mountPath: /data/mimir
+              mountPath: /data/mimir/tsdb
+              subPath: tsdb
+            - name: data
+              mountPath: /data/mimir/compactor
+              subPath: compactor
           resources:
             requests:
               memory: "384Mi"
@@ -37,8 +42,9 @@ spec:
               cpu: "600m"
           securityContext:
             runAsNonRoot: true
-            runAsUser: 10001 # grafana user in image
-            readOnlyRootFilesystem: false # needs write to /var/mimir
+            runAsUser: 10001
+            fsGroup: 1000 # Important for PVC write access
+            readOnlyRootFilesystem: false
           readinessProbe:
             httpGet:
               path: /ready
