@@ -15,6 +15,10 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/arch: arm64
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000 # or the user ID that the image expects
+        fsGroup: 1000
       containers:
         - name: tempo
           image: grafana/tempo:2.9.0
