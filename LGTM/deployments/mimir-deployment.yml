@@ -22,27 +22,7 @@ spec:
         runAsUser: 10001
         seccompProfile:
           type: RuntimeDefault
-      initContainers:
-        - name: init-chown-data
-          image: busybox:1.35
-          command:
-            - sh
-            - -c
-            - |
-              set -e
-              mkdir -p /data/tsdb /data/active-query-tracker
-              chown -R 10001:10001 /data
-              chmod -R 755 /data
-              ls -la /data
-          volumeMounts:
-            - name: data
-              mountPath: /data
-          securityContext:
-            runAsUser: 0
-            runAsGroup: 0
-            allowPrivilegeEscalation: true
-            capabilities:
-              add: [DAC_OVERRIDE] # Allow overriding permissions
+      # ✅ NO init container - fsGroup handles it all
       containers:
         - name: mimir
           image: grafana/mimir:3.0.0
