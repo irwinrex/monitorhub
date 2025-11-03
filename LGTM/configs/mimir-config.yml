@@ -9,10 +9,8 @@ data:
       http_listen_port: 8080
       http_path_prefix: /mimir
       log_level: info
-
     target: all
     multitenancy_enabled: false
-
     blocks_storage:
       backend: s3
       s3:
@@ -21,28 +19,19 @@ data:
         region: us-west-2
       tsdb:
         dir: /tmp/mimir/tsdb
-
     ruler_storage:
       backend: s3
       s3:
         bucket_name: ebs-monitoring-data
         endpoint: s3.us-west-2.amazonaws.com
         region: us-west-2
-
     alertmanager_storage:
       backend: s3
       s3:
         bucket_name: ebs-monitoring-data
         endpoint: s3.us-west-2.amazonaws.com
         region: us-west-2
-
-    ingester:
-      wal:
-        enabled: true
-        dir: /tmp/mimir/wal
-
     compactor:
       data_dir: /tmp/mimir/compactor
-
     limits:
       compactor_blocks_retention_period: 90d
