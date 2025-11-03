@@ -35,7 +35,7 @@ spec:
           args:
             - -config.file=/etc/tempo/tempo.yaml
           ports:
-            - name: http
+            - name: tempo
               containerPort: 3200
             - name: otlp-grpc
               containerPort: 4317
@@ -58,13 +58,13 @@ spec:
           readinessProbe:
             httpGet:
               path: /tempo/ready
-              port: 3200
+              port: tempo
             initialDelaySeconds: 30
             periodSeconds: 15
           livenessProbe:
             httpGet:
               path: /tempo/metrics
-              port: 3200
+              port: tempo
             initialDelaySeconds: 60
             periodSeconds: 30
       volumes:
