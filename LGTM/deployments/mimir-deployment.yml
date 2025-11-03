@@ -22,6 +22,15 @@ spec:
         runAsUser: 10001
         seccompProfile:
           type: RuntimeDefault
+      initContainers:
+        - name: init-chown-data
+          image: busybox:1.35
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /data/tsdb /data/active-query-tracker
+              chmod 777 /data /data/tsdb /data/active-query-tracker
       containers:
         - name: mimir
           image: grafana/mimir:3.0.0
