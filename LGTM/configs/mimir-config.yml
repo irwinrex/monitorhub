@@ -13,6 +13,9 @@ data:
     target: all
     multitenancy_enabled: false
 
+    activity_tracker:
+      filepath: /active-query-tracker/activity.log  # ✅ FROM HELM CHART
+
     ingester:
       ring:
         kvstore:
@@ -21,17 +24,17 @@ data:
 
     blocks_storage:
       backend: s3
-      storage_prefix: mimirblocks  # ✅ CHANGED: removed slashes
+      storage_prefix: mimirblocks
       s3:
         bucket_name: ebs-monitoring-data
         endpoint: s3.us-west-2.amazonaws.com
         region: us-west-2
       tsdb:
-        dir: /data/mimir/tsdb
+        dir: /data/tsdb
 
     ruler_storage:
       backend: s3
-      storage_prefix: mimiruler  # ✅ CHANGED: removed slashes
+      storage_prefix: mimiruler
       s3:
         bucket_name: ebs-monitoring-data
         endpoint: s3.us-west-2.amazonaws.com
@@ -39,14 +42,14 @@ data:
 
     alertmanager_storage:
       backend: s3
-      storage_prefix: mimiralertmanager  # ✅ CHANGED: removed slashes
+      storage_prefix: mimiralertmanager
       s3:
         bucket_name: ebs-monitoring-data
         endpoint: s3.us-west-2.amazonaws.com
         region: us-west-2
 
     compactor:
-      data_dir: /data/mimir/compactor
+      data_dir: /data
 
     limits:
       compactor_blocks_retention_period: 90d
