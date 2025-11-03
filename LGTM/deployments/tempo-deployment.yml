@@ -63,7 +63,7 @@ spec:
             name: tempo-config
         - name: wal
           persistentVolumeClaim:
-            claimName: tempo-wal-pvc
+            claimName: tempo-pvc
         - name: tmp
           emptyDir: {}
 ---
