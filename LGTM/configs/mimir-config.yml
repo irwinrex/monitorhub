@@ -5,78 +5,48 @@ metadata:
   namespace: monitoring
 data:
   mimir.yaml: |
-    # LINE 1: VALID - Server block (required)
     server:
-      # LINE 2: VALID - HTTP listen port (default: 8080)
       http_listen_port: 8080
-      # LINE 3: VALID - HTTP path prefix (base path to serve all API routes)
       http_path_prefix: /mimir
-      # LINE 4: VALID - Log level (options: debug, info, warn, error)
       log_level: info
 
-    # LINE 5: VALID - Target (default: all)
     target: all
-    # LINE 6: VALID - Multitenancy enabled flag
     multitenancy_enabled: false
 
-    # LINE 7: VALID - Ingester block (required for classic architecture)
     ingester:
-      # LINE 8: VALID - Ring configuration block
       ring:
-        # LINE 9: VALID - Key-value store type (inmemory is valid for classic mode)
         kvstore:
           store: inmemory
-        # LINE 10: VALID - Replication factor
         replication_factor: 1
 
-    # LINE 11: VALID - Blocks storage configuration
     blocks_storage:
-      # LINE 12: VALID - Backend type (s3, gcs, azure, swift, filesystem)
       backend: s3
-      # LINE 13: VALID - Storage prefix for blocks
-      storage_prefix: mimir/blocks/
-      # LINE 14: VALID - S3 backend configuration
+      storage_prefix: mimirblocks  # ✅ CHANGED: removed slashes
       s3:
-        # LINE 15: VALID - S3 bucket name
         bucket_name: ebs-monitoring-data
-        # LINE 16: VALID - S3 endpoint
         endpoint: s3.us-west-2.amazonaws.com
-        # LINE 17: VALID - AWS region
         region: us-west-2
-      # LINE 18: VALID - TSDB configuration
       tsdb:
-        # LINE 19: VALID - Local TSDB directory
         dir: /data/mimir/tsdb
 
-    # LINE 20: VALID - Ruler storage configuration
     ruler_storage:
-      # LINE 21: VALID - Backend type
       backend: s3
-      # LINE 22: VALID - Storage prefix for ruler data
-      storage_prefix: mimir/ruler/
-      # LINE 23: VALID - S3 backend
+      storage_prefix: mimiruler  # ✅ CHANGED: removed slashes
       s3:
-        # LINE 24-26: VALID - S3 configuration
         bucket_name: ebs-monitoring-data
         endpoint: s3.us-west-2.amazonaws.com
         region: us-west-2
 
-    # LINE 27: VALID - Alertmanager storage configuration
     alertmanager_storage:
-      # LINE 28-33: VALID - Backend and S3 configuration
       backend: s3
-      storage_prefix: mimir/alertmanager/
+      storage_prefix: mimiralertmanager  # ✅ CHANGED: removed slashes
       s3:
         bucket_name: ebs-monitoring-data
         endpoint: s3.us-west-2.amazonaws.com
         region: us-west-2
 
-    # LINE 34: VALID - Compactor configuration
     compactor:
-      # LINE 35: VALID - Data directory for compactor
       data_dir: /data/mimir/compactor
 
-    # LINE 36: VALID - Limits block (contains per-tenant and global limits)
     limits:
-      # LINE 37: VALID - Retention period for compacted blocks
       compactor_blocks_retention_period: 90d
