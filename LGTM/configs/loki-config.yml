@@ -9,51 +9,63 @@ data:
 
     server:
       http_listen_port: 3100
+      grpc_listen_port: 9095
 
     common:
-      path_prefix: /tmp/loki # Base directory for all temporary files on the PVC
+      path_prefix: /data/loki  # On persistent volume
       replication_factor: 1
       ring:
-        instance_addr: $(HOSTNAME) # Crucial for memberlist to function
+        instance_addr: 0.0.0.0
         kvstore:
           store: memberlist
-      # BEST PRACTICE: The primary object store is now defined here.
-      # All components (ingester, querier, compactor) will use this.
       storage:
         s3:
           s3: s3://us-west-2/ebs-monitoring-data/loki
           region: us-west-2
           s3forcepathstyle: true
+          http_config:
+            idle_conn_timeout: 90s
+          s3uploader:
+            part_size: 134217728
 
     schema_config:
       configs:
         - from: 2025-01-01
           store: tsdb
-          # This 's3' refers to the store defined in common.storage
           object_store: s3
           schema: v13
           index:
             prefix: index_
             period: 24h
 
-    # FIX: The 'storage_config' block is no longer used for defining the S3 backend
-    # in this way. It has been replaced by 'common.storage'.
-
     compactor:
-      # This path should be relative to the common.path_prefix
-      working_directory: /tmp/loki/compactor
+      working_directory: /loki/compactor
       retention_enabled: true
       retention_delete_delay: 2h
-      # FIX: The 'delete_request_store' is not a standard or necessary
-      # part of the compactor config for a simple setup and was likely misconfigured.
+      deletion_mode: filter-only
+      delete_request_store:
+        store: s3
+        s3:
+          s3: s3://us-west-2/ebs-monitoring-data/loki
+          region: us-west-2
+          s3forcepathstyle: true
 
     limits_config:
-      retention_period: 2160h  # 90 days
-      # FIX: max_query_lookback belongs in limits_config. It's a global limit.
-      max_query_lookback: 2160h  # 90 days
+      retention_period: 2160h
+      max_query_lookback: 2160h
+      reject_old_samples: true
+      reject_old_samples_max_age: 168h
 
-    # FIX: The query_range block is for controlling query splitting and parallelism,
-    # not for setting the lookback limit.
+    ingester:
+      wal:
+        enabled: true
+        dir: /loki/wal
+      max_transfer_retries: 0
+
+    querier:
+      max_concurrent: 4
+      query_timeout: 5m
+
     query_range:
       results_cache:
         cache:

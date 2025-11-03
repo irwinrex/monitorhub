@@ -27,7 +27,7 @@ spec:
             - name: config
               mountPath: /etc/loki
             - name: temp
-              mountPath: /tmp/loki
+              mountPath: /data/loki
           resources:
             requests:
               memory: "256Mi"
