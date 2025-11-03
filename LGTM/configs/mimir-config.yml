@@ -7,31 +7,51 @@ data:
   mimir.yaml: |
     server:
       http_listen_port: 8080
-      http_path_prefix: /mimir
+      http_prefix: /mimir
       log_level: info
+
     target: all
     multitenancy_enabled: false
+
     blocks_storage:
       backend: s3
       s3:
         bucket_name: ebs-monitoring-data
         endpoint: s3.us-west-2.amazonaws.com
         region: us-west-2
+        prefix: mimir/blocks/
       tsdb:
-        dir: /tmp/mimir/tsdb
+        dir: /data/mimir/tsdb
+
+    ingester:
+      lifecycler:
+        ring:
+          kvstore:
+            store: inmemory
+          replication_factor: 1
+        instance_addr: '127.0.0.1'
+        instance_port: 8080
+      wal:
+        dir: /data/mimir/wal
+
     ruler_storage:
       backend: s3
       s3:
         bucket_name: ebs-monitoring-data
         endpoint: s3.us-west-2.amazonaws.com
         region: us-west-2
+        prefix: mimir/ruler/
+
     alertmanager_storage:
       backend: s3
       s3:
         bucket_name: ebs-monitoring-data
         endpoint: s3.us-west-2.amazonaws.com
         region: us-west-2
+        prefix: mimir/alertmanager/
+
     compactor:
-      data_dir: /tmp/mimir/compactor
+      data_dir: /data/mimir/compactor
+
     limits:
-      compactor_blocks_retention_period: 90d
+      retention_period: 90d
