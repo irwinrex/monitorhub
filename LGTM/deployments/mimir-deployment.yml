@@ -16,7 +16,7 @@ spec:
       nodeSelector:
         kubernetes.io/arch: arm64
       securityContext:
-        fsGroup: 1000 # ✅ MOVED: Pod-level security context
+        fsGroup: 1000
       containers:
         - name: mimir
           image: grafana/mimir:3.0.0
@@ -34,6 +34,10 @@ spec:
             - name: data
               mountPath: /data/mimir/compactor
               subPath: compactor
+            - name: data
+              mountPath: /work
+              subPath: work
+          workingDir: /work
           resources:
             requests:
               memory: "384Mi"
