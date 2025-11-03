@@ -63,7 +63,7 @@ spec:
             periodSeconds: 15
           livenessProbe:
             httpGet:
-              path: /tempo/ready
+              path: /tempo/metrics/go
               port: tempo
             initialDelaySeconds: 60
             periodSeconds: 30
