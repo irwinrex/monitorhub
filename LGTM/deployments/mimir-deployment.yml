@@ -42,13 +42,13 @@ spec:
             httpGet:
               path: /mimir/ready
               port: mimir
-            initialDelaySeconds: 30
-            periodSeconds: 10
+            initialDelaySeconds: 60
+            periodSeconds: 30
           livenessProbe:
             httpGet:
               path: /mimir/ready
               port: mimir
-            initialDelaySeconds: 60
+            initialDelaySeconds: 120
             periodSeconds: 30
       volumes:
         - name: config
