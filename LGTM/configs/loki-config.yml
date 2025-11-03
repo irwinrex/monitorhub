@@ -11,45 +11,50 @@ data:
       http_listen_port: 3100
 
     common:
-      path_prefix: /tmp/loki
+      path_prefix: /tmp/loki # Base directory for all temporary files on the PVC
       replication_factor: 1
       ring:
+        instance_addr: $(HOSTNAME) # Crucial for memberlist to function
         kvstore:
           store: memberlist
+      # BEST PRACTICE: The primary object store is now defined here.
+      # All components (ingester, querier, compactor) will use this.
+      storage:
+        s3:
+          s3: s3://us-west-2/ebs-monitoring-data/loki
+          region: us-west-2
+          s3forcepathstyle: true
 
     schema_config:
       configs:
         - from: 2025-01-01
           store: tsdb
+          # This 's3' refers to the store defined in common.storage
           object_store: s3
           schema: v13
           index:
             prefix: index_
             period: 24h
 
-    storage_config:
-      tsdb:
-        # If using S3 for chunks and index
-        # active_index_directory: /data/loki/index
-        # chunk_directory: /data/loki/chunks
-      aws:
-        s3: s3://us-west-2/ebs-monitoring-data/loki
-        region: us-west-2
-        s3forcepathstyle: true
+    # FIX: The 'storage_config' block is no longer used for defining the S3 backend
+    # in this way. It has been replaced by 'common.storage'.
 
     compactor:
-      working_directory: /data/loki/compactor
+      # This path should be relative to the common.path_prefix
+      working_directory: /tmp/loki/compactor
       retention_enabled: true
       retention_delete_delay: 2h
-      delete_request_store:
-        filesystem:
-          directory: /tmp/loki/deleterequests
+      # FIX: The 'delete_request_store' is not a standard or necessary
+      # part of the compactor config for a simple setup and was likely misconfigured.
 
     limits_config:
       retention_period: 2160h  # 90 days
-
-    query_range:
+      # FIX: max_query_lookback belongs in limits_config. It's a global limit.
       max_query_lookback: 2160h  # 90 days
+
+    # FIX: The query_range block is for controlling query splitting and parallelism,
+    # not for setting the lookback limit.
+    query_range:
       results_cache:
         cache:
           embedded_cache:
