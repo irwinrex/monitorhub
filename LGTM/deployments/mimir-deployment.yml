@@ -27,7 +27,7 @@ spec:
             - name: config
               mountPath: /etc/mimir
             - name: data
-              mountPath: /var/mimir
+              mountPath: /data/mimir
           resources:
             requests:
               memory: "384Mi"
