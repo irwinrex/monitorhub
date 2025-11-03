@@ -5,7 +5,7 @@ metadata:
   name: loki-pv
 spec:
   capacity:
-    storage: 5Gi
+    storage: 30Gi
   accessModes: [ReadWriteOnce]
   hostPath:
     path: /data/loki-temp
@@ -19,4 +19,4 @@ spec:
   accessModes: [ReadWriteOnce]
   resources:
     requests:
-      storage: 5Gi
+      storage: 30Gi

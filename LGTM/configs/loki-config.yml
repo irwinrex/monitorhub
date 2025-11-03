@@ -5,12 +5,18 @@ metadata:
   namespace: monitoring
 data:
   loki.yaml: |
+    auth_enabled: false
+
     server:
       http_listen_port: 3100
-      http_path_prefix: /loki
-      log_level: info
-    auth_enabled: false
-    target: all
+
+    common:
+      path_prefix: /tmp/loki
+      replication_factor: 1
+      ring:
+        kvstore:
+          store: memberlist
+
     schema_config:
       configs:
         - from: 2025-01-01
@@ -20,29 +26,32 @@ data:
           index:
             prefix: index_
             period: 24h
+
     storage_config:
+      tsdb:
+        # If using S3 for chunks and index
+        # active_index_directory: /data/loki/index
+        # chunk_directory: /data/loki/chunks
       aws:
         s3: s3://us-west-2/ebs-monitoring-data/loki
         region: us-west-2
-      tsdb_shipper:
-        active_index_directory: /tmp/loki/index
-        cache_location: /tmp/loki/cache
+        s3forcepathstyle: true
+
     compactor:
-      working_directory: /tmp/loki/compactor
-      shared_store: s3
+      working_directory: /data/loki/compactor
       retention_enabled: true
       retention_delete_delay: 2h
+      delete_request_store:
+        filesystem:
+          directory: /tmp/loki/deleterequests
+
     limits_config:
-      ingestion_rate_mb: 4
-      ingestion_burst_size_mb: 8
-      max_query_lookback: 168h
-      max_cache_freshness_per_query: 10m
-    chunk_store_config:
-      max_look_back_period: 168h
+      retention_period: 2160h  # 90 days
+
     query_range:
+      max_query_lookback: 2160h  # 90 days
       results_cache:
         cache:
-          enable_fifocache: true
-          fifocache:
-            size: 1024
-            validity: 24h
+          embedded_cache:
+            enabled: true
+            max_size_mb: 1024
