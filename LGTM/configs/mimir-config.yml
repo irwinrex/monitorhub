@@ -7,7 +7,7 @@ data:
   mimir.yaml: |
     server:
       http_listen_port: 8080
-      http_prefix: /mimir
+      http_path_prefix: /mimir
       log_level: info
 
     target: all
@@ -15,11 +15,11 @@ data:
 
     blocks_storage:
       backend: s3
+      storage_prefix: mimir/blocks/
       s3:
         bucket_name: ebs-monitoring-data
         endpoint: s3.us-west-2.amazonaws.com
         region: us-west-2
-        prefix: mimir/blocks/
       tsdb:
         dir: /data/mimir/tsdb
 
@@ -29,29 +29,31 @@ data:
           kvstore:
             store: inmemory
           replication_factor: 1
-        instance_addr: '127.0.0.1'
+        # Remove instance_addr for auto-detection in Kubernetes
+        # Or use: instance_addr: ${POD_IP}
         instance_port: 8080
       wal:
         dir: /data/mimir/wal
 
     ruler_storage:
       backend: s3
+      storage_prefix: mimir/ruler/
       s3:
         bucket_name: ebs-monitoring-data
         endpoint: s3.us-west-2.amazonaws.com
         region: us-west-2
-        prefix: mimir/ruler/
 
     alertmanager_storage:
       backend: s3
+      storage_prefix: mimir/alertmanager/
       s3:
         bucket_name: ebs-monitoring-data
         endpoint: s3.us-west-2.amazonaws.com
         region: us-west-2
-        prefix: mimir/alertmanager/
 
     compactor:
       data_dir: /data/mimir/compactor
 
+    # Retention period belongs in limits block
     limits:
-      retention_period: 90d
+      compactor_blocks_retention_period: 90d
