@@ -5,6 +5,7 @@ metadata:
   namespace: monitoring
 data:
   mimir.yaml: |
+    # Common storage configuration
     common:
       storage:
         backend: s3
@@ -13,35 +14,45 @@ data:
           endpoint: s3.us-west-2.amazonaws.com
           region: us-west-2
 
+    # Server settings
     server:
       http_listen_port: 8080
       http_path_prefix: /mimir
       log_level: info
 
+    # Long‑term blocks storage (metrics)
     blocks_storage:
       backend: s3
       s3:
         bucket_name: ebs-monitoring-data
         endpoint: s3.us-west-2.amazonaws.com
         region: us-west-2
-        storage_prefix: mimir/blocks       # path inside bucket
+        storage_prefix: mimir/blocks
 
+      # TSDB WAL configuration (for local durability before upload)
+      tsdb:
+        wal:
+          enabled: true
+          dir: /var/mimir/wal
+
+    # Ruler recording rules storage
     ruler_storage:
       backend: s3
       s3:
         bucket_name: ebs-monitoring-data
-        endpoint: s3.us-west-2.amazonaws.com
+        endpoint: s3.us‑west‑2.amazonaws.com
         region: us-west-2
-        storage_prefix: mimir/ruler        # path inside bucket
+        storage_prefix: mimir/ruler
 
+    # Alertmanager state storage
     alertmanager_storage:
       backend: s3
       s3:
         bucket_name: ebs-monitoring-data
         endpoint: s3.us-west-2.amazonaws.com
         region: us-west-2
-        storage_prefix: mimir/alertmanager # path inside bucket
+        storage_prefix: mimir/alertmanager
 
-    ingester:
-      wal:
-        dir: /var/mimir/wal
+    # Limits / retention example
+    limits:
+      compactor_blocks_retention_period: 90d
