@@ -17,15 +17,15 @@ spec:
         kubernetes.io/arch: arm64
       securityContext:
         runAsNonRoot: true
-        runAsUser: 1000 # or the user ID that the image expects
-        fsGroup: 1000
+        runAsUser: 10001 # Tempo image runs with UID 10001 by default :contentReference[oaicite:1]{index=1}
+        fsGroup: 10001
       containers:
         - name: tempo
           image: grafana/tempo:2.9.0
           args:
             - -config.file=/etc/tempo/tempo.yaml
           ports:
-            - name: tempo
+            - name: http
               containerPort: 3200
             - name: otlp-grpc
               containerPort: 4317
@@ -48,13 +48,13 @@ spec:
           readinessProbe:
             httpGet:
               path: /tempo/ready
-              port: tempo
+              port: 3200
             initialDelaySeconds: 30
             periodSeconds: 15
           livenessProbe:
             httpGet:
               path: /tempo/metrics
-              port: tempo
+              port: 3200
             initialDelaySeconds: 60
             periodSeconds: 30
       volumes:
@@ -63,7 +63,7 @@ spec:
             name: tempo-config
         - name: wal
           persistentVolumeClaim:
-            claimName: tempo-pvc
+            claimName: tempo-wal-pvc
         - name: tmp
           emptyDir: {}
 ---
