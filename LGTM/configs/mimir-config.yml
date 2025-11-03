@@ -13,6 +13,20 @@ data:
     target: all
     multitenancy_enabled: false
 
+    # Classic architecture - no ingest_storage block needed
+
+    ingester:
+      ring:
+        kvstore:
+          store: inmemory
+        replication_factor: 1
+      # WAL configuration for crash recovery
+      wal:
+        enabled: true
+        dir: /data/mimir/wal
+      # Local TSDB retention before compaction
+      max_chunk_age: 2h
+
     blocks_storage:
       backend: s3
       storage_prefix: mimir/blocks/
@@ -22,18 +36,6 @@ data:
         region: us-west-2
       tsdb:
         dir: /data/mimir/tsdb
-
-    ingester:
-      lifecycler:
-        ring:
-          kvstore:
-            store: inmemory
-          replication_factor: 1
-        # Remove instance_addr for auto-detection in Kubernetes
-        # Or use: instance_addr: ${POD_IP}
-        instance_port: 8080
-      wal:
-        dir: /data/mimir/wal
 
     ruler_storage:
       backend: s3
@@ -54,6 +56,5 @@ data:
     compactor:
       data_dir: /data/mimir/compactor
 
-    # Retention period belongs in limits block
     limits:
       compactor_blocks_retention_period: 90d
