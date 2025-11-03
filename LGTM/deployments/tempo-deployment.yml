@@ -15,15 +15,9 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/arch: arm64
-      # Pod-level security context ensures the user can write to the volume.
-      securityContext:
-        runAsUser: 1000
-        runAsGroup: 1000
-        fsGroup: 1000
-        runAsNonRoot: true
       containers:
         - name: tempo
-          image: grafana/tempo:2.9.0 # This version has ARM64 support.
+          image: grafana/tempo:2.9.0
           args:
             - -config.file=/etc/tempo/tempo.yaml
           ports:
@@ -47,12 +41,6 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "500m"
-          # Container-level security for hardening.
-          securityContext:
-            readOnlyRootFilesystem: true
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: [ALL]
           readinessProbe:
             httpGet:
               path: /tempo/ready
