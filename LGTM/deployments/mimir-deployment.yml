@@ -40,13 +40,13 @@ spec:
           # Container-level securityContext is removed to allow running as root
           readinessProbe:
             httpGet:
-              path: /ready
+              path: /mimir/ready
               port: mimir
             initialDelaySeconds: 30
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /ready
+              path: /mimir/ready
               port: mimir
             initialDelaySeconds: 60
             periodSeconds: 30
