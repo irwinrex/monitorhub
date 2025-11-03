@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tempo-config
+  namespace: monitoring
+data:
+  tempo.yaml: |
+    server:
+      http_listen_port: 3200
+      http_path_prefix: /tempo
+
+    storage:
+      trace:
+        backend: s3
+        s3:
+          bucket_name: ebs-monitoring-data
+          endpoint: s3.us-west-2.amazonaws.com
+          region: us-west-2
+          path_style_access: true
+          prefix: tempo
+        wal:
+          path: /var/tempo/wal                   # use dedicated dir instead of /tmp

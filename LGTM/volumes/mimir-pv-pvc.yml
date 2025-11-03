@@ -1,0 +1,22 @@
+# Mimir Temp
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mimir-pv
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes: [ReadWriteOnce]
+  hostPath:
+    path: /data/mimir-temp
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mimir-pvc
+  namespace: monitoring
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 5Gi

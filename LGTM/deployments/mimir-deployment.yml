@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mimir-deployment
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mimir
+  template:
+    metadata:
+      labels:
+        app: mimir
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: arm64
+      containers:
+        - name: mimir
+          image: grafana/mimir:3.0.0
+          args:
+            - -config.file=/etc/mimir/mimir.yaml
+          ports:
+            - containerPort: 8080
+              name: mimir
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: config
+              mountPath: /etc/mimir
+            - name: wal
+              mountPath: /var/mimir/wal
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 30
+      volumes:
+        - name: config
+          configMap:
+            name: mimir-config
+        - name: wal
+          persistentVolumeClaim:
+            claimName: mimir-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mimir-service
+  namespace: monitoring
+spec:
+  type: ClusterIP
+  selector:
+    app: mimir
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: mimir
