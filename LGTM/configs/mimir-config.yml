@@ -14,7 +14,7 @@ data:
     multitenancy_enabled: false
 
     activity_tracker:
-      filepath: /active-query-tracker/activity.log  # ✅ FROM HELM CHART
+      filepath: /data/active-query-tracker/activity.log
 
     ingester:
       ring:
@@ -49,7 +49,7 @@ data:
         region: us-west-2
 
     compactor:
-      data_dir: /data
+      data_dir: /data/compactor
 
     limits:
       compactor_blocks_retention_period: 90d
