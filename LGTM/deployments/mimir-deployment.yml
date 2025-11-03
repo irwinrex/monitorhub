@@ -16,7 +16,12 @@ spec:
       nodeSelector:
         kubernetes.io/arch: arm64
       securityContext:
-        fsGroup: 1000
+        fsGroup: 10001
+        runAsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: mimir
           image: grafana/mimir:3.0.0
@@ -29,15 +34,9 @@ spec:
             - name: config
               mountPath: /etc/mimir
             - name: data
-              mountPath: /data/mimir/tsdb
-              subPath: tsdb
-            - name: data
-              mountPath: /data/mimir/compactor
-              subPath: compactor
-            - name: data
-              mountPath: /work
-              subPath: work
-          workingDir: /work
+              mountPath: /data
+            - name: active-query-tracker
+              mountPath: /active-query-tracker
           resources:
             requests:
               memory: "384Mi"
@@ -46,9 +45,10 @@ spec:
               memory: "768Mi"
               cpu: "600m"
           securityContext:
-            runAsNonRoot: true
-            runAsUser: 10001
+            allowPrivilegeEscalation: false
             readOnlyRootFilesystem: false
+            capabilities:
+              drop: [ALL]
           readinessProbe:
             httpGet:
               path: /ready
@@ -68,6 +68,8 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: mimir-pvc
+        - name: active-query-tracker
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
