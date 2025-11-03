@@ -23,39 +23,39 @@ spec:
           ports:
             - containerPort: 8080
               name: mimir
-          resources:
-            requests:
-              memory: "256Mi"
-              cpu: "250m"
-            limits:
-              memory: "512Mi"
-              cpu: "500m"
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1000
-            readOnlyRootFilesystem: true
           volumeMounts:
             - name: config
               mountPath: /etc/mimir
-            - name: wal
-              mountPath: /var/mimir/wal
+            - name: data
+              mountPath: /var/mimir
+          resources:
+            requests:
+              memory: "384Mi"
+              cpu: "300m"
+            limits:
+              memory: "768Mi"
+              cpu: "600m"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001 # grafana user in image
+            readOnlyRootFilesystem: false # needs write to /var/mimir
           readinessProbe:
             httpGet:
               path: /ready
-              port: 8080
+              port: mimir
             initialDelaySeconds: 30
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /metrics
-              port: 8080
+              path: /ready
+              port: mimir
             initialDelaySeconds: 60
             periodSeconds: 30
       volumes:
         - name: config
           configMap:
             name: mimir-config
-        - name: wal
+        - name: data
           persistentVolumeClaim:
             claimName: mimir-pvc
 ---
@@ -70,5 +70,5 @@ spec:
     app: mimir
   ports:
     - port: 8080
-      targetPort: 8080
+      targetPort: mimir
       name: mimir
