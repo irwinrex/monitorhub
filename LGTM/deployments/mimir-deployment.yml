@@ -33,10 +33,10 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /etc/mimir
-              readOnly: true # Config should be read-only
+              readOnly: true
             - name: data
               mountPath: /data
-              readOnly: false # Explicitly allow writing
+              readOnly: false
           resources:
             requests:
               memory: "384Mi"
@@ -46,10 +46,9 @@ spec:
               cpu: "600m"
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: false # This allows writing to root filesystem
+            readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
-            # Add these for better file permissions:
             runAsUser: 10001
             runAsGroup: 10001
           readinessProbe:
