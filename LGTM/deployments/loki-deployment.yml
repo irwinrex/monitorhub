@@ -54,4 +54,5 @@ spec:
     app: loki
   ports:
     - port: 3100
-      targetPort: loki
+      targetPort: 3100
+      name: loki
