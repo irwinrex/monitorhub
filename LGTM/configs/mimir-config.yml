@@ -14,7 +14,7 @@ data:
     multitenancy_enabled: false
 
     activity_tracker:
-      filepath: /data/active-query-tracker/activity.log
+      filepath: ""
 
     ingester:
       ring:
