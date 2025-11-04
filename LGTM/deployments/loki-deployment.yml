@@ -13,6 +13,20 @@ spec:
       labels:
         app: loki
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      initContainers:
+        - name: fix-perms
+          image: busybox
+          command: ["sh", "-c", "chown -R 10001:10001 /data/loki"]
+          securityContext:
+            runAsUser: 0
+            runAsNonRoot: false
+          volumeMounts:
+            - name: wal
+              mountPath: /data/loki
       nodeSelector:
         kubernetes.io/arch: arm64
       containers:
