@@ -11,21 +11,24 @@ data:
       grpc_listen_port: 9095
     common:
       path_prefix: /data/loki
-      storage:
-        s3:
-          s3: s3://us-west-2/ebs-monitoring-data/data/loki
-          region: us-west-2
-          s3forcepathstyle: true
       replication_factor: 1
       ring:
         instance_addr: 0.0.0.0
         kvstore:
           store: memberlist
+    storage_config:
+      aws:
+        s3: s3://us-west-2/ebs-monitoring-data/data/loki
+        region: us-west-2
+        s3forcepathstyle: true
+      tsdb_shipper:
+        active_index_directory: /data/loki/tsdb-shipper-active
+        cache_location: /data/loki/tsdb-shipper-cache
     schema_config:
       configs:
         - from: 2025-01-01
           store: tsdb
-          object_store: s3
+          object_store: aws
           schema: v13
           index:
             prefix: index_
@@ -34,6 +37,10 @@ data:
       working_directory: /data/loki/compactor
       retention_enabled: true
       retention_delete_delay: 2h
+      delete_request_store: aws
+      compactor_ring:
+        kvstore:
+          store: memberlist
     limits_config:
       retention_period: 2160h
       max_query_lookback: 2160h
@@ -70,6 +77,7 @@ data:
             max_size_mb: 2048
       parallelise_shardable_queries: true
     ruler_storage:
+      backend: local
       local:
         directory: /data/loki/rules
     ruler:
