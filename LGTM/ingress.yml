@@ -1,0 +1,42 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: monitoring-ingress
+  namespace: monitoring
+  annotations:
+    kubernetes.io/ingress.class: haproxy
+    haproxy.org/ssl-redirect: "false"
+    haproxy.org/rewrite-target: /$2
+spec:
+  ingressClassName: haproxy
+  rules:
+    - http:
+        paths:
+          - path: /grafana(/|$)(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana-service
+                port:
+                  name: grafana
+          - path: /loki(/|$)(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: loki-service
+                port:
+                  name: loki
+          - path: /tempo(/|$)(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: tempo-service
+                port:
+                  name: tempo
+          - path: /mimir(/|$)(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: mimir-service
+                port:
+                  name: mimir
