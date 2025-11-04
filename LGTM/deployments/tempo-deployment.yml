@@ -87,9 +87,9 @@ spec:
   selector:
     app: tempo
   ports:
-    - name: http
+    - name: tempo
       port: 3200
-      targetPort: http
+      targetPort: tempo
     - name: otlp-grpc
       port: 4317
       targetPort: otlp-grpc
