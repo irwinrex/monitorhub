@@ -6,9 +6,11 @@ metadata:
 data:
   loki.yaml: |
     auth_enabled: false
+
     server:
       http_listen_port: 3100
       grpc_listen_port: 9095
+
     common:
       path_prefix: /data/loki
       replication_factor: 1
@@ -16,34 +18,36 @@ data:
         instance_addr: 0.0.0.0
         kvstore:
           store: memberlist
-    storage_config:
-      aws:
-        s3: s3://us-west-2/ebs-monitoring-data/data/loki  # This line might be redundant; the block below is the standard method.
-        s3forcepathstyle: true
-        region: us-west-2
-      boltdb_shipper:
-        active_index_directory: /data/loki/boltdb-index
-        cache_location: /data/loki/boltdb-cache
-        shared_store: s3
-      tsdb_shipper:
-        active_index_directory: /data/loki/tsdb-index
-        cache_location: /data/loki/tsdb-cache
-        shared_store: s3
+
     schema_config:
       configs:
         - from: 2025-01-01
           store: tsdb
-          object_store: s3  # Changed from 'aws' to 's3' to match the storage_config
+          object_store: s3
           schema: v13
           index:
             prefix: index_
             period: 24h
+
+    storage_config:
+      aws:
+        region: us-west-2
+        bucketnames: ebs-monitoring-data
+        s3forcepathstyle: true
+        # Use environment variables for credentials
+        # access_key_id: ${S3_ACCESS_KEY}
+        # secret_access_key: ${S3_SECRET_KEY}
+        
+      tsdb_shipper:
+        active_index_directory: /data/loki/tsdb-index
+        cache_location: /data/loki/tsdb-cache
+
     compactor:
       working_directory: /data/loki/compactor
       retention_enabled: true
       retention_delete_delay: 2h
-      delete_request_store: s3  # Changed from 'aws' to 's3'
-      shared_store: s3  # Added to specify the backing store for the compactor
+      delete_request_store: s3
+
     limits_config:
       retention_period: 2160h
       max_query_lookback: 2160h
@@ -52,6 +56,8 @@ data:
       max_entries_limit_per_query: 5000
       reject_old_samples: true
       reject_old_samples_max_age: 168h
+      split_queries_by_interval: 24h
+
     ingester:
       wal:
         enabled: true
@@ -66,26 +72,11 @@ data:
       max_chunk_age: 1h
       chunk_target_size: 1536000
       chunk_retain_period: 30s
+
     querier:
       query_ingesters_within: 3h
       max_concurrent: 8
+
     frontend:
       log_queries_longer_than: 5s
-      split_queries_by_interval: 24h
-    query_range:
-      results_cache:
-        cache:
-          embedded_cache:
-            enabled: true
-            max_size_mb: 2048
-      parallelise_shardable_queries: true
-    ruler_storage:
-      type: local  # Added 'type' key for ruler_storage
-      local:
-        directory: /data/loki/rules  # Moved 'directory' under 'local'
-    ruler:
-      rule_path: /data/loki/rules-temp
-      ring:
-        kvstore:
-          store: memberlist
-      enable_api: true
+      max_cache_freshness_per_query: 10m
