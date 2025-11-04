@@ -1,0 +1,13 @@
+controller:
+  ingressClassResource:
+    enabled: true # creates an IngressClass object
+  service:
+    type: LoadBalancer # or NodePort depending on your setup
+    # Optionally set nodePorts explicitly for HTTP/HTTPS if type=NodePort
+    nodePorts:
+      http: 30080
+      https: 30443
+# Optionally specify ports the controller listens on
+config:
+  httpBindPort: 80 # default HTTP port inside controller
+  httpsBindPort: 443 # default HTTPS port inside controller
