@@ -18,17 +18,22 @@ data:
           store: memberlist
     storage_config:
       aws:
-        s3: s3://us-west-2/ebs-monitoring-data/data/loki
-        region: us-west-2
+        s3: s3://us-west-2/ebs-monitoring-data/data/loki  # This line might be redundant; the block below is the standard method.
         s3forcepathstyle: true
+        region: us-west-2
+      boltdb_shipper:
+        active_index_directory: /data/loki/boltdb-index
+        cache_location: /data/loki/boltdb-cache
+        shared_store: s3
       tsdb_shipper:
-        active_index_directory: /data/loki/tsdb-shipper-active
-        cache_location: /data/loki/tsdb-shipper-cache
+        active_index_directory: /data/loki/tsdb-index
+        cache_location: /data/loki/tsdb-cache
+        shared_store: s3
     schema_config:
       configs:
         - from: 2025-01-01
           store: tsdb
-          object_store: aws
+          object_store: s3  # Changed from 'aws' to 's3' to match the storage_config
           schema: v13
           index:
             prefix: index_
@@ -37,10 +42,8 @@ data:
       working_directory: /data/loki/compactor
       retention_enabled: true
       retention_delete_delay: 2h
-      delete_request_store: aws
-      compactor_ring:
-        kvstore:
-          store: memberlist
+      delete_request_store: s3  # Changed from 'aws' to 's3'
+      shared_store: s3  # Added to specify the backing store for the compactor
     limits_config:
       retention_period: 2160h
       max_query_lookback: 2160h
@@ -77,9 +80,9 @@ data:
             max_size_mb: 2048
       parallelise_shardable_queries: true
     ruler_storage:
-      backend: local
+      type: local  # Added 'type' key for ruler_storage
       local:
-        directory: /data/loki/rules
+        directory: /data/loki/rules  # Moved 'directory' under 'local'
     ruler:
       rule_path: /data/loki/rules-temp
       ring:
