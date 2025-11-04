@@ -25,7 +25,7 @@ spec:
             runAsUser: 0
             runAsNonRoot: false
           volumeMounts:
-            - name: loki
+            - name: volume
               mountPath: /data/loki
       nodeSelector:
         kubernetes.io/arch: arm64
@@ -56,7 +56,7 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /etc/loki
-            - name: loki
+            - name: volume
               mountPath: /data/loki
           resources:
             requests:
@@ -69,7 +69,7 @@ spec:
         - name: config
           configMap:
             name: loki-config
-        - name: loki
+        - name: volume
           persistentVolumeClaim:
             claimName: loki-pvc
 ---

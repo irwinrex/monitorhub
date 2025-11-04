@@ -34,10 +34,6 @@ data:
         region: us-west-2
         bucketnames: ebs-monitoring-data
         s3forcepathstyle: true
-        # Use environment variables for credentials
-        # access_key_id: ${S3_ACCESS_KEY}
-        # secret_access_key: ${S3_SECRET_KEY}
-        
       tsdb_shipper:
         active_index_directory: /data/loki/tsdb-index
         cache_location: /data/loki/tsdb-cache
