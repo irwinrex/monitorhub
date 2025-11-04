@@ -13,6 +13,20 @@ spec:
       labels:
         app: grafana
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      initContainers:
+        - name: fix-perms
+          image: busybox
+          command: ["sh", "-c", "chown -R 10001:10001 /data/loki"]
+          securityContext:
+            runAsUser: 0
+            runAsNonRoot: false
+          volumeMounts:
+            - name: volume
+              mountPath: /var/lib/grafana
       nodeSelector:
         kubernetes.io/arch: arm64
       containers:
@@ -29,7 +43,7 @@ spec:
           volumeMounts:
             - name: provisioning
               mountPath: /etc/grafana/provisioning/datasources
-            - name: temp
+            - name: volume
               mountPath: /var/lib/grafana
           resources:
             requests:
@@ -42,9 +56,9 @@ spec:
         - name: provisioning
           configMap:
             name: grafana-datasources
-        - name: temp
+        - name: volume
           persistentVolumeClaim:
-            claimName: grafana-temp-pvc
+            claimName: grafana-pvc
 ---
 apiVersion: v1
 kind: Service
@@ -57,6 +71,6 @@ spec:
     app: grafana
   ports:
     - port: 3000
-      targetPort: 3000
+      targetPort: grafana
       protocol: TCP
       name: grafana
