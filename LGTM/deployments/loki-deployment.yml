@@ -37,6 +37,22 @@ spec:
           ports:
             - containerPort: 3100
               name: loki
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: 3100
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3100
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
           volumeMounts:
             - name: config
               mountPath: /etc/loki
@@ -68,5 +84,5 @@ spec:
     app: loki
   ports:
     - port: 3100
-      targetPort: 3100
+      targetPort: loki
       name: loki
