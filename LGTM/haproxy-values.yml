@@ -10,13 +10,11 @@ controller:
       service.beta.kubernetes.io/aws-load-balancer-scheme: "internal"
 
     ports:
-      http:
-        port: 80
-        targetPort: 80
+      http: 80
+      # Remove https if not needed, or use:
+      # https: 443
 
-  extraArgs:
-    - --http-bind-port=80
-
+# Basic resources
 resources:
   requests:
     cpu: 100m
@@ -25,9 +23,4 @@ resources:
     cpu: 256m
     memory: 256Mi
 
-# Single replica is fine for most cases
 replicaCount: 1
-
-# Disable metrics if not needed
-metrics:
-  enabled: false
