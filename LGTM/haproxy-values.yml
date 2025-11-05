@@ -5,7 +5,7 @@ controller:
     name: haproxy
 
   service:
-    type: NodePort
+    type: LoadBalancer
 
     ports:
       http: 80
