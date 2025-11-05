@@ -5,10 +5,7 @@ controller:
     name: haproxy
 
   service:
-    type: LoadBalancer
-    annotations:
-      service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
-    # externalTrafficPolicy: Local
+    type: NodePort
 
     ports:
       http: 80
