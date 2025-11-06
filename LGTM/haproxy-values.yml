@@ -1,28 +1,28 @@
+# FILE: haproxy-values.yml
+
 controller:
+  # This explicitly creates an IngressClass resource named 'haproxy'.
+  # Any Ingress manifest you create must now include `ingressClassName: haproxy`
+  # in its spec. This is excellent practice.
   ingressClassResource:
     enabled: true
     name: haproxy
+    default: true
 
+  # This tells the controller pods to only handle Ingresses of this class.
   ingressClass: haproxy
 
+  # Deploy as a DaemonSet to run on the node.
+  kind: DaemonSet
+
+  # The critical setting for binding to the EC2 instance's IP address.
+  hostNetwork: true
+
+  # We are not using a cloud load balancer, so disable the service.
   service:
-    type: LoadBalancer
-    externalTrafficPolicy: Local
+    enabled: false
 
-    annotations:
-      alb.ingress.kubernetes.io/scheme: internet‑facing
-      alb.ingress.kubernetes.io/listen‑ports: '[{"HTTP":80},{"HTTPS":443}]'
-      alb.ingress.kubernetes.io/certificate‑arn: "${CERT_ARN}"
-      alb.ingress.kubernetes.io/target‑type: ip
-      alb.ingress.kubernetes.io/ssl‑redirect: "443"
-
-    httpPorts:
-      - port: 80
-        targetPort: 80
-    httpsPorts:
-      - port: 443
-        targetPort: 443
-
+  # Your resource requests and limits for production stability.
   resources:
     limits:
       cpu: "256m"
@@ -30,5 +30,3 @@ controller:
     requests:
       cpu: "128m"
       memory: "128Mi"
-
-  replicaCount: 2
