@@ -1,28 +1,26 @@
-# FILE: haproxy-values.yml
-
 controller:
-  # This explicitly creates an IngressClass resource named 'haproxy'.
-  # Any Ingress manifest you create must now include `ingressClassName: haproxy`
-  # in its spec. This is excellent practice.
   ingressClassResource:
     enabled: true
     name: haproxy
     default: true
 
-  # This tells the controller pods to only handle Ingresses of this class.
   ingressClass: haproxy
 
-  # Deploy as a DaemonSet to run on the node.
-  kind: DaemonSet
+  kind: Deployment # Use Deployment for replicas.
+  replicaCount: 2 # Set to 2 for HA.
+  hostNetwork: false # Disable hostNetwork for NodePort service.
 
-  # The critical setting for binding to the EC2 instance's IP address.
-  hostNetwork: true
-
-  # We are not using a cloud load balancer, so disable the service.
   service:
-    enabled: false
+    enabled: true
+    type: NodePort
+    nodePorts:
+      http: 30080 # Assign specific NodePort for HTTP (edit as needed).
+      https: 30443 # Assign specific NodePort for HTTPS (optional).
+      stat: 31024 # Stats page NodePort (optional).
+    ports:
+      http: 80
+      https: 443
 
-  # Your resource requests and limits for production stability.
   resources:
     limits:
       cpu: "256m"
