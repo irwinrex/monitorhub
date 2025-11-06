@@ -6,7 +6,9 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: haproxy
     haproxy.org/ssl-redirect: "false"
-    haproxy.org/rewrite-target: /$2
+    haproxy.org/path-rewrite: |
+      /loki/(.*) /\1
+      /tempo/(.*) /\1
 spec:
   ingressClassName: haproxy
   rules:
