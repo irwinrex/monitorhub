@@ -6,7 +6,7 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: haproxy
     haproxy.org/ssl-redirect: "false"
-    haproxy.org/rewrite-target: /
+    haproxy.org/rewrite-target: /$2
 spec:
   ingressClassName: haproxy
   rules:
@@ -19,6 +19,8 @@ spec:
                 name: grafana-service
                 port:
                   name: grafana
+
+          # Loki needs rewrite to strip /loki prefix
           - path: /loki(/|$)(.*)
             pathType: Prefix
             backend:
@@ -26,13 +28,17 @@ spec:
                 name: loki-service
                 port:
                   name: loki
-          - path: /tempo
+
+          # Tempo also needs rewrite if you want /tempo/api/traces etc.
+          - path: /tempo(/|$)(.*)
             pathType: Prefix
             backend:
               service:
                 name: tempo-service
                 port:
                   name: tempo
+
+          # Mimir supports path prefixes — no rewrite needed
           - path: /mimir
             pathType: Prefix
             backend:
