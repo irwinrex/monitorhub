@@ -10,7 +10,6 @@ data:
     server:
       http_listen_port: 3100
       grpc_listen_port: 9095
-      http_prefix: /loki
 
     common:
       path_prefix: /data/loki
