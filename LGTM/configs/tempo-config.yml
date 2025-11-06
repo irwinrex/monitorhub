@@ -32,9 +32,6 @@ data:
         block_retention: 2160h
         compacted_block_retention: 1h
 
-    metrics_generator:
-      enabled: false  # Explicitly disable to suppress warning
-
     storage:
       trace:
         backend: s3
@@ -51,10 +48,9 @@ data:
       max_concurrent_queries: 20
 
     query_frontend:
-      max_cache_freshness_per_tenant: 1m
       search:
         max_duration: 2160h
 
     memberlist:
-      node_name: tempo-single
-      randomize_node_name: false
+      node_name: tempo-node
+      randomize_node_name: true
