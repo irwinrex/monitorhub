@@ -5,6 +5,10 @@ metadata:
   namespace: monitoring
 data:
   tempo.yaml: |
+
+    http_api_prefix: /tempo
+    multitenancy_enabled: true
+
     server:
       http_listen_port: 3200
       http_api_prefix: /tempo
