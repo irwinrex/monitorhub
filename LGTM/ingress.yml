@@ -6,34 +6,35 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: haproxy
     haproxy.org/ssl-redirect: "false"
-    haproxy.org/rewrite-target: /$2
+    # Remove or adjust rewrite-target as needed, e.g.:
+    haproxy.org/rewrite-target: /
 spec:
   ingressClassName: haproxy
   rules:
     - http:
         paths:
-          - path: /grafana(/|$)(.*)
+          - path: /grafana
             pathType: Prefix
             backend:
               service:
                 name: grafana-service
                 port:
                   name: grafana
-          - path: /loki(/|$)(.*)
+          - path: /loki
             pathType: Prefix
             backend:
               service:
                 name: loki-service
                 port:
                   name: loki
-          - path: /tempo(/|$)(.*)
+          - path: /tempo
             pathType: Prefix
             backend:
               service:
                 name: tempo-service
                 port:
                   name: tempo
-          - path: /mimir(/|$)(.*)
+          - path: /mimir
             pathType: Prefix
             backend:
               service:
