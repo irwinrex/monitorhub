@@ -20,7 +20,7 @@ spec:
                 name: grafana-service
                 port:
                   name: grafana
-          - path: /loki
+          - path: /loki(/|$)(.*)
             pathType: Prefix
             backend:
               service:
