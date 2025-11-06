@@ -6,7 +6,6 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: haproxy
     haproxy.org/ssl-redirect: "false"
-    # Remove or adjust rewrite-target as needed, e.g.:
     haproxy.org/rewrite-target: /
 spec:
   ingressClassName: haproxy
