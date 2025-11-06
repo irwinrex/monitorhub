@@ -7,6 +7,7 @@ data:
   tempo.yaml: |
     server:
       http_listen_port: 3200
+      http_api_prefix: /tempo
 
     distributor:
       receivers:

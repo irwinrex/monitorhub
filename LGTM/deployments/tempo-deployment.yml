@@ -57,13 +57,13 @@ spec:
               cpu: "500m"
           readinessProbe:
             httpGet:
-              path: /ready
+              path: /tempo/ready
               port: tempo
             initialDelaySeconds: 30
             periodSeconds: 15
           livenessProbe:
             httpGet:
-              path: /metrics
+              path: /tempo/metrics
               port: tempo
             initialDelaySeconds: 60
             periodSeconds: 30
