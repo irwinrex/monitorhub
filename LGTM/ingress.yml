@@ -20,25 +20,22 @@ spec:
                 port:
                   name: grafana
 
-          # Loki needs rewrite to strip /loki prefix
           - path: /loki(/|$)(.*)
-            pathType: Prefix
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: loki-service
                 port:
                   name: loki
 
-          # Tempo also needs rewrite if you want /tempo/api/traces etc.
           - path: /tempo(/|$)(.*)
-            pathType: Prefix
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: tempo-service
                 port:
                   name: tempo
 
-          # Mimir supports path prefixes — no rewrite needed
           - path: /mimir
             pathType: Prefix
             backend:
