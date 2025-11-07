@@ -6,8 +6,8 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: haproxy
     haproxy.org/ssl-redirect: "false"
-    haproxy.org/auth-type: "basic-auth"
-    haproxy.org/auth-secret: "tempo-auth"
+    # haproxy.org/auth-type: "basic-auth"
+    # haproxy.org/auth-secret: "tempo-auth"
 spec:
   ingressClassName: haproxy
   rules:
