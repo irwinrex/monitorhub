@@ -6,10 +6,9 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: haproxy
     haproxy.org/ssl-redirect: "false"
-    # haproxy.org/rewrite-target: /
-    haproxy.org/rewrite-target: /$2
-    # haproxy.org/auth-type: "basic-auth"
+    # haproxy.org/auth-type: "basic"
     # haproxy.org/auth-secret: "tempo-auth"
+    haproxy.org/path-rewrite: "/ready=/tempo/ready"
 spec:
   ingressClassName: haproxy
   rules:
@@ -31,8 +30,8 @@ spec:
                 port:
                   name: loki
 
-          - path: /tempo(/|$)(.*)
-            pathType: ImplementationSpecific
+          - path: /tempo
+            pathType: Prefix
             backend:
               service:
                 name: tempo-service
