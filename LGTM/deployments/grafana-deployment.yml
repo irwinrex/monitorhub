@@ -37,6 +37,16 @@ spec:
               value: "%(protocol)s://%(domain)s:%(http_port)s/grafana"
             - name: GF_SERVER_SERVE_FROM_SUB_PATH
               value: "true"
+            - name: GF_SECURITY_ADMIN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-cred
+                  key: admin-user
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-cred
+                  key: admin-password
           ports:
             - containerPort: 3000
               name: grafana

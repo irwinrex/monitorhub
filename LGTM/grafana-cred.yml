@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-cred
+  namespace: monitoring
+type: Opaque
+stringData:
+  admin-user: admin
+  admin-password: strong_password_here
