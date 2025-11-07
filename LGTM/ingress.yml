@@ -30,7 +30,7 @@ spec:
                 port:
                   name: loki
 
-          - path: /tempo
+          - path: /
             pathType: Prefix
             backend:
               service:
