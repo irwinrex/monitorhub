@@ -30,7 +30,7 @@ spec:
                 port:
                   name: loki
 
-          - path: /temp(/|$)(.*)
+          - path: /tempo(/|$)(.*)
             pathType: ImplementationSpecific
             backend:
               service:
