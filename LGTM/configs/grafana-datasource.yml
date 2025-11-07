@@ -10,12 +10,12 @@ data:
       - name: Mimir
         type: prometheus
         access: proxy
-        url: http://mimir-service.monitoring.svc.cluster.local:8080/prometheus
+        url: http://mimir-service.monitoring.svc.cluster.local:8080
         isDefault: true
       - name: Loki
         type: loki
         access: proxy
-        url: http://loki-service.monitoring.svc.cluster.local:3100/loki
+        url: http://loki-service.monitoring.svc.cluster.local:3100
       - name: Tempo
         type: tempo
         access: proxy
