@@ -6,17 +6,17 @@ controller:
 
   ingressClass: haproxy
 
-  kind: Deployment # Use Deployment for replicas.
-  replicaCount: 2 # Set to 2 for HA.
-  hostNetwork: false # Disable hostNetwork for NodePort service.
+  kind: Deployment
+  replicaCount: 2
+  hostNetwork: false
 
   service:
     enabled: true
     type: NodePort
     nodePorts:
-      http: 30080 # Assign specific NodePort for HTTP (edit as needed).
-      https: 30443 # Assign specific NodePort for HTTPS (optional).
-      stat: 31024 # Stats page NodePort (optional).
+      http: 30080
+      https: 30443
+      stat: 31024
     ports:
       http: 80
       https: 443
@@ -30,5 +30,4 @@ controller:
       memory: "128Mi"
 
   extraArgs:
-    # Allow regex-style paths in ImplementationSpecific mode
-    implementation-prefix: "true"
+    - "--implementation-prefix=true"
