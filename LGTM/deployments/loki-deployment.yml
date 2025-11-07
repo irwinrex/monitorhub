@@ -58,6 +58,8 @@ spec:
               mountPath: /etc/loki
             - name: volume
               mountPath: /data/loki
+            - name: secret
+              mountPath: /etc/loki/auth
           resources:
             requests:
               memory: "512Mi"
@@ -72,6 +74,9 @@ spec:
         - name: volume
           persistentVolumeClaim:
             claimName: loki-pvc
+        - name: secret
+          secret:
+            secretName: loki-auth
 ---
 apiVersion: v1
 kind: Service

@@ -5,7 +5,11 @@ metadata:
   namespace: monitoring
 data:
   loki.yaml: |
-    auth_enabled: false
+    auth_enabled: true
+    auth_config:
+      basic_auth:
+        enabled: true
+        users_file: /etc/loki/auth
 
     server:
       http_listen_port: 3100
