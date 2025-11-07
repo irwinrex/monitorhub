@@ -28,3 +28,7 @@ controller:
     requests:
       cpu: "128m"
       memory: "128Mi"
+
+  extraArgs:
+    # Allow regex-style paths in ImplementationSpecific mode
+    implementation-prefix: "true"
