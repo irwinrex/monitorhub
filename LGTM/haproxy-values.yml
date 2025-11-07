@@ -6,22 +6,20 @@ controller:
 
   ingressClass: haproxy
 
-  kind: Deployment # Use Deployment for HA
-  replicaCount: 2 # 2 replicas for HA
-  hostNetwork: false # Keep pods in cluster network
+  kind: Deployment # Use Deployment for replicas.
+  replicaCount: 2 # Set to 2 for HA.
+  hostNetwork: false # Disable hostNetwork for NodePort service.
 
   service:
     enabled: true
-    type: LoadBalancer # Let ALB automatically provision external IP
+    type: NodePort
+    nodePorts:
+      http: 30080 # Assign specific NodePort for HTTP (edit as needed).
+      https: 30443 # Assign specific NodePort for HTTPS (optional).
+      stat: 31024 # Stats page NodePort (optional).
     ports:
       http: 80
       https: 443
-    annotations:
-      service.beta.kubernetes.io/aws-load-balancer-type: "alb" # ALB integration
-      service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
-      service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "http"
-      service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout: "60"
-      service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "https"
 
   resources:
     limits:
@@ -30,17 +28,3 @@ controller:
     requests:
       cpu: "128m"
       memory: "128Mi"
-
-  # Optional: pod anti-affinity to spread HAProxy pods across nodes
-  affinity:
-    podAntiAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        - labelSelector:
-            matchLabels:
-              app.kubernetes.io/name: haproxy
-          topologyKey: "kubernetes.io/hostname"
-
-  # Optional: metrics/stats port
-  stats:
-    enabled: true
-    port: 31024

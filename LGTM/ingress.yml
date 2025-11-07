@@ -4,44 +4,43 @@ metadata:
   name: monitoring-ingress
   namespace: monitoring
   annotations:
-    kubernetes.io/ingress.class: alb
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
-    alb.ingress.kubernetes.io/target-type: instance
-    alb.ingress.kubernetes.io/healthcheck-path: /ready
+    kubernetes.io/ingress.class: haproxy
+    haproxy.org/ssl-redirect: "false"
+    haproxy.org/auth-type: "basic"
+    haproxy.org/auth-secret: "tempo-auth"
 spec:
-  ingressClassName: alb
+  ingressClassName: haproxy
   rules:
     - http:
         paths:
-          - path: /grafana/*
+          - path: /grafana
             pathType: Prefix
             backend:
               service:
                 name: grafana-service
                 port:
-                  number: 3000
+                  name: grafana
 
-          - path: /loki/*
+          - path: /loki
             pathType: Prefix
             backend:
               service:
                 name: loki-service
                 port:
-                  number: 3100
+                  name: loki
 
-          - path: /tempo/*
+          - path: /tempo
             pathType: Prefix
             backend:
               service:
                 name: tempo-service
                 port:
-                  number: 3200
+                  name: tempo
 
-          - path: /mimir/*
+          - path: /mimir
             pathType: Prefix
             backend:
               service:
                 name: mimir-service
                 port:
-                  number: 8080
+                  name: mimir
