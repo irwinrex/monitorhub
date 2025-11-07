@@ -5,7 +5,7 @@ metadata:
   namespace: monitoring
 data:
   tempo.yaml: |
-    http_api_prefix: /traces
+    http_api_prefix: /slack
     multitenancy_enabled: false
 
     server:
