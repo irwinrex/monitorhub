@@ -34,7 +34,6 @@ spec:
           image: grafana/tempo:2.9.0
           args:
             - "-config.file=/etc/tempo/tempo.yaml"
-            - "--http-api-prefix=/slack"
           ports:
             - name: tempo
               containerPort: 3200
