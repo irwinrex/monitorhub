@@ -3,6 +3,7 @@ kind: ServiceAccount
 metadata:
   name: grafana-alloy
   namespace: monitoring
+
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -12,6 +13,13 @@ rules:
   - apiGroups: [""]
     resources: ["pods", "nodes", "namespaces"]
     verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch"]
+
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -25,6 +33,7 @@ subjects:
   - kind: ServiceAccount
     name: grafana-alloy
     namespace: monitoring
+
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -46,14 +55,61 @@ spec:
         - name: alloy
           image: grafana/alloy:v1.11.0
           args:
-            - "--config.file=/etc/alloy/config.alloy"
+            - run
+            - /etc/alloy/config.alloy
+            - --server.http.listen-addr=0.0.0.0:12345
+            - --storage.path=/var/lib/alloy/data
+          ports:
+            - name: http
+              containerPort: 12345
+            - name: otlp-grpc
+              containerPort: 4317
+            - name: otlp-http
+              containerPort: 4318
           envFrom:
             - secretRef:
                 name: alloy-auth
           volumeMounts:
             - name: config
               mountPath: /etc/alloy
+            - name: alloy-data
+              mountPath: /var/lib/alloy/data
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: 12345
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: 12345
+            initialDelaySeconds: 10
+            periodSeconds: 5
       volumes:
         - name: config
           configMap:
             name: alloy-config
+        - name: alloy-data
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alloy-service
+  namespace: monitoring
+spec:
+  selector:
+    app: alloy
+  ports:
+    - name: http
+      port: 12345
+      targetPort: 12345
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318
+  type: ClusterIP
