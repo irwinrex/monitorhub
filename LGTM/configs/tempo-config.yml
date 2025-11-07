@@ -5,7 +5,7 @@ metadata:
   namespace: monitoring
 data:
   tempo.yaml: |
-    http_api_prefix: /tempo
+    http_api_prefix: /traces
     multitenancy_enabled: false
 
     server:
