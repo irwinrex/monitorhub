@@ -10,7 +10,6 @@ data:
       format = "logfmt"
     }
 
-    # ---------- Service Discovery ----------
     discovery.kubernetes "pods" {
       role = "pod"
     }
@@ -19,16 +18,11 @@ data:
       role = "node"
     }
 
-    # ============================================
-    # METRICS PIPELINE
-    # ============================================
-
     prometheus.scrape "default" {
       targets = discovery.kubernetes.pods.targets
       forward_to = [otelcol.processor.batch.default.input]
     }
 
-    # Batch processor for metrics
     otelcol.processor.batch "default" {
       send_batch_size = 2000
       send_batch_max_size = 3000
@@ -51,10 +45,6 @@ data:
       }
     }
 
-    # ============================================
-    # LOGS PIPELINE
-    # ============================================
-
     loki.source.kubernetes "pods" {
       targets = discovery.kubernetes.pods.targets
       forward_to = [otelcol.processor.batch.default.input]
@@ -69,10 +59,6 @@ data:
         }
       }
     }
-
-    # ============================================
-    # TRACES PIPELINE (OTLP Receiver)
-    # ============================================
 
     otelcol.receiver.otlp "default" {
       grpc {
