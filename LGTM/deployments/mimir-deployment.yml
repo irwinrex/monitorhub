@@ -37,7 +37,6 @@ spec:
             limits:
               memory: "768Mi"
               cpu: "600m"
-          # Container-level securityContext is removed to allow running as root
           readinessProbe:
             httpGet:
               path: /ready
