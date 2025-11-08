@@ -11,7 +11,7 @@ spec:
   rules:
     - http:
         paths:
-          - path: /observability
+          - path: /
             pathType: Prefix
             backend:
               service:
@@ -19,7 +19,7 @@ spec:
                 port:
                   name: otlp-http
 
-          - path: /
+          - path: /grafana
             pathType: Prefix
             backend:
               service:
