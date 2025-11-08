@@ -20,19 +20,7 @@ data:
 
     prometheus.scrape "default" {
       targets = discovery.kubernetes.pods.targets
-      forward_to = [otelcol.processor.batch.default.input]
-    }
-
-    otelcol.processor.batch "default" {
-      send_batch_size = 2000
-      send_batch_max_size = 3000
-      timeout = "10s"
-      
-      output {
-        metrics = [prometheus.remote_write.mimir.receiver]
-        logs    = [loki.write.loki.receiver]
-        traces  = [otelcol.exporter.otlp.tempo.input]
-      }
+      forward_to = [prometheus.remote_write.mimir.receiver]
     }
 
     prometheus.remote_write "mimir" {
@@ -47,7 +35,7 @@ data:
 
     loki.source.kubernetes "pods" {
       targets = discovery.kubernetes.pods.targets
-      forward_to = [otelcol.processor.batch.default.input]
+      forward_to = [loki.write.loki.receiver]
     }
 
     loki.write "loki" {
@@ -69,8 +57,39 @@ data:
       }
 
       output {
-        traces = [otelcol.processor.batch.default.input]
+        metrics = [otelcol.processor.batch.default.input]
+        logs    = [otelcol.processor.batch.default.input]
+        traces  = [otelcol.processor.batch.default.input]
       }
+    }
+
+    otelcol.processor.batch "default" {
+      send_batch_size = 2000
+      send_batch_max_size = 3000
+      timeout = "10s"
+      
+      output {
+        metrics = [otelcol.exporter.otlphttp.mimir.input]
+        logs    = [otelcol.exporter.loki.default.input]
+        traces  = [otelcol.exporter.otlp.tempo.input]
+      }
+    }
+
+    otelcol.exporter.otlphttp "mimir" {
+      client {
+        endpoint = "http://mimir-service.monitoring.svc.cluster.local:8080"
+        headers = {"Authorization" = "Bearer token"}
+        auth = otelcol.auth.basic.mimir.handler
+      }
+    }
+
+    otelcol.auth.basic "mimir" {
+      username = env("MIMIR_USERNAME")
+      password = env("MIMIR_PASSWORD")
+    }
+
+    otelcol.exporter.loki "default" {
+      forward_to = [loki.write.loki.receiver]
     }
 
     otelcol.exporter.otlp "tempo" {
@@ -78,12 +97,6 @@ data:
         endpoint = "http://tempo-service.monitoring.svc.cluster.local:4317"
         tls {
           insecure = true
-        }
-        auth {
-          basic {
-            username = env("TEMPO_USERNAME")
-            password = env("TEMPO_PASSWORD")
-          }
         }
       }
     }
