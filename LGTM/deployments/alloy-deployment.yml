@@ -69,6 +69,13 @@ spec:
           envFrom:
             - secretRef:
                 name: alloy-auth
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
           volumeMounts:
             - name: config
               mountPath: /etc/alloy
