@@ -106,10 +106,13 @@ spec:
     - name: http
       port: 12345
       targetPort: 12345
+      nodePort: 30345
     - name: otlp-grpc
       port: 4317
       targetPort: 4317
+      nodePort: 30317
     - name: otlp-http
       port: 4318
       targetPort: 4318
-  type: ClusterIP
+      nodePort: 30318
+  type: NodePort
