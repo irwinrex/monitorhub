@@ -59,7 +59,6 @@ spec:
             - /etc/alloy/config.alloy
             - --server.http.listen-addr=0.0.0.0:12345
             - --storage.path=/var/lib/alloy/data
-            - --server.http.prefix=/alloy
           ports:
             - name: http
               containerPort: 12345
