@@ -6,20 +6,11 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: haproxy
     haproxy.org/ssl-redirect: "false"
-    haproxy.org/rewrite-target: /
 spec:
   ingressClassName: haproxy
   rules:
     - http:
         paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: grafana-service
-                port:
-                  name: grafana
-
           - path: /observability
             pathType: Prefix
             backend:
@@ -27,3 +18,11 @@ spec:
                 name: alloy-service
                 port:
                   name: otlp-http
+
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana-service
+                port:
+                  name: grafana
