@@ -7,14 +7,12 @@ metadata:
     kubernetes.io/ingress.class: haproxy
     haproxy.org/ssl-redirect: "false"
     haproxy.org/rewrite-target: /
-    # haproxy.org/auth-type: "basic-auth"
-    # haproxy.org/auth-secret: "tempo-auth"
 spec:
   ingressClassName: haproxy
   rules:
     - http:
         paths:
-          - path: /grafana
+          - path: /
             pathType: Prefix
             backend:
               service:
@@ -22,26 +20,10 @@ spec:
                 port:
                   name: grafana
 
-          - path: /loki
+          - path: /observability
             pathType: Prefix
             backend:
               service:
-                name: loki-service
+                name: alloy-service
                 port:
-                  name: loki
-
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: tempo-service
-                port:
-                  name: tempo
-
-          - path: /mimir
-            pathType: Prefix
-            backend:
-              service:
-                name: mimir-service
-                port:
-                  name: mimir
+                  name: otlp-http
