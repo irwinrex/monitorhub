@@ -29,7 +29,8 @@ services:
       - mimir-data:/data
     expose:
       - "9009"
-    <<: [*default-restart, *default-logging, *default-security]
+    read_only: false # ✅ allow /data writes
+    <<: [*default-restart, *default-logging]
     mem_limit: 2g
     cpus: "1.0"
     healthcheck:
@@ -49,11 +50,11 @@ services:
       - loki-data:/data
     expose:
       - "3100"
+    read_only: false # ✅ already fixed
     security_opt:
       - no-new-privileges:true
     tmpfs:
       - /tmp:size=64M
-    read_only: false
     <<: [*default-restart, *default-logging]
     mem_limit: 2g
     cpus: "1.0"
@@ -74,7 +75,8 @@ services:
       - tempo-data:/data
     expose:
       - "3200"
-    <<: [*default-restart, *default-logging, *default-security]
+    read_only: false # ✅ allow WAL + compactor writes
+    <<: [*default-restart, *default-logging]
     mem_limit: 2g
     cpus: "1.0"
     healthcheck:
