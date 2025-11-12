@@ -49,7 +49,12 @@ services:
       - loki-data:/data
     expose:
       - "3100"
-    <<: [*default-restart, *default-logging, *default-security]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=64M
+    read_only: false
+    <<: [*default-restart, *default-logging]
     mem_limit: 2g
     cpus: "1.0"
     healthcheck:
