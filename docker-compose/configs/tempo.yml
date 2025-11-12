@@ -1,19 +1,25 @@
+# tempo.yaml (Tempo 2.5.0)
+multitenancy_enabled: false
+server:
+  http_listen_port: 3200
+  log_level: info
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc: {}
+        http: {}
 ingester:
   trace_idle_period: 10s
   lifecycler:
-    live_traces_period: 5m # was trace_live_period
-  max_block_duration: 30m # add if needed
+    ring:
+      replication_factor: 1
+  max_block_bytes: 524288000
   wal:
     path: /data/tempo/wal
-    encoding: snappy # was v2_encoding
-
 compactor:
   compaction:
     block_retention: 2160h
-    compacted_block_retention: 1h
-    retention_concurrency: 10
-    # cleanup_interval removed
-
 storage:
   trace:
     backend: s3
@@ -22,11 +28,12 @@ storage:
       endpoint: s3.${AWS_REGION}.amazonaws.com
       region: ${AWS_REGION}
       prefix: tempo/
-      insecure: false
-      force_path_style: false # was s3forcepathstyle
+      forcepathstyle: false
     wal:
       path: /data/tempo/wal
-      encoding: snappy
-
+      v2_encoding: snappy
 query_frontend:
   log_queries_longer_than: 5s
+memberlist:
+  join_members: [tempo]
+  bind_port: 7946
