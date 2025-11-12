@@ -1,84 +1,53 @@
-server:
-  http_listen_port: 9009
-  log_level: info
-  graceful_shutdown_timeout: 30s
-
 target: all
 multitenancy_enabled: false
+
+server:
+  http_listen_port: 9009 # Match the port in docker-compose
+  log_level: info
 
 activity_tracker:
   filepath: /data/mimir-activity.log
 
-# --- Ingesters ---
 ingester:
-  wal:
-    enabled: true
-    dir: /data/wal
-  lifecycler:
-    ring:
-      replication_factor: 3
-      kvstore:
-        store: inmemory
-  max_transfer_retries: 0
+  ring:
+    kvstore:
+      store: inmemory
+    replication_factor: 1
 
-# --- Blocks Storage (S3 backend) ---
 blocks_storage:
   backend: s3
   storage_prefix: mimirblocks
   s3:
-    bucket_name: ebs-monitoring-data
-    endpoint: s3.us-west-2.amazonaws.com
-    region: us-west-2
-    # The correct parameter and location is inside http_config
-    http_config:
-      force_path_style: false
+    # Use environment variables from docker-compose
+    bucket_name: ${S3_BUCKET_NAME}
+    endpoint: s3.${AWS_REGION}.amazonaws.com
+    region: ${AWS_REGION}
   tsdb:
     dir: /data/tsdb
 
-# --- Ruler Storage (recording & alerting rules) ---
 ruler_storage:
   backend: s3
   storage_prefix: mimiruler
   s3:
-    bucket_name: ebs-monitoring-data
-    endpoint: s3.us-west-2.amazonaws.com
-    region: us-west-2
-    # The correct parameter and location is inside http_config
-    http_config:
-      force_path_style: false
+    bucket_name: ${S3_BUCKET_NAME}
+    endpoint: s3.${AWS_REGION}.amazonaws.com
+    region: ${AWS_REGION}
 
-# --- Alertmanager Storage ---
 alertmanager_storage:
   backend: s3
+  storage_prefix: mimiralertmanager
   s3:
-    bucket_name: ebs-monitoring-data
-    region: us-west-2
-    endpoint: s3.us-west-2.amazonaws.com
-    prefix: mimir/alertmanager/
-    # The correct parameter and location is inside http_config
-    http_config:
-      force_path_style: false
+    bucket_name: ${S3_BUCKET_NAME}
+    endpoint: s3.${AWS_REGION}.amazonaws.com
+    region: ${AWS_REGION}
 
-# --- Compactor ---
 compactor:
   data_dir: /data/compactor
-  sharding_enabled: true
-  sharding_ring:
-    kvstore:
-      store: inmemory
-  block_retention: 90d
 
-# --- Store Gateway ---
 store_gateway:
-  sharding_enabled: true
-  sharding_ring:
-    replication_factor: 1
-    kvstore:
-      store: inmemory
+  sharding_enabled: false
 
-# --- Common (shared defaults across all components) ---
-# We are defining storage specifically in each section, so a common
-# storage block is not strictly necessary but can be kept for other defaults.
-common:
-  path_prefix: /data
-  replication_factor: 3
+query_frontend: {}
+
+limits:
+  compactor_blocks_retention_period: 90d

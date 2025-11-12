@@ -39,13 +39,13 @@ spec:
               cpu: "600m"
           readinessProbe:
             httpGet:
-              path: /ready
+              path: /mimir/ready
               port: mimir
             initialDelaySeconds: 60
             periodSeconds: 30
           livenessProbe:
             httpGet:
-              path: /ready
+              path: /mimir/ready
               port: mimir
             initialDelaySeconds: 120
             periodSeconds: 30

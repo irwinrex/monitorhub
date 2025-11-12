@@ -87,7 +87,7 @@ metadata:
   name: tempo-service
   namespace: monitoring
 spec:
-  type: NodePort
+  type: ClusterIp
   selector:
     app: tempo
   ports:
