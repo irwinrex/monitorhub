@@ -78,20 +78,13 @@ services:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=strong-password
       - GF_FEATURE_TOGGLES_ENABLE=tempoSearch,mimirFeature,lokiFeature
-      - GF_PATHS_CONFIG=/etc/grafana/grafana.ini
       - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s/grafana/
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
-      - GRAFANA_HOST=grafana
-      - LOKI_HOST=loki
-      - TEMPO_HOST=tempo
-      - MIMIR_HOST=mimir
     depends_on:
       - loki
       - tempo
       - mimir
     volumes:
-      - ./configs/grafana.ini:/etc/grafana/grafana.ini:ro
-      - ./configs/grafana-dashboard.yml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
       - grafana-data:/var/lib/grafana
     expose:
       - "3000"
@@ -99,7 +92,7 @@ services:
     mem_limit: 512m
     cpus: "0.5"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/grafana/api/health"]
       interval: 30s
       timeout: 5s
       retries: 5
