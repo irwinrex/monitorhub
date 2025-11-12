@@ -27,7 +27,7 @@ blocks_storage:
   s3:
     bucket_name: ${S3_BUCKET_NAME}
     region: ${AWS_REGION}
-    s3forcepathstyle: false
+    force_path_style: false
     signature_version: v4
     insecure: false
     http:
@@ -118,5 +118,5 @@ common:
       bucket_name: ${S3_BUCKET_NAME}
       region: ${AWS_REGION}
       endpoint: s3.${AWS_REGION}.amazonaws.com
-      s3forcepathstyle: false
+      force_path_style: false
       signature_version: v4
