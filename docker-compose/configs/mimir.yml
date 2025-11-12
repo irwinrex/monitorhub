@@ -29,6 +29,8 @@ blocks_storage:
     bucket_name: ebs-monitoring-data
     endpoint: s3.us-west-2.amazonaws.com
     region: us-west-2
+    # Corrected parameter for Mimir 3.0.0
+    s3_force_path_style: false
   tsdb:
     dir: /data/tsdb
 
@@ -40,6 +42,8 @@ ruler_storage:
     bucket_name: ebs-monitoring-data
     endpoint: s3.us-west-2.amazonaws.com
     region: us-west-2
+    # Corrected parameter for Mimir 3.0.0
+    s3_force_path_style: false
 
 # --- Alertmanager Storage ---
 alertmanager_storage:
@@ -49,6 +53,8 @@ alertmanager_storage:
     region: us-west-2
     endpoint: s3.us-west-2.amazonaws.com
     prefix: mimir/alertmanager/
+    # Corrected parameter for Mimir 3.0.0
+    s3_force_path_style: false
 
 # --- Compactor (retention & cleanup) ---
 compactor:
@@ -107,5 +113,5 @@ common:
       region: us-west-2
       endpoint: s3.us-west-2.amazonaws.com
       signature_version: v4
-      # 'force_path_style' should be a direct child of the 's3' block
-      force_path_style: false
+      # Corrected parameter for Mimir 3.0.0
+      s3_force_path_style: false```
