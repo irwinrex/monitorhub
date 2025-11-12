@@ -7,7 +7,7 @@ data:
   mimir.yaml: |
     server:
       http_listen_port: 8080
-      # http_path_prefix: /mimir
+      http_path_prefix: /mimir
       log_level: info
 
     target: all

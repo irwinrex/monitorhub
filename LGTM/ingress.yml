@@ -11,14 +11,6 @@ spec:
   rules:
     - http:
         paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: alloy-service
-                port:
-                  name: otlp-http
-
           - path: /grafana
             pathType: Prefix
             backend:
@@ -26,3 +18,27 @@ spec:
                 name: grafana-service
                 port:
                   name: grafana
+
+          - path: /logs
+            pathType: Prefix
+            backend:
+              service:
+                name: loki-service
+                port:
+                  name: loki
+
+          - path: /mimir
+            pathType: Prefix
+            backend:
+              service:
+                name: mimir-service
+                port:
+                  name: mimir
+
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: tempo-service
+                port:
+                  name: tempo

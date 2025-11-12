@@ -39,7 +39,7 @@ spec:
               name: loki
           livenessProbe:
             httpGet:
-              path: /ready
+              path: /logs/ready
               port: 3100
             initialDelaySeconds: 60
             periodSeconds: 60
@@ -47,7 +47,7 @@ spec:
             failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /ready
+              path: /logs/ready
               port: 3100
             initialDelaySeconds: 60
             periodSeconds: 10
