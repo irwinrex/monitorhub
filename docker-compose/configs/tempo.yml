@@ -1,6 +1,3 @@
-# Tempo Configuration - AWS Native / Scalable Single Binary
-# Works seamlessly with Docker Compose + .env (AWS_REGION, S3_BUCKET_NAME)
-
 target: scalable-single-binary
 multitenancy_enabled: false
 
@@ -31,19 +28,18 @@ ingester:
 compactor:
   compaction:
     block_retention: 2160h # 90 days
-    compacted_block_retention: 1h # compacted blocks cleaned quickly
+    compacted_block_retention: 1h
     compaction_window: 1h
-  data_dir: /data/tempo/compactor
 
 storage:
   trace:
     backend: s3
     s3:
-      bucket: ${S3_BUCKET_NAME} # from .env
-      region: ${AWS_REGION} # from .env
-      forcepathstyle: false # AWS native
+      bucket: ${S3_BUCKET_NAME}
+      region: ${AWS_REGION}
+      forcepathstyle: false
       insecure: false
-      prefix: tempo/ # logical S3 prefix
+      prefix: tempo/
     wal:
       path: /data/tempo/wal
       v2_encoding: snappy
@@ -51,15 +47,12 @@ storage:
 
 query_frontend:
   search:
-    max_duration: 2160h # 90 days
-  query_shards: 8
+    max_duration: 2160h
 
 querier:
   max_concurrent_queries: 16
-  search:
-    concurrent_jobs: 8
 
 memberlist:
-  join_members: [] # single-node mode
+  join_members: []
   bind_port: 7946
   randomize_node_name: true
