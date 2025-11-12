@@ -4,7 +4,6 @@
 ########################################
 AWS_REGION=us-west-2
 S3_BUCKET_NAME=ebs-monitoring-data
-S3_ENDPOINT=s3.us-west-2.amazonaws.com
 
 ########################################
 # 👤 Grafana Admin Credentials
