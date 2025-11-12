@@ -3,7 +3,7 @@ auth_enabled: false
 server:
   http_listen_port: 3100
   grpc_listen_port: 9095
-  http_path_prefix: /logs
+  # http_path_prefix: /logs
   log_level: info
   graceful_shutdown_timeout: 30s
 
