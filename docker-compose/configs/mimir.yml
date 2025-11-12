@@ -2,6 +2,7 @@ target: all
 multitenancy_enabled: false
 
 server:
+  http_path_prefix: /mimir
   http_listen_port: 8080
   log_level: info
 
