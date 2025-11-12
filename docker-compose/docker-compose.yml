@@ -11,9 +11,7 @@ x-default-restart: &default-restart
 services:
   mimir:
     image: grafana/mimir:3.0.0
-    command: >
-      sh -c "envsubst < /etc/mimir/mimir.yaml > /tmp/mimir.yaml &&
-             exec /usr/bin/mimir -config.file=/tmp/mimir.yaml"
+    command: ["/usr/bin/mimir", "-config.file=/etc/mimir/mimir.yaml"]
     environment:
       - AWS_REGION=us-west-2
       - S3_BUCKET_NAME=ebs-monitoring-data
@@ -22,7 +20,7 @@ services:
       - TEMPO_HOST=tempo
       - MIMIR_HOST=mimir
     volumes:
-      - ./configs/mimir.yml:/etc/mimir/mimir.yaml
+      - ./configs/mimir.yml:/etc/mimir/mimir.yaml:ro
       - mimir-data:/data
     expose:
       - "9009"
@@ -37,11 +35,8 @@ services:
 
   loki:
     image: grafana/loki:3.0.0
-    user: root
-    command: >
-      sh -c "envsubst < /etc/loki/config.yaml > /tmp/config.yaml &&
-             chown -R 10001:10001 /data &&
-             exec su -s /bin/sh -c '/usr/bin/loki -config.file=/tmp/config.yaml' 10001"
+    user: "10001"
+    command: ["/usr/bin/loki", "-config.file=/etc/loki/config.yaml"]
     environment:
       - AWS_REGION=us-west-2
       - S3_BUCKET_NAME=ebs-monitoring-data
@@ -50,7 +45,7 @@ services:
       - TEMPO_HOST=tempo
       - MIMIR_HOST=mimir
     volumes:
-      - ./configs/loki.yml:/etc/loki/config.yaml
+      - ./configs/loki.yml:/etc/loki/config.yaml:ro
       - loki-data:/data
     expose:
       - "3100"
@@ -65,9 +60,7 @@ services:
 
   tempo:
     image: grafana/tempo:2.9.0
-    command: >
-      sh -c "envsubst < /etc/tempo/tempo.yaml > /tmp/tempo.yaml &&
-             exec /usr/bin/tempo -config.file=/tmp/tempo.yaml"
+    command: ["/usr/bin/tempo", "-config.file=/etc/tempo/tempo.yaml"]
     environment:
       - AWS_REGION=us-west-2
       - S3_BUCKET_NAME=ebs-monitoring-data
@@ -76,7 +69,7 @@ services:
       - TEMPO_HOST=tempo
       - MIMIR_HOST=mimir
     volumes:
-      - ./configs/tempo.yml:/etc/tempo/tempo.yaml
+      - ./configs/tempo.yml:/etc/tempo/tempo.yaml:ro
       - tempo-data:/data
     expose:
       - "3200"
@@ -109,8 +102,8 @@ services:
       - tempo
       - mimir
     volumes:
-      - ./configs/grafana.ini:/etc/grafana/grafana.ini
-      - ./configs/grafana-dashboard.yml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - ./configs/grafana.ini:/etc/grafana/grafana.ini:ro
+      - ./configs/grafana-dashboard.yml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
       - grafana-data:/var/lib/grafana
     expose:
       - "3000"
@@ -133,7 +126,7 @@ services:
     ports:
       - "80:80"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     <<: [*default-restart, *default-logging]
     mem_limit: 512m
     cpus: "0.5"
