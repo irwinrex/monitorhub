@@ -33,7 +33,7 @@ storage:
     backend: s3
     s3:
       bucket: ${S3_BUCKET_NAME}
-      endpoint: ${AWS_ENDPOINT}
+      endpoint: ${S3_ENDPOINT}
       region: ${AWS_REGION}
       forcepathstyle: false
     wal:
