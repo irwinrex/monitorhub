@@ -1,0 +1,43 @@
+
+########################################
+# 🌎 AWS / S3 Configuration
+########################################
+AWS_REGION=us-west-2
+S3_BUCKET_NAME=data-s3-name
+
+########################################
+# 👤 Grafana Admin Credentials
+########################################
+GF_SECURITY_ADMIN_USER=admin
+GF_SECURITY_ADMIN_PASSWORD=strong-password
+
+########################################
+# 🧠 Grafana Configuration
+########################################
+GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s/grafana/
+GF_SERVER_SERVE_FROM_SUB_PATH=true
+GF_FEATURE_TOGGLES_ENABLE=tempoSearch,mimirFeature,lokiFeature
+
+########################################
+# ⚙️ Resource Controls
+########################################
+MIMIR_MEM_LIMIT=2g
+LOKI_MEM_LIMIT=2g
+TEMPO_MEM_LIMIT=2g
+GRAFANA_MEM_LIMIT=512m
+NGINX_MEM_LIMIT=512m
+
+########################################
+# 🧩 Network / Security
+########################################
+GRAFANA_HOST=grafana
+LOKI_HOST=loki
+TEMPO_HOST=tempo
+MIMIR_HOST=mimir
+
+########################################
+# 🔍 Health Check Parameters
+########################################
+HEALTHCHECK_INTERVAL=30
+HEALTHCHECK_TIMEOUT=5
+HEALTHCHECK_RETRIES=5
