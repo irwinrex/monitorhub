@@ -15,10 +15,6 @@ services:
     environment:
       - AWS_REGION=us-west-2
       - S3_BUCKET_NAME=ebs-monitoring-data
-      - GRAFANA_HOST=grafana
-      - LOKI_HOST=loki
-      - TEMPO_HOST=tempo
-      - MIMIR_HOST=mimir
     volumes:
       - ./configs/mimir.yml:/etc/mimir/mimir.yaml:ro
       - mimir-data:/data
@@ -35,28 +31,34 @@ services:
 
   loki:
     image: grafana/loki:3.0.0
-    user: "0:0" # ✅ run as root
-    command: ["/usr/bin/loki", "-config.file=/etc/loki/config.yaml"]
+    user: "0:0" # run as root so volume writes work
+    ports:
+      - "3100:3100"
     environment:
       - AWS_REGION=us-west-2
       - S3_BUCKET_NAME=ebs-monitoring-data
-      - GRAFANA_HOST=grafana
-      - LOKI_HOST=loki
-      - TEMPO_HOST=tempo
-      - MIMIR_HOST=mimir
     volumes:
-      - ./configs/loki.yml:/etc/loki/config.yaml:ro
+      - ./configs/loki.yml:/config.yaml:ro
       - loki-data:/data
-    expose:
-      - "3100"
-    <<: [*default-restart, *default-logging]
-    mem_limit: 2g
-    cpus: "1.0"
+    command:
+      - "/usr/bin/loki"
+      - "-config.file=/config.yaml"
+      - "-config.expand-env=true"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3100/ready"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--output-document=/dev/null",
+          "http://localhost:3100/ready",
+        ]
       interval: 30s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+    mem_limit: 2g
+    cpus: "1.0"
 
   tempo:
     image: grafana/tempo:2.9.0
