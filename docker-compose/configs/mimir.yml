@@ -9,7 +9,7 @@ multitenancy_enabled: false
 activity_tracker:
   filepath: /data/mimir-activity.log
 
-# --- Ingesters (metric ingestion durability & replication) ---
+# --- Ingesters ---
 ingester:
   wal:
     enabled: true
@@ -29,8 +29,9 @@ blocks_storage:
     bucket_name: ebs-monitoring-data
     endpoint: s3.us-west-2.amazonaws.com
     region: us-west-2
-    # The correct, recognized parameter is placed here.
-    s3_force_path_style: false
+    # The correct parameter and location is inside http_config
+    http_config:
+      force_path_style: false
   tsdb:
     dir: /data/tsdb
 
@@ -42,8 +43,9 @@ ruler_storage:
     bucket_name: ebs-monitoring-data
     endpoint: s3.us-west-2.amazonaws.com
     region: us-west-2
-    # The correct, recognized parameter is placed here.
-    s3_force_path_style: false
+    # The correct parameter and location is inside http_config
+    http_config:
+      force_path_style: false
 
 # --- Alertmanager Storage ---
 alertmanager_storage:
@@ -53,10 +55,11 @@ alertmanager_storage:
     region: us-west-2
     endpoint: s3.us-west-2.amazonaws.com
     prefix: mimir/alertmanager/
-    # The correct, recognized parameter is placed here.
-    s3_force_path_style: false
+    # The correct parameter and location is inside http_config
+    http_config:
+      force_path_style: false
 
-# --- Compactor (retention & cleanup) ---
+# --- Compactor ---
 compactor:
   data_dir: /data/compactor
   sharding_enabled: true
@@ -64,52 +67,18 @@ compactor:
     kvstore:
       store: inmemory
   block_retention: 90d
-  consistency_delay: 30m
-  compaction_interval: 10m
-  retention_enabled: true
-  delete_request_cancel_period: 24h
-  cleanup_interval: 1h
 
-# --- Query Frontend (query caching & performance) ---
-query_frontend:
-  compress_responses: true
-  log_queries_longer_than: 5s
-  cache_results: true
-  max_outstanding_per_tenant: 500
-
-# --- Store Gateway (reading historical blocks from S3) ---
+# --- Store Gateway ---
 store_gateway:
   sharding_enabled: true
   sharding_ring:
     replication_factor: 1
     kvstore:
       store: inmemory
-  backend: s3
-
-# --- Limits (anti-overload safety nets) ---
-limits:
-  ingestion_rate: 20MB
-  ingestion_burst_size: 40MB
-  ingestion_tenant_shard_size: 1
-  max_series_per_user: 500000
-  max_samples_per_query: 5000000
-  max_query_parallelism: 16
-  compactor_blocks_retention_period: 90d
-  accept_ha_samples: true
-
-# --- Runtime Config (dynamic reloads without restart) ---
-runtime_config:
-  file: /etc/mimir/runtime-config.yaml
-  reload_period: 10s
 
 # --- Common (shared defaults across all components) ---
+# We are defining storage specifically in each section, so a common
+# storage block is not strictly necessary but can be kept for other defaults.
 common:
   path_prefix: /data
   replication_factor: 3
-  storage:
-    backend: s3
-    s3:
-      bucket_name: ebs-monitoring-data
-      region: us-west-2
-      endpoint: s3.us-west-2.amazonaws.com
-      signature_version: v4
