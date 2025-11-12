@@ -12,9 +12,6 @@ services:
   mimir:
     image: grafana/mimir:3.0.0
     command: ["/usr/bin/mimir", "-config.file=/etc/mimir/mimir.yaml"]
-    environment:
-      - AWS_REGION=us-west-2
-      - S3_BUCKET_NAME=ebs-monitoring-data
     volumes:
       - ./configs/mimir.yml:/etc/mimir/mimir.yaml:ro
       - mimir-data:/data
@@ -24,7 +21,7 @@ services:
     mem_limit: 2g
     cpus: "1.0"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:9009/ready"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/ready"]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -34,9 +31,6 @@ services:
     user: "0:0" # run as root so volume writes work
     ports:
       - "3100:3100"
-    environment:
-      - AWS_REGION=us-west-2
-      - S3_BUCKET_NAME=ebs-monitoring-data
     volumes:
       - ./configs/loki.yml:/config.yaml:ro
       - loki-data:/data
@@ -64,13 +58,6 @@ services:
     image: grafana/tempo:2.9.0
     user: "0:0" # ✅ run as root
     command: ["/usr/bin/tempo", "-config.file=/etc/tempo/tempo.yaml"]
-    environment:
-      - AWS_REGION=us-west-2
-      - S3_BUCKET_NAME=ebs-monitoring-data
-      - GRAFANA_HOST=grafana
-      - LOKI_HOST=loki
-      - TEMPO_HOST=tempo
-      - MIMIR_HOST=mimir
     volumes:
       - ./configs/tempo.yml:/etc/tempo/tempo.yaml:ro
       - tempo-data:/data
@@ -94,8 +81,6 @@ services:
       - GF_PATHS_CONFIG=/etc/grafana/grafana.ini
       - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s/grafana/
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
-      - AWS_REGION=us-west-2
-      - S3_BUCKET_NAME=ebs-monitoring-data
       - GRAFANA_HOST=grafana
       - LOKI_HOST=loki
       - TEMPO_HOST=tempo
