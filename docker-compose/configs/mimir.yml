@@ -107,5 +107,5 @@ common:
       region: us-west-2
       endpoint: s3.us-west-2.amazonaws.com
       signature_version: v4
-      http:
-        force_path_style: false
+      # 'force_path_style' should be a direct child of the 's3' block
+      force_path_style: false
