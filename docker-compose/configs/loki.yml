@@ -5,7 +5,6 @@ server:
   grpc_listen_port: 9095
   log_level: info
   graceful_shutdown_timeout: 30s
-  # http_path_prefix: /loki
 
 memberlist:
   join_members:
@@ -35,18 +34,16 @@ schema_config:
 
 storage_config:
   aws:
-    region: ${AWS_REGION}
-    bucketnames: ${S3_BUCKET_NAME}
+    region: us-west-2
+    bucketnames: ebs-monitoring-data
     s3forcepathstyle: false
     insecure: false
   tsdb_shipper:
     active_index_directory: /data/loki/tsdb-index
     cache_location: /data/loki/tsdb-cache
-    shared_store: s3
 
 compactor:
   working_directory: /data/loki/compactor
-  shared_store: s3
   compaction_interval: 10m
   retention_enabled: true
   retention_delete_delay: 2h
@@ -54,16 +51,10 @@ compactor:
   retention_delete_worker_count: 150
 
 limits_config:
-  retention_period: 2160h # 90 days
+  retention_period: 2160h
   max_query_lookback: 2160h
-  max_query_length: 2160h
-  query_timeout: 30m
-  max_entries_limit_per_query: 5000
-  reject_old_samples: true
-  reject_old_samples_max_age: 168h # 7 days
-  split_queries_by_interval: 24h
-  ingestion_burst_size_mb: 128
   ingestion_rate_mb: 64
+  ingestion_burst_size_mb: 128
   max_streams_per_user: 100000
   max_global_streams_per_user: 100000
 
@@ -85,11 +76,7 @@ ingester:
 
 querier:
   query_ingesters_within: 3h
-  max_concurrent: 8
 
 frontend:
   log_queries_longer_than: 5s
   compress_responses: true
-
-frontend_worker:
-  frontend_address: 127.0.0.1:9095
