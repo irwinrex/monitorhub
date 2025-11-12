@@ -15,7 +15,6 @@ services:
     environment:
       - AWS_REGION=${AWS_REGION}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
-      - S3_ENDPOINT=s3.${AWS_REGION}.amazonaws.com
     volumes:
       - ./configs/mimir.yml:/etc/mimir/mimir.yaml
       - mimir-data:/data
@@ -35,7 +34,6 @@ services:
     environment:
       - AWS_REGION=${AWS_REGION}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
-      - S3_ENDPOINT=s3.${AWS_REGION}.amazonaws.com
     user: root
     command: >
       sh -c "chown -R 10001:10001 /data && exec su -s /bin/sh -c '/usr/bin/loki -config.file=/etc/loki/loki.yaml' 10001"
@@ -59,7 +57,6 @@ services:
     environment:
       - AWS_REGION=${AWS_REGION}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
-      - S3_ENDPOINT=s3.${AWS_REGION}.amazonaws.com
     volumes:
       - ./configs/tempo.yml:/etc/tempo/tempo.yaml
       - tempo-data:/data
