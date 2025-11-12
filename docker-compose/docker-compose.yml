@@ -19,7 +19,7 @@ x-default-security: &default-security
 
 services:
   mimir:
-    image: ghcr.io/grafana/mimir:3.4.0
+    image: grafana/mimir:2.14.0
     command: ["-config.file=/etc/mimir/mimir.yaml"]
     environment:
       - AWS_REGION=${AWS_REGION}
