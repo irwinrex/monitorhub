@@ -27,7 +27,7 @@ blocks_storage:
   s3:
     bucket_name: ${S3_BUCKET_NAME}
     region: ${AWS_REGION}
-    endpoint: s3.${AWS_REGION}.amazonaws.com
+    endpoint: ${AWS_ENDPOINT}
     s3forcepathstyle: false
     signature_version: v4
     insecure: false
