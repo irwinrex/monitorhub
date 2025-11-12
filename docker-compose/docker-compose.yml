@@ -38,7 +38,7 @@ services:
     command: >
       sh -c "chown -R 10001:10001 /data && exec su -s /bin/sh -c '/usr/bin/loki -config.file=/etc/loki/loki.yaml' 10001"
     volumes:
-      - ./configs/loki.yml:/etc/loki/loki.yaml
+      - ./configs/loki.yml:/etc/loki/config.yaml
       - loki-data:/data
     expose:
       - "3100"
