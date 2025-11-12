@@ -46,13 +46,19 @@ storage:
       v2_encoding: snappy
     blocklist_poll: 5m
 
+# ✅ New query components for Tempo 2.9+
 query_frontend:
   search:
     max_duration: 2160h
+  scheduler_address: 127.0.0.1:9096 # query scheduler listener
+
+query_scheduler:
+  frontend_address: 127.0.0.1:9096 # querier connects back here
 
 querier:
   max_concurrent_queries: 16
-  query_frontend_address: 127.0.0.1:9095
+  search:
+    concurrent_jobs: 8
 
 memberlist:
   join_members: []
