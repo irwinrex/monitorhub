@@ -16,7 +16,7 @@ services:
       - ./configs/mimir.yml:/etc/mimir/mimir.yaml:ro
       - mimir-data:/data
     expose:
-      - "9009"
+      - "8080"
     <<: [*default-restart, *default-logging]
     mem_limit: 2g
     cpus: "1.0"
