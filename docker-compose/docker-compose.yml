@@ -57,6 +57,7 @@ services:
     environment:
       - AWS_REGION=${AWS_REGION}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - AWS_ENDPOINT=${AWS_ENDPOINT}
     volumes:
       - ./configs/tempo.yml:/etc/tempo/tempo.yaml
       - tempo-data:/data
