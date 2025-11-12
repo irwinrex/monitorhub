@@ -10,7 +10,7 @@ x-default-restart: &default-restart
 
 services:
   mimir:
-    image: grafana/mimir:2.14.0
+    image: grafana/mimir:3.0.0
     command: ["-config.file=/etc/mimir/mimir.yaml"]
     environment:
       - AWS_REGION=${AWS_REGION}
@@ -30,13 +30,13 @@ services:
       retries: ${HEALTHCHECK_RETRIES}
 
   loki:
-    image: grafana/loki:2.9.7
+    image: grafana/loki:3.0.0
     environment:
       - AWS_REGION=${AWS_REGION}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
     user: root
     command: >
-      sh -c "chown -R 10001:10001 /data && exec su -s /bin/sh -c '/usr/bin/loki -config.file=/etc/loki/loki.yaml' 10001"
+      sh -c "chown -R 10001:10001 /data && exec su -s /bin/sh -c '/usr/bin/loki -config.file=/etc/loki/config.yaml' 10001"
     volumes:
       - ./configs/loki.yml:/etc/loki/config.yaml
       - loki-data:/data
@@ -52,7 +52,7 @@ services:
       retries: ${HEALTHCHECK_RETRIES}
 
   tempo:
-    image: grafana/tempo:2.5.0
+    image: grafana/tempo:2.9.0
     command: ["-config.file=/etc/tempo/tempo.yaml"]
     environment:
       - AWS_REGION=${AWS_REGION}
@@ -72,7 +72,7 @@ services:
       retries: ${HEALTHCHECK_RETRIES}
 
   grafana:
-    image: grafana/grafana:11.2.0
+    image: grafana/grafana:11.3.0
     environment:
       - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER}
       - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD}
