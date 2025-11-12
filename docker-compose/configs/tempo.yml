@@ -52,6 +52,7 @@ query_frontend:
 
 querier:
   max_concurrent_queries: 16
+  query_frontend_address: 127.0.0.1:9095
 
 memberlist:
   join_members: []
