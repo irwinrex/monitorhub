@@ -118,7 +118,7 @@ services:
     ports:
       - "80:80"
     volumes:
-      - ./configs/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     <<: [*default-restart, *default-logging, *default-security]
     mem_limit: 512m
     cpus: "0.5"
