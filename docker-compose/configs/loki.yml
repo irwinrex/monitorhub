@@ -37,7 +37,7 @@ storage_config:
   aws:
     region: ${AWS_REGION}
     bucketnames: ${S3_BUCKET_NAME}
-    endpoint: s3.${AWS_REGION}.amazonaws.com
+    endpoint: ${AWS_ENDPOINT}
     s3forcepathstyle: false
     insecure: false
   tsdb_shipper:

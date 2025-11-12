@@ -3,7 +3,7 @@
 # 🌎 AWS / S3 Configuration
 ########################################
 AWS_REGION=us-west-2
-S3_BUCKET_NAME=data-s3-name
+S3_BUCKET_NAME=ebs-monitoring-data
 AWS_ENDPOINT=https://s3.us-west-2.amazonaws.com
 
 ########################################

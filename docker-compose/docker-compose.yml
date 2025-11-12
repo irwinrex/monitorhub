@@ -15,6 +15,7 @@ services:
     environment:
       - AWS_REGION=${AWS_REGION}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - AWS_ENDPOINT=${AWS_ENDPOINT}
     volumes:
       - ./configs/mimir.yml:/etc/mimir/mimir.yaml
       - mimir-data:/data
@@ -34,6 +35,7 @@ services:
     environment:
       - AWS_REGION=${AWS_REGION}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - AWS_ENDPOINT=${AWS_ENDPOINT}
     user: root
     command: >
       sh -c "chown -R 10001:10001 /data && exec su -s /bin/sh -c '/usr/bin/loki -config.file=/etc/loki/loki.yaml' 10001"
