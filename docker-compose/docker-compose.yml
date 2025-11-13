@@ -23,17 +23,17 @@ services:
     <<: [*default-restart, *default-logging]
     mem_limit: 2g
     cpus: "1.0"
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "/usr/bin/mimir",
-          "-config.file=/etc/mimir/mimir.yaml",
-          "--ready-check",
-        ]
-      interval: 60s
-      timeout: 30s
-      retries: 3
+    # healthcheck:
+    #   test:
+    #     [
+    #       "CMD",
+    #       "/usr/bin/mimir",
+    #       "-config.file=/etc/mimir/mimir.yaml",
+    #       "--ready-check",
+    #     ]
+    #   interval: 60s
+    #   timeout: 30s
+    #   retries: 3
 
   loki:
     image: grafana/loki:3.0.0
