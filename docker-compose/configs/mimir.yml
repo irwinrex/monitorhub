@@ -3,7 +3,7 @@ multitenancy_enabled: false
 
 server:
   # http_path_prefix: /mimir
-  http_listen_port: 8080
+  http_listen_port: 9009
   log_level: info
 
 activity_tracker:
