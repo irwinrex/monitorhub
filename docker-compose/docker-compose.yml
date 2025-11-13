@@ -18,6 +18,8 @@ services:
     volumes:
       - ./configs/mimir.yml:/etc/mimir/mimir.yaml:ro
       - mimir-data:/data
+    ports:
+      - "9009:9009"
     <<: [*default-restart, *default-logging]
     mem_limit: 2g
     cpus: "1.0"
