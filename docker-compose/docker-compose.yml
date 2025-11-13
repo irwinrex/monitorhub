@@ -12,8 +12,8 @@ services:
   mimir:
     # image: grafana/mimir:3.0.0
     build:
-    context: .
-    dockerfile: Dockerfile.mimir
+      context: .
+      dockerfile: Dockerfile.mimir
     command: ["/usr/bin/mimir", "-config.file=/etc/mimir/mimir.yaml"]
     volumes:
       - ./configs/mimir.yml:/etc/mimir/mimir.yaml:ro
