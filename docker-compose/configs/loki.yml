@@ -29,8 +29,6 @@ storage_config:
     bucketnames: ebs-monitoring-data
     s3forcepathstyle: false
     insecure: false
-    sse_encryption: true
-    sse_type: s3
 
   tsdb_shipper:
     active_index_directory: /data/loki/tsdb-index
