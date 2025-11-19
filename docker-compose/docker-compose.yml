@@ -70,8 +70,10 @@ services:
     volumes:
       - ./configs/tempo.yml:/etc/tempo/tempo.yaml:ro
       - tempo-data:/data
-    expose:
-      - "3200"
+    ports:
+      - "3200:3200"    # Tempo HTTP API
+      - "4317:4317"    # OTLP gRPC receiver
+      - "4318:4318"    # OTLP HTTP receiver
     <<: [*default-restart, *default-logging]
     mem_limit: 2g
     cpus: "1.0"
