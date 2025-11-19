@@ -124,7 +124,7 @@ services:
     mem_limit: 512m
     cpus: "0.5"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost"]
+      test: ["CMD", "wget", "-qO-", "http://localhost/healthz"]
       interval: 30s
       timeout: 5s
       retries: 5
