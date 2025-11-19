@@ -17,8 +17,8 @@ distributor:
 
 ingester:
   trace_idle_period: 10s
-  max_block_duration: 30m
-  complete_block_timeout: 15m
+  max_block_duration: 5m      # Keep this low so data hits S3 faster
+  complete_block_timeout: 5m
   max_block_bytes: 500000000
   lifecycler:
     ring:
@@ -35,6 +35,7 @@ compactor:
 storage:
   trace:
     backend: s3
+    format: vParquet3          
     s3:
       bucket: ebs-monitoring-data
       region: us-west-2
@@ -45,7 +46,13 @@ storage:
     wal:
       path: /data/tempo/wal
       v2_encoding: snappy
-    blocklist_poll: 5m
+    block:
+      bloom_filter_false_positive: .05
+      index_downsample_bytes: 1000
+      encoding: zstd
+    pool:
+      max_workers: 400
+      queue_depth: 20000
 
 query_frontend:
   search:
@@ -54,7 +61,7 @@ query_frontend:
 querier:
   frontend_worker:
     frontend_address: 127.0.0.1:9095
-  max_concurrent_queries: 16
+  max_concurrent_queries: 40  
 
 memberlist:
   join_members: []
