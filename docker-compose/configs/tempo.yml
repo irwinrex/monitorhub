@@ -17,7 +17,7 @@ distributor:
 
 ingester:
   trace_idle_period: 10s
-  max_block_duration: 5m        
+  max_block_duration: 5m
   complete_block_timeout: 5m
   max_block_bytes: 500000000
   lifecycler:
@@ -46,10 +46,7 @@ storage:
       path: /data/tempo/wal
       v2_encoding: snappy
     
-    cache:
-      backend: local
-      local:
-        path: /data/tempo/cache
+    blocklist_poll: 5m
 
     pool:
       max_workers: 400
