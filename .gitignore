@@ -1,0 +1,4 @@
+monitoring/.pyc*
+monitoring/__pyc*
+.monitorenv
+db.sql*
