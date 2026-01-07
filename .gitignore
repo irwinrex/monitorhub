@@ -1,4 +1,37 @@
-monitoring/.pyc*
-monitoring/__pyc*
-.monitorenv
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Django ---
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# --- Project-specific ---
+monitoring/__pycache__/
+monitoring/*.pyc
+
+# --- Virtual environments ---
+.venv/
+.monitorenv/
+env/
+venv/
+
+# --- Docker ---
+*.pid
+docker-compose.override.yml
+
+# --- Database dumps ---
 db.sql*
+*.dump
+*.sql.gz
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- IDEs ---
+.vscode/
+.idea/
