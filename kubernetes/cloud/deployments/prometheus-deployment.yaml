@@ -1,0 +1,123 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-deployment
+  namespace: monitoring
+  labels:
+    app: prometheus
+    version: "3.5"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+        version: "3.5"
+    spec:
+      # securityContext:
+      #   runAsNonRoot: true
+      #   runAsUser: 65534
+      #   fsGroup: 65534
+      #   seccompProfile:
+      #     type: RuntimeDefault
+      initContainers:
+        - name: setup-permissions
+          image: busybox
+          command: ["sh", "-c", "chmod 777 -R /etc/prometheus"]
+          volumeMounts:
+            - name: prometheus-storage
+              mountPath: /etc/prometheus
+          # securityContext:
+          #   runAsNonRoot: true
+          #   runAsUser: 65534
+          #   seccompProfile:
+          #     type: RuntimeDefault
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v3.5.0
+          args:
+            - "--config.file=/etc/prometheus/prometheus.yml"
+            - "--storage.tsdb.path=/prometheus"
+            - "--storage.tsdb.retention.time=7d"
+            - "--storage.tsdb.retention.size=10GiB"
+            - "--storage.tsdb.wal-compression"
+            - "--web.enable-lifecycle"
+            - "--query.max-concurrency=10"
+            - "--query.timeout=2m"
+            - "--log.level=debug"
+          imagePullPolicy: Always
+          ports:
+            - name: prometheus
+              containerPort: 9090
+              protocol: TCP
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/prometheus
+              readOnly: true
+            - name: prometheus-storage
+              mountPath: /prometheus
+            - name: tmp-volume
+              mountPath: /tmp
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "1"
+          # securityContext:
+          #   readOnlyRootFilesystem: true
+          #   allowPrivilegeEscalation: false
+          #   runAsNonRoot: true
+          #   runAsUser: 65534
+          #   capabilities:
+          #     drop:
+          #       - ALL
+          #   seccompProfile:
+          #     type: RuntimeDefault
+          # startupProbe:
+          #   httpGet:
+          #     path: /-/ready
+          #     port: 9090
+          #     scheme: HTTP
+          #   initialDelaySeconds: 60  # Increased to give more startup time
+          #   periodSeconds: 15
+          #   timeoutSeconds: 15
+          #   failureThreshold: 40  # Allows up to 10 minutes (600s) for startup
+          #   successThreshold: 1
+      volumes:
+        - name: config-volume
+          configMap:
+            name: prometheus-config
+            defaultMode: 0644
+        - name: prometheus-storage
+          persistentVolumeClaim:
+            claimName: prometheus-pvc
+        - name: tmp-volume
+          emptyDir:
+            sizeLimit: 1Gi
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-service
+  namespace: monitoring
+  labels:
+    app: prometheus
+  annotations:
+    prometheus.io/scrape: "false"
+spec:
+  type: ClusterIP
+  selector:
+    app: prometheus
+  ports:
+    - name: prometheus
+      protocol: TCP
+      targetPort: prometheus
+      port: 9090

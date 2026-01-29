@@ -1,0 +1,65 @@
+# grafana-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana-deployment
+  namespace: monitoring
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      initContainers:
+        - name: setup-permissions
+          image: busybox
+          command: ["sh", "-c", "chmod 777 -R /var/lib/grafana"]
+          volumeMounts:
+            - name: grafana-storage
+              mountPath: /var/lib/grafana
+      containers:
+        - name: grafana
+          image: grafana/grafana:latest
+          imagePullPolicy: Always
+          ports:
+            - name: grafana
+              containerPort: 3000
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "128m"
+            limits:
+              memory: "256Mi"
+              cpu: "512m"
+          volumeMounts:
+            - name: grafana-storage
+              mountPath: /var/lib/grafana
+      volumes:
+        - name: grafana-storage
+          persistentVolumeClaim:
+            claimName: grafana-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-service
+  namespace: monitoring
+  labels:
+    app: grafana
+spec:
+  # LoadBalancer type exposes the service externally via a cloud load balancer
+  type: LoadBalancer
+  ports:
+    - name: grafana
+      protocol: TCP
+      port: 3000        # Port on which the service is exposed
+      targetPort: 3000  # Port on the Grafana pod (typically 3000 for Grafana)
+  selector:
+    app: grafana
