@@ -11,3 +11,14 @@ chmod 600 secrets/*.txt
 # 5. Create the .env file
 echo "GITHUB_REPO_URL=https://github.com/YOUR_USER/YOUR_REPO" > .env
 echo "POSTGRES_PASSWORD=sonar_password_123" >> .env
+
+
+sudo tee /etc/sysctl.d/99-sonarqube.conf <<EOF
+vm.max_map_count=262144
+fs.file-max=131072
+EOF
+
+sudo sysctl --system
+ulimit -n 131072
+ulimit -u 8192
+

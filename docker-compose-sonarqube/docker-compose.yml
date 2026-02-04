@@ -1,68 +1,59 @@
 services:
-  # --- Database ---
+  # -----------------------------
+  # PostgreSQL
+  # -----------------------------
   db:
     image: postgres:16-alpine
+    container_name: sonar-db
     environment:
-      - POSTGRES_USER=sonar
-      - POSTGRES_DB=sonarqube
-      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
+      POSTGRES_USER: sonar
+      POSTGRES_DB: sonarqube
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    deploy:
-      resources:
-        limits:
-          memory: 512M
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U sonar -d sonarqube"]
       interval: 5s
+      retries: 10
+    restart: unless-stopped
     secrets:
       - postgres_password
 
-  # --- SonarQube ---
+  # -----------------------------
+  # SonarQube
+  # -----------------------------
   sonarqube:
     image: sonarqube:community
+    container_name: sonarqube
     depends_on:
       db:
         condition: service_healthy
     environment:
-      - SONAR_JDBC_URL=jdbc:postgresql://db:5432/sonarqube
-      - SONAR_JDBC_USERNAME=sonar
-    secrets:
-      - postgres_password
-    volumes:
-      - sonar_data:/opt/sonarqube/data
-      - sonar_extensions:/opt/sonarqube/extensions
-      - sonar_logs:/opt/sonarqube/logs
+      SONAR_JDBC_URL: jdbc:postgresql://db:5432/sonarqube
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_WEB_JAVAOPTS: "-Xms2g -Xmx2g"
+      SONAR_CE_JAVAOPTS: "-Xms1g -Xmx1g"
     entrypoint:
       - sh
       - -c
       - |
         export SONAR_JDBC_PASSWORD="$(cat /run/secrets/postgres_password)"
         exec /opt/sonarqube/docker/entrypoint.sh
-    deploy:
-      resources:
-        limits:
-          memory: 2G
+    volumes:
+      - sonar_data:/opt/sonarqube/data
+      - sonar_extensions:/opt/sonarqube/extensions
+      - sonar_logs:/opt/sonarqube/logs
+    mem_limit: 4g
     restart: unless-stopped
+    secrets:
+      - postgres_password
 
-  # --- GitHub Runner ---
-  # github-runner:
-  #   image: myoung34/github-runner:latest
-  #   environment:
-  #     - REPO_URL=
-  #     - RUNNER_TOKEN_FILE=/run/secrets/github_token
-  #     - RUNNER_NAME=sonar-scanner-runner
-  #     - RUNNER_LABELS=self-hosted,security-scanner
-  #   volumes:
-  #     - /var/run/docker.sock:/var/run/docker.sock
-  #     - runner_data:/data
-  #   restart: unless-stopped
-  #   secrets:
-  #     - github_token
-
-  # --- NGINX Reverse Proxy ---
+  # -----------------------------
+  # NGINX Reverse Proxy
+  # -----------------------------
   nginx:
     image: nginx:alpine
+    container_name: sonar-nginx
     depends_on:
       - sonarqube
     ports:
@@ -72,6 +63,29 @@ services:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     restart: unless-stopped
 
+  # -----------------------------
+  # GitHub Self-Hosted Runner
+  # -----------------------------
+  github-runner:
+    image: myoung34/github-runner:latest
+    container_name: github-runner
+    restart: unless-stopped
+    environment:
+      REPO_URL: https://github.com/ORG/REPO
+      RUNNER_NAME: sonar-runner-01
+      RUNNER_LABELS: self-hosted,linux,sonar,security
+      RUNNER_TOKEN_FILE: /run/secrets/github_runner_token
+      RUNNER_WORKDIR: /_work
+      DISABLE_AUTO_UPDATE: "false"
+    volumes:
+      - runner_data:/_work
+      - /var/run/docker.sock:/var/run/docker.sock
+    secrets:
+      - github_runner_token
+
+# -----------------------------
+# Volumes
+# -----------------------------
 volumes:
   postgres_data:
   sonar_data:
@@ -79,8 +93,11 @@ volumes:
   sonar_logs:
   runner_data:
 
+# -----------------------------
+# Secrets
+# -----------------------------
 secrets:
   postgres_password:
     file: ./secrets/postgres_password.txt
-  github_token:
-    file: ./secrets/github_token.txt
+  github_runner_token:
+    file: ./secrets/github_runner_token.txt
