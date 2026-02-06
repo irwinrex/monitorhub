@@ -1,0 +1,54 @@
+name: Security Scan (Opengrep + Trivy + Gitleaks)
+
+on:
+  pull_request:
+    branches: [ beta ]
+
+jobs:
+  security_scan:
+    runs-on: [self-hosted, security ] # Runs on the container you defined above
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 
+
+      # 1. SAST: Opengrep (Community maintained)
+      - name: Opengrep Scan
+        run: |
+          docker run --rm -v $(pwd):/src opengrep/opengrep opengrep scan --json --output opengrep_results.json || true
+
+      # 2. SCA: Trivy (Dependencies & Vulnerabilities)
+      - name: Trivy Scan
+        run: |
+          docker run --rm -v $(pwd):/root/.cache/ -v $(pwd):/src aquasec/trivy fs /src --format json --output trivy_results.json
+
+      # 3. Secrets: Gitleaks
+      - name: Gitleaks Scan
+        run: |
+          docker run --rm -v $(pwd):/path zricethezav/gitleaks:latest detect --source="/path" --format=json --report-path=/path/gitleaks_results.json || true
+
+      # 4. Upload to DefectDojo
+      - name: Upload to DefectDojo
+        env:
+          DOJO_API_KEY: ${{ secrets.DEFECTDOJO_API_KEY }}
+          DOJO_URL: "http://defectdojo/api/v2"
+        run: |
+          # Function to upload reports
+          upload_to_dojo() {
+            local file=$1
+            local scan_type=$2
+            echo "Uploading $scan_type..."
+            curl -X POST "$DOJO_URL/import-scan/" \
+              -H "Authorization: Token $DOJO_API_KEY" \
+              -F "active=true" \
+              -F "verified=true" \
+              -F "scan_type=$scan_type" \
+              -F "product_name=Aspyre-Security" \
+              -F "engagement_name=Aspyre Pipeline" \
+              -F "file=@$file"
+          }
+
+          upload_to_dojo "results_opengrep.json" "Semgrep JSON Report"
+          upload_to_dojo "results_trivy.json" "Trivy Scan"
+          upload_to_dojo "results_gitleaks.json" "Gitleaks Scan"

@@ -1,0 +1,17 @@
+{
+  "name": "Nvim Python 3.12 (Ubuntu)",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "remoteUser": "dev",
+  "containerEnv": {
+    "EDITOR": "nvim"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "configureZshAsDefaultShell": true
+    }
+  },
+  // CLONE LOGIC: Targeted for your repo structure
+  "postCreateCommand": "mkdir -p ~/.config && git clone --depth 1 https://github.com/irwinrex/dotfiles.git /tmp/dots && cp -rv /tmp/dots/nvim/.config/nvim ~/.config/ && rm -rf /tmp/dots && nvim --headless '+Lazy! sync' +qa"
+}

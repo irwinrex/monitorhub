@@ -1,0 +1,115 @@
+services:
+  # ---------------------------------------------------------
+  # Database
+  # ---------------------------------------------------------
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: dojo
+      POSTGRES_DB: defectdojo
+      POSTGRES_PASSWORD: ${DD_DATABASE_PASSWORD:-defectdojo}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dojo -d defectdojo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - defectdojo-network
+
+  # ---------------------------------------------------------
+  # Valkey (Redis-compatible)
+  # ---------------------------------------------------------
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+    networks:
+      - defectdojo-network
+
+  # ---------------------------------------------------------
+  # DefectDojo Web Application
+  # ---------------------------------------------------------
+  defectdojo:
+    image: defectdojo/defectdojo-django:latest
+    depends_on:
+      db:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    entrypoint: ['/wait-for-it.sh', 'db:5432', '-t', '30', '--', '/entrypoint-uwsgi.sh']
+    environment:
+      DD_DEBUG: 'False'
+      DD_ALLOWED_HOSTS: "*"
+      DD_DATABASE_URL: ${DD_DATABASE_URL:-postgresql://dojo:defectdojo@db:5432/defectdojo}
+      DD_CELERY_BROKER_URL: ${DD_CELERY_BROKER_URL:-redis://valkey:6379/0}
+      DD_SECRET_KEY: "${DD_SECRET_KEY:-hhZCp@D28z!n@NED*yB!ROMt+WzsY*iq}"
+      DD_CREDENTIAL_AES_256_KEY: "${DD_CREDENTIAL_AES_256_KEY:-&91a*agLqesc*0DJ+2*bAbsUZfR*4nLw}"
+    restart: unless-stopped
+    networks:
+      - defectdojo-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ---------------------------------------------------------
+  # NGINX Reverse Proxy
+  # ---------------------------------------------------------
+  nginx:
+    image: nginx:1.29-alpine
+    depends_on:
+      defectdojo:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: unless-stopped
+    networks:
+      - defectdojo-network
+
+  # ---------------------------------------------------------
+  # GitHub Self-Hosted Runner
+  # ---------------------------------------------------------
+  github-runner:
+    image: myoung34/github-runner:latest
+    restart: unless-stopped
+    environment:
+      REPO_URL: "https://github.com/equipo-aspyre/aspyre-security"
+      RUNNER_NAME: "local-runner"
+      LABELS: "self-hosted,linux,opengrep,trivy,gitleaks"
+      RUNNER_WORKDIR: "/_work"
+      RUNNER_SCOPE: "repo"
+    entrypoint:
+      - sh
+      - -c
+      - |
+        export ACCESS_TOKEN=$$(cat /run/secrets/github_runner_token)
+        exec /entrypoint.sh ./bin/Runner.Listener run --startuptype service
+    volumes:
+      - runner_data:/_work
+      - /var/run/docker.sock:/var/run/docker.sock
+    secrets:
+      - github_runner_token
+    networks:
+      - defectdojo-network
+
+networks:
+  defectdojo-network:
+    name: defectdojo-network
+
+volumes:
+  postgres_data:
+  runner_data:
+
+secrets:
+  github_runner_token:
+    file: ./secrets/github_token.txt
