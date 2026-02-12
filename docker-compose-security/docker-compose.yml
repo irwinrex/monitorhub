@@ -1,0 +1,176 @@
+services:
+  # --- DefectDojo Database ---
+  dojo-db:
+    image: postgres:18.1-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DD_DATABASE_NAME:-defectdojo}
+      POSTGRES_USER: ${DD_DATABASE_USER:-defectdojo}
+      POSTGRES_PASSWORD: ${DD_DATABASE_PASSWORD:-defectdojoDBPassword}
+    volumes:
+      - dojo_postgres_data:/var/lib/postgresql/data
+    mem_limit: 512m
+    mem_reservation: 256m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DD_DATABASE_USER:-defectdojo} -d ${DD_DATABASE_NAME:-defectdojo}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - security-network
+
+  # --- Valkey (Redis replacement for DefectDojo) ---
+  dojo-valkey:
+    image: valkey/valkey:7.2.11-alpine
+    restart: unless-stopped
+    command: valkey-server --appendonly yes --port 6379
+    volumes:
+      - dojo_valkey_data:/data
+    mem_limit: 128m
+    mem_reservation: 64m
+    cpus: 0.25
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - security-network
+
+  # --- DefectDojo Initialization ---
+  dojo-init:
+    image: defectdojo/defectdojo-django:2.55.2
+    restart: "no"
+    depends_on:
+      dojo-db:
+        condition: service_healthy
+      dojo-valkey:
+        condition: service_healthy
+    entrypoint: ['/wait-for-it.sh', 'dojo-db:5432', '--', '/entrypoint-initializer.sh']
+    environment:
+      DD_DATABASE_URL: postgresql://${DD_DATABASE_USER:-defectdojo}:${DD_DATABASE_PASSWORD:-defectdojoDBPassword}@dojo-db:5432/${DD_DATABASE_NAME:-defectdojo}
+      DD_CELERY_BROKER_URL: redis://dojo-valkey:6379/0
+      DD_SECRET_KEY: ${DD_SECRET_KEY:-your-secret-key-change-this-in-production}
+      DD_CREDENTIAL_AES_256_KEY: ${DD_CREDENTIAL_AES_256_KEY:-your-aes-key-change-this-in-production}
+      DD_ADMIN_USER: ${DD_ADMIN_USER:-admin}
+      DD_ADMIN_PASSWORD: ${DD_ADMIN_PASSWORD:-admin}
+      DD_ADMIN_MAIL: ${DD_ADMIN_MAIL:-admin@defectdojo.local}
+      DD_INITIALIZE: "true"
+      DD_DATABASE_READINESS_TIMEOUT: "30"
+    mem_limit: 512m
+    cpus: 0.5
+    networks:
+      - security-network
+
+  # --- DefectDojo Django (uwsgi) ---
+  dojo-uwsgi:
+    image: defectdojo/defectdojo-django:2.55.2
+    restart: unless-stopped
+    depends_on:
+      dojo-db:
+        condition: service_healthy
+      dojo-valkey:
+        condition: service_healthy
+      dojo-init:
+        condition: service_completed_successfully
+    entrypoint: ['/wait-for-it.sh', 'dojo-db:5432', '-t', '30', '--', '/entrypoint-uwsgi.sh']
+    environment:
+      DD_DATABASE_URL: postgresql://${DD_DATABASE_USER:-defectdojo}:${DD_DATABASE_PASSWORD:-defectdojoDBPassword}@dojo-db:5432/${DD_DATABASE_NAME:-defectdojo}
+      DD_CELERY_BROKER_URL: redis://dojo-valkey:6379/0
+      DD_SECRET_KEY: ${DD_SECRET_KEY:-your-secret-key-change-this-in-production}
+      DD_CREDENTIAL_AES_256_KEY: ${DD_CREDENTIAL_AES_256_KEY:-your-aes-key-change-this-in-production}
+      DD_ALLOWED_HOSTS: "${DD_ALLOWED_HOSTS:-*}"
+      DD_CSRF_TRUSTED_ORIGINS: ${DD_CSRF_TRUSTED_ORIGINS:-http://localhost,http://127.0.0.1}
+      DD_UWSGI_NUM_OF_PROCESSES: "2"
+      DD_UWSGI_NUM_OF_THREADS: "2"
+      DD_DATABASE_READINESS_TIMEOUT: "30"
+    volumes:
+      - dojo_media:/app/media
+    mem_limit: 1g
+    mem_reservation: 512m
+    cpus: 0.75
+    networks:
+      - security-network
+
+  # --- DefectDojo Celery Worker ---
+  dojo-celery-worker:
+    image: defectdojo/defectdojo-django:2.55.2
+    restart: unless-stopped
+    depends_on:
+      dojo-db:
+        condition: service_healthy
+      dojo-valkey:
+        condition: service_healthy
+      dojo-init:
+        condition: service_completed_successfully
+    entrypoint: ['/wait-for-it.sh', 'dojo-db:5432', '-t', '30', '--', '/entrypoint-celery-worker.sh']
+    environment:
+      DD_DATABASE_URL: postgresql://${DD_DATABASE_USER:-defectdojo}:${DD_DATABASE_PASSWORD:-defectdojoDBPassword}@dojo-db:5432/${DD_DATABASE_NAME:-defectdojo}
+      DD_CELERY_BROKER_URL: redis://dojo-valkey:6379/0
+      DD_SECRET_KEY: ${DD_SECRET_KEY:-your-secret-key-change-this-in-production}
+      DD_CREDENTIAL_AES_256_KEY: ${DD_CREDENTIAL_AES_256_KEY:-your-aes-key-change-this-in-production}
+      DD_DATABASE_READINESS_TIMEOUT: "30"
+    volumes:
+      - dojo_media:/app/media
+    mem_limit: 512m
+    mem_reservation: 256m
+    cpus: 0.5
+    networks:
+      - security-network
+
+  # --- DefectDojo Celery Beat (Scheduler) ---
+  dojo-celery-beat:
+    image: defectdojo/defectdojo-django:2.55.2
+    restart: unless-stopped
+    depends_on:
+      dojo-db:
+        condition: service_healthy
+      dojo-valkey:
+        condition: service_healthy
+      dojo-init:
+        condition: service_completed_successfully
+    entrypoint: ['/wait-for-it.sh', 'dojo-db:5432', '-t', '30', '--', '/entrypoint-celery-beat.sh']
+    environment:
+      DD_DATABASE_URL: postgresql://${DD_DATABASE_USER:-defectdojo}:${DD_DATABASE_PASSWORD:-defectdojoDBPassword}@dojo-db:5432/${DD_DATABASE_NAME:-defectdojo}
+      DD_CELERY_BROKER_URL: redis://dojo-valkey:6379/0
+      DD_SECRET_KEY: ${DD_SECRET_KEY:-your-secret-key-change-this-in-production}
+      DD_CREDENTIAL_AES_256_KEY: ${DD_CREDENTIAL_AES_256_KEY:-your-aes-key-change-this-in-production}
+      DD_DATABASE_READINESS_TIMEOUT: "30"
+    mem_limit: 128m
+    mem_reservation: 64m
+    cpus: 0.25
+    networks:
+      - security-network
+
+  # --- NGINX Reverse Proxy ---
+  nginx:
+    image: defectdojo/defectdojo-nginx:2.55.2
+    restart: unless-stopped
+    depends_on:
+      dojo-uwsgi:
+        condition: service_started
+    environment:
+      NGINX_METRICS_ENABLED: "false"
+      DD_UWSGI_HOST: "dojo-uwsgi"
+      DD_UWSGI_PORT: "3031"
+    ports:
+      - "80:8080"
+    volumes:
+      - dojo_media:/usr/share/nginx/html/media:ro
+    mem_limit: 128m
+    mem_reservation: 64m
+    cpus: 0.25
+    networks:
+      - security-network
+
+networks:
+  security-network:
+    name: security-network
+
+volumes:
+  dojo_postgres_data:
+  dojo_valkey_data:
+  dojo_media:
