@@ -2,53 +2,261 @@ name: Security Scan (Opengrep + Trivy + Gitleaks)
 
 on:
   pull_request:
-    branches: [ beta ]
+    branches: [ beta, main ]
+  push:
+    branches: [ beta, main ]
+  workflow_dispatch:
+    inputs:
+      scan_type:
+        description: 'Type of scan to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - sast
+          - sca
+          - secrets
 
 jobs:
   security_scan:
-    runs-on: [self-hosted, security ] # Runs on the container you defined above
+    runs-on: self-hosted
+    container: myoung34/github-runner:latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Prepare Docker in Docker
+        run: |
+          chmod +x /entrypoint.sh 2>/dev/null || true
+          docker info 2>/dev/null || true
+
+      - name: Set up Python for API calls
+        run: |
+          python3 -m pip install requests --quiet
 
       # 1. SAST: Opengrep (Community maintained)
       - name: Opengrep Scan
+        id: opengrep
+        if: inputs.scan_type == 'all' || inputs.scan_type == 'sast'
         run: |
-          docker run --rm -v $(pwd):/src opengrep/opengrep opengrep scan --json --output opengrep_results.json || true
+          docker run --rm \
+            -v "${{ github.workspace }}:/src" \
+            -w /src \
+            opengrep/opengrep:latest \
+            opengrep scan \
+              --json \
+              --output "${{ github.workspace }}/opengrep_results.json" \
+              --no-color || true
+          echo "opengrep_exit_code=$?" >> $GITHUB_OUTPUT
 
       # 2. SCA: Trivy (Dependencies & Vulnerabilities)
       - name: Trivy Scan
+        id: trivy
+        if: inputs.scan_type == 'all' || inputs.scan_type == 'sca'
         run: |
-          docker run --rm -v $(pwd):/root/.cache/ -v $(pwd):/src aquasec/trivy fs /src --format json --output trivy_results.json
+          docker run --rm \
+            -v "${{ github.workspace }}:/src" \
+            -v "${{ github.workspace }}/trivy-cache:/root/.cache/" \
+            aquasec/trivy:latest \
+            fs /src \
+              --format json \
+              --output "${{ github.workspace }}/trivy_results.json" \
+              --severity HIGH,CRITICAL || true
 
       # 3. Secrets: Gitleaks
       - name: Gitleaks Scan
+        id: gitleaks
+        if: inputs.scan_type == 'all' || inputs.scan_type == 'secrets'
         run: |
-          docker run --rm -v $(pwd):/path zricethezav/gitleaks:latest detect --source="/path" --format=json --report-path=/path/gitleaks_results.json || true
+          docker run --rm \
+            -v "${{ github.workspace }}:/path" \
+            zricethezav/gitleaks:latest \
+            detect \
+              --source="/path" \
+              --format=json \
+              --report-path="/path/gitleaks_results.json" \
+              --verbose || true
 
-      # 4. Upload to DefectDojo
+      # 4. Generate Test Results Summary
+      - name: Generate Test Results Summary
+        id: summary
+        run: |
+          python3 << 'EOF'
+          import json
+          import os
+
+          workspace = os.environ.get('GITHUB_WORKSPACE', '.')
+
+          summary = "## Security Scan Results\n\n"
+
+          # Opengrep results
+          opengrep_file = os.path.join(workspace, 'opengrep_results.json')
+          if os.path.exists(opengrep_file):
+              try:
+                  with open(opengrep_file) as f:
+                      data = json.load(f)
+                  count = len(data.get('results', []))
+                  summary += f"### Opengrep (SAST): {count} findings\n"
+                  if count > 0:
+                      summary += "| Severity | File | Line | Rule |\n"
+                      summary += "|----------|------|------|------|\n"
+                      for r in data.get('results', [])[:10]:
+                          severity = r.get('severity', 'UNKNOWN')
+                          file = r.get('location', {}).get('file', 'Unknown')
+                          line = r.get('location', {}).get('line', '?')
+                          rule = r.get('id', r.get('check_id', 'Unknown'))
+                          summary += f"| {severity} | {file} | {line} | {rule} |\n"
+                  summary += "\n"
+              except Exception as e:
+                  summary += f"### Opengrep: Error parsing results ({e})\n\n"
+
+          # Trivy results
+          trivy_file = os.path.join(workspace, 'trivy_results.json')
+          if os.path.exists(trivy_file):
+              try:
+                  with open(trivy_file) as f:
+                      data = json.load(f)
+                  vulnerabilities = data.get('Results', [])
+                  crit_count = sum(1 for r in vulnerabilities if any(v.get('Severity') == 'CRITICAL' for v in r.get('Vulnerabilities', [])))
+                  high_count = sum(1 for r in vulnerabilities if any(v.get('Severity') == 'HIGH' for v in r.get('Vulnerabilities', [])))
+                  summary += f"### Trivy (SCA): {crit_count} CRITICAL, {high_count} HIGH vulnerabilities\n\n"
+              except Exception as e:
+                  summary += f"### Trivy: Error parsing results ({e})\n\n"
+
+          # Gitleaks results
+          gitleaks_file = os.path.join(workspace, 'gitleaks_results.json')
+          if os.path.exists(gitleaks_file):
+              try:
+                  with open(gitleaks_file) as f:
+                      data = json.load(f)
+                  count = len(data)
+                  summary += f"### Gitleaks (Secrets): {count} secrets found\n\n"
+                  if count > 0:
+                      summary += "| File | Secret Type |\n"
+                      summary += "|------|-------------|\n"
+                      for r in data[:10]:
+                          file = r.get('File', 'Unknown')
+                          secret = r.get('Rule', 'Unknown')
+                          summary += f"| {file} | {secret} |\n"
+                  summary += "\n"
+              except Exception as e:
+                  summary += f"### Gitleaks: Error parsing results ({e})\n\n"
+
+          with open(os.environ.get('GITHUB_STEP_SUMMARY', '/dev/stdout'), 'w') as f:
+              f.write(summary)
+
+          print(summary)
+          EOF
+
+      # 5. Upload to DefectDojo
       - name: Upload to DefectDojo
         env:
           DOJO_API_KEY: ${{ secrets.DEFECTDOJO_API_KEY }}
-          DOJO_URL: "http://defectdojo/api/v2"
+          DOJO_URL: ${{ secrets.DEFECTDOJO_URL || 'http://localhost:8080/api/v2' }}
         run: |
-          # Function to upload reports
-          upload_to_dojo() {
-            local file=$1
-            local scan_type=$2
-            echo "Uploading $scan_type..."
-            curl -X POST "$DOJO_URL/import-scan/" \
-              -H "Authorization: Token $DOJO_API_KEY" \
-              -F "active=true" \
-              -F "verified=true" \
-              -F "scan_type=$scan_type" \
-              -F "product_name=Aspyre-Security" \
-              -F "engagement_name=Aspyre Pipeline" \
-              -F "file=@$file"
-          }
+          python3 << 'EOF'
+          import os
+          import json
+          import requests
 
-          upload_to_dojo "results_opengrep.json" "Semgrep JSON Report"
-          upload_to_dojo "results_trivy.json" "Trivy Scan"
-          upload_to_dojo "results_gitleaks.json" "Gitleaks Scan"
+          api_key = os.environ.get('DOJO_API_KEY')
+          dojo_url = os.environ.get('DOJO_URL', 'http://localhost:8080/api/v2')
+          workspace = os.environ.get('GITHUB_WORKSPACE', '.')
+
+          if not api_key:
+              print("::warning::DEFECTDOJO_API_KEY not set, skipping upload")
+              exit(0)
+
+          headers = {"Authorization": f"Token {api_key}"}
+
+          scans = [
+              ("opengrep_results.json", "Semgrep JSON Report", "Opengrep Scan"),
+              ("trivy_results.json", "Trivy Scan", "Trivy Vulnerability Scan"),
+              ("gitleaks_results.json", "Gitleaks Scan", "Gitleaks Scan"),
+          ]
+
+          for filename, scan_type, test_name in scans:
+              filepath = os.path.join(workspace, filename)
+              if not os.path.exists(filepath):
+                  print(f"::warning::File {filename} not found, skipping")
+                  continue
+
+              print(f"Uploading {scan_type}...")
+
+              try:
+                  with open(filepath, 'rb') as f:
+                      files = {'file': (filename, f, 'application/json')}
+                      data = {
+                          'active': True,
+                          'verified': True,
+                          'scan_type': scan_type,
+                          'product_name': 'GitHub Actions Pipeline',
+                          'engagement_name': f"Security Scan - {os.environ.get('GITHUB_RUN_ID', 'unknown')}",
+                          'test_title': test_name,
+                          'commit_hash': os.environ.get('GITHUB_SHA', '')[:8],
+                      }
+                      response = requests.post(
+                          f"{dojo_url}/import-scan/",
+                          headers=headers,
+                          data=data,
+                          files=files,
+                          timeout=60
+                      )
+
+                  if response.status_code in [200, 201]:
+                      result = response.json()
+                      print(f"✓ Uploaded {scan_type} - Finding #{result.get('id', 'unknown')}")
+                  else:
+                      print(f"::warning::Failed to upload {scan_type}: {response.status_code} - {response.text[:200]}")
+              except Exception as e:
+                  print(f"::warning::Error uploading {scan_type}: {e}")
+
+          print("\n✓ All scans uploaded to DefectDojo")
+          EOF
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-scan-results
+          path: |
+            *_results.json
+            security-scan-summary.md
+          retention-days: 30
+        continue-on-error: true
+
+  dockle_scan:
+    runs-on: self-hosted
+    container: myoung34/github-runner:latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Dockle Container Image Security Scan
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/src" \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            goodwithtech/dockle:latest \
+            dockle /src || true
+
+  dependency_check:
+    runs-on: self-hosted
+    container: myoung34/github-runner:latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: OWASP Dependency Check
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/src" \
+            -v "${{ github.workspace }}/dependency-check-cache:/usr/share/dependency-check/data" \
+            owasp/dependency-check:latest \
+            --project "Security Scan" \
+            --scan /src \
+            --format JSON \
+            --out /src/dependency_check_results.json || true

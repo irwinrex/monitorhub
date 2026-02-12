@@ -145,6 +145,24 @@ services:
     networks:
       - security-network
 
+  # --- GitHub Actions Runner ---
+  github-runner:
+    image: myoung34/github-runner:latest
+    restart: unless-stopped
+    environment:
+      - REPO_URL=https://github.com/your-org/your-repo
+      - RUNNER_TOKEN=${RUNNER_TOKEN}
+      - RUNNER_NAME=security-scanner-runner
+      - RUNNER_LABELS=self-hosted,security-scanner
+      - DISABLE_RUNNER_UPDATE_CHECK=true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - runner_data:/data
+    networks:
+      - security-network
+    mem_limit: 2g
+    cpus: 1.0
+
   # --- NGINX Reverse Proxy ---
   nginx:
     image: defectdojo/defectdojo-nginx:2.55.2
@@ -174,3 +192,4 @@ volumes:
   dojo_postgres_data:
   dojo_valkey_data:
   dojo_media:
+  runner_data:
