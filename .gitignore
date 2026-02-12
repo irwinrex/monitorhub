@@ -18,6 +18,7 @@ monitoring/*.pyc
 .monitorenv/
 env/
 venv/
+.env
 
 # --- Docker ---
 *.pid
