@@ -1,0 +1,147 @@
+name: "Security & QA"
+
+on:
+  push:
+    branches: [ "develop" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+env:
+  # DefectDojo Config
+  DOJO_URL: ${{ secrets.DEFECTDOJO_URL }}          # https://dojo.yourdomain.com/api/v2
+  DOJO_API_KEY: ${{ secrets.DEFECTDOJO_API_KEY }}  # Your PAT from Dojo
+  DOJO_PRODUCT: "Full-Stack-Platform"              # Must exist in Dojo
+  
+  # Scan Scope
+  GITHUB_TOKEN: ${{ secrets.githubtoken }}         # PAT with 'repo' scope
+
+jobs:
+  comprehensive-scan:
+    name: "Analyze and Report"
+    runs-on: [self-hosted, security-scanner]
+    
+    steps:
+      # --- 1. PREPARATION ---
+      - name: "Checkout Main Project"
+        uses: actions/checkout@v4
+
+      - name: "Checkout Backend API"
+        uses: actions/checkout@v4
+        with:
+          repository: test/backend-app
+          token: ${{ env.GITHUB_TOKEN }}
+          path: backend
+
+      - name: "Checkout Frontend App"
+        uses: actions/checkout@v4
+        with:
+          repository: test/frontend-app
+          token: ${{ env.GITHUB_TOKEN }}
+          path: frontend
+
+      # --- 2. FUNCTIONAL TESTING ---
+      - name: "Run Functional Tests (Pytest)"
+        run: |
+          python3 -m pip install pytest pytest-cov requests --quiet
+          # Generating JUnit XML for DefectDojo Dashboard
+          python3 -m pytest backend/tests frontend/tests --junitxml=junit_results.xml || true
+
+      # --- 3. SECURITY SCANNERS ---
+      
+      # SECRETS: Gitleaks
+      - name: "Gitleaks (Secrets Scan)"
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/path" \
+            zricethezav/gitleaks:latest detect \
+            --source="/path" --format=json --report-path="/path/gitleaks_results.json" --exit-code 0
+
+      # SAST: Opengrep (Standard for 2026)
+      - name: "Opengrep (SAST Scan)"
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/src" -w /src \
+            opengrep/opengrep:latest opengrep scan \
+            --json --output /src/opengrep_results.json || true
+
+      # SCA: Trivy
+      - name: "Trivy (Vulnerability Scan)"
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/src" \
+            aquasec/trivy:latest fs /src \
+            --format json --output /src/trivy_results.json --severity HIGH,CRITICAL || true
+
+      # DEEP SCA: OWASP Dependency-Check
+      - name: "OWASP Dependency-Check"
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/src" \
+            -v "${{ github.workspace }}/odc-data:/usr/share/dependency-check/data" \
+            owasp/dependency-check:latest \
+            --project "Platform-Scan" --scan /src --format JSON --out /src/owasp_results.json || true
+
+      # --- 4. DASHBOARD INTEGRATION ---
+      
+      - name: "Push All Reports to DefectDojo"
+        shell: python
+        run: |
+          import os, requests, datetime
+
+          # Config
+          DOJO_URL = os.getenv('DOJO_URL').rstrip('/')
+          API_KEY  = os.getenv('DOJO_API_KEY')
+          PRODUCT  = os.getenv('DOJO_PRODUCT')
+          RUN_ID   = os.getenv('GITHUB_RUN_ID')
+          
+          # Engagement Name (Groups all scans together)
+          ENGAGEMENT_NAME = f"Pipeline-Run-{RUN_ID}-{datetime.date.today()}"
+
+          def upload(file_name, scan_type, test_title):
+              if not os.path.exists(file_name):
+                  print(f"[-] Skipping {test_title}: File {file_name} not found.")
+                  return
+              
+              print(f"[+] Uploading {test_title}...")
+              
+              headers = {'Authorization': f'Token {API_KEY}'}
+              data = {
+                  'active': True,
+                  'verified': True,
+                  'scan_type': scan_type,
+                  'product_name': PRODUCT,
+                  'engagement_name': ENGAGEMENT_NAME,
+                  'test_title': test_title,
+                  'auto_create_context': True # Auto-creates Engagement if missing
+              }
+              
+              with open(file_name, 'rb') as f:
+                  response = requests.post(
+                      f"{DOJO_URL}/import-scan/",
+                      headers=headers,
+                      data=data,
+                      files={'file': f},
+                      timeout=120
+                  )
+              
+              if response.status_code in [200, 201]:
+                  print(f" [SUCCESS] {test_title} is now in DefectDojo.")
+              else:
+                  print(f" [ERROR] {response.status_code}: {response.text}")
+
+          # Map your scanner outputs to DefectDojo's accepted scan types
+          upload("gitleaks_results.json",  "Gitleaks Scan",         "Secrets Detection")
+          upload("opengrep_results.json",  "Semgrep JSON Report",   "SAST (Opengrep)")
+          upload("trivy_results.json",     "Trivy Scan",            "SCA (Trivy)")
+          upload("owasp_results.json",     "Dependency Check Scan", "SCA (OWASP)")
+          upload("junit_results.xml",      "JUnit XML Report",      "Functional Unit Tests")
+
+      # --- 5. CLEANUP & ARCHIVE ---
+      - name: "Upload Artifacts for Manual Review"
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-reports
+          path: |
+            *_results.json
+            *.xml
+          retention-days: 14
