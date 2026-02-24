@@ -1,0 +1,268 @@
+# ==============================================================================
+# values/mtls-patch.yaml
+# mTLS overlay — applied ON TOP of lgtm-values.yaml.
+#
+# What this file adds:
+#   Loki    — TLS on HTTP + gRPC listeners; RequireAndVerifyClientCert
+#   Tempo   — TLS on HTTP API + OTLP gRPC/HTTP receivers
+#   Mimir   — TLS on all server + internal gRPC client calls
+#   Grafana — client cert mounted; secureJsonData wired for each datasource
+#
+# Cert secrets are created by scripts/install_mTLS.sh via cert-manager.
+# Each secret contains: tls.crt, tls.key, ca.crt
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# LOKI mTLS
+# ------------------------------------------------------------------------------
+loki:
+  loki:
+    server:
+      http_tls_config:
+        cert_file:        /etc/loki/tls/tls.crt
+        key_file:         /etc/loki/tls/tls.key
+        client_ca_file:   /etc/loki/tls/ca.crt
+        client_auth_type: RequireAndVerifyClientCert
+
+      grpc_tls_config:
+        cert_file:        /etc/loki/tls/tls.crt
+        key_file:         /etc/loki/tls/tls.key
+        client_ca_file:   /etc/loki/tls/ca.crt
+        client_auth_type: RequireAndVerifyClientCert
+
+  singleBinary:
+    extraVolumes:
+      - name: loki-tls
+        secret:
+          secretName: loki-tls-secret
+      - name: loki-ca
+        secret:
+          secretName: lgtm-root-ca-secret
+
+    extraVolumeMounts:
+      - name:      loki-tls
+        mountPath: /etc/loki/tls
+        readOnly:  true
+      - name:      loki-ca
+        mountPath: /etc/loki/tls/ca.crt
+        subPath:   ca.crt
+        readOnly:  true
+
+# ------------------------------------------------------------------------------
+# TEMPO mTLS
+# gRPC :4317 — full mTLS (apps must present a valid cert)
+# HTTP :4318 — TLS only (no client cert — easier for OTel SDKs during migration)
+# ------------------------------------------------------------------------------
+tempo:
+  tempo:
+    server:
+      http_tls_config:
+        cert_file:        /etc/tempo/tls/tls.crt
+        key_file:         /etc/tempo/tls/tls.key
+        client_ca_file:   /etc/tempo/tls/ca.crt
+        client_auth_type: RequireAndVerifyClientCert
+
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: "0.0.0.0:4317"
+            tls:
+              cert_file:        /etc/tempo/tls/tls.crt
+              key_file:         /etc/tempo/tls/tls.key
+              client_ca_file:   /etc/tempo/tls/ca.crt
+              client_auth_type: RequireAndVerifyClientCert
+          http:
+            endpoint: "0.0.0.0:4318"
+            tls:
+              cert_file: /etc/tempo/tls/tls.crt
+              key_file:  /etc/tempo/tls/tls.key
+
+  extraVolumes:
+    - name: tempo-tls
+      secret:
+        secretName: tempo-tls-secret
+    - name: tempo-ca
+      secret:
+        secretName: lgtm-root-ca-secret
+
+  extraVolumeMounts:
+    - name:      tempo-tls
+      mountPath: /etc/tempo/tls
+      readOnly:  true
+    - name:      tempo-ca
+      mountPath: /etc/tempo/tls/ca.crt
+      subPath:   ca.crt
+      readOnly:  true
+
+# ------------------------------------------------------------------------------
+# MIMIR mTLS
+# Internal gRPC calls (distributor→ingester, querier→store-gateway) also TLS.
+# global.extraVolumes propagates to all mimir-distributed sub-deployments.
+# Ingester gets its own dedicated cert (different SANs, isolated blast radius).
+# ------------------------------------------------------------------------------
+mimir:
+  mimir:
+    structuredConfig:
+      server:
+        http_tls_config:
+          cert_file:        /etc/mimir/tls/tls.crt
+          key_file:         /etc/mimir/tls/tls.key
+          client_ca_file:   /etc/mimir/tls/ca.crt
+          client_auth_type: RequireAndVerifyClientCert
+        grpc_tls_config:
+          cert_file:        /etc/mimir/tls/tls.crt
+          key_file:         /etc/mimir/tls/tls.key
+          client_ca_file:   /etc/mimir/tls/ca.crt
+          client_auth_type: RequireAndVerifyClientCert
+
+      ingester_client:
+        grpc_client_config:
+          tls_enabled:              true
+          tls_cert_path:            /etc/mimir/tls/tls.crt
+          tls_key_path:             /etc/mimir/tls/tls.key
+          tls_ca_path:              /etc/mimir/tls/ca.crt
+          tls_insecure_skip_verify: false
+
+      querier:
+        store_gateway_client:
+          tls_enabled:   true
+          tls_cert_path: /etc/mimir/tls/tls.crt
+          tls_key_path:  /etc/mimir/tls/tls.key
+          tls_ca_path:   /etc/mimir/tls/ca.crt
+
+      frontend:
+        grpc_client_config:
+          tls_enabled:   true
+          tls_cert_path: /etc/mimir/tls/tls.crt
+          tls_key_path:  /etc/mimir/tls/tls.key
+          tls_ca_path:   /etc/mimir/tls/ca.crt
+
+  global:
+    extraVolumes:
+      - name: mimir-tls
+        secret:
+          secretName: mimir-gateway-tls-secret
+      - name: mimir-ca
+        secret:
+          secretName: lgtm-root-ca-secret
+    extraVolumeMounts:
+      - name:      mimir-tls
+        mountPath: /etc/mimir/tls
+        readOnly:  true
+      - name:      mimir-ca
+        mountPath: /etc/mimir/tls/ca.crt
+        subPath:   ca.crt
+        readOnly:  true
+
+  ingester:
+    extraVolumes:
+      - name: mimir-ingester-tls
+        secret:
+          secretName: mimir-ingester-tls-secret
+      - name: mimir-ca
+        secret:
+          secretName: lgtm-root-ca-secret
+    extraVolumeMounts:
+      - name:      mimir-ingester-tls
+        mountPath: /etc/mimir/tls
+        readOnly:  true
+      - name:      mimir-ca
+        mountPath: /etc/mimir/tls/ca.crt
+        subPath:   ca.crt
+        readOnly:  true
+
+# ------------------------------------------------------------------------------
+# GRAFANA mTLS client
+# Grafana presents grafana-client-tls-secret to every backend.
+# $__file{} reads cert content from the mounted volume at runtime —
+# credentials are never stored in Grafana's database.
+# ------------------------------------------------------------------------------
+grafana:
+  extraVolumes:
+    - name: grafana-client-tls
+      secret:
+        secretName: grafana-client-tls-secret
+    - name: grafana-ca
+      secret:
+        secretName: lgtm-root-ca-secret
+
+  extraVolumeMounts:
+    - name:      grafana-client-tls
+      mountPath: /etc/grafana/tls
+      readOnly:  true
+    - name:      grafana-ca
+      mountPath: /etc/grafana/tls/ca.crt
+      subPath:   ca.crt
+      readOnly:  true
+
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+
+        - name: Mimir
+          type: prometheus
+          uid: mimir
+          url: https://lgtm-mimir-gateway.monitoring.svc.cluster.local:443/prometheus
+          access: proxy
+          isDefault: true
+          jsonData:
+            timeInterval:      "60s"
+            tlsAuthWithCACert: true
+            tlsAuth:           true
+            exemplarTraceIdDestinations:
+              - name: trace_id
+                datasourceUid: tempo
+          secureJsonData:
+            tlsCACert:     "$__file{/etc/grafana/tls/ca.crt}"
+            tlsClientCert: "$__file{/etc/grafana/tls/tls.crt}"
+            tlsClientKey:  "$__file{/etc/grafana/tls/tls.key}"
+
+        - name: Loki
+          type: loki
+          uid: loki
+          url: https://lgtm-loki.monitoring.svc.cluster.local:3100
+          access: proxy
+          jsonData:
+            maxLines:          1000
+            tlsAuthWithCACert: true
+            tlsAuth:           true
+            derivedFields:
+              - datasourceUid: tempo
+                matcherRegex:  "trace_id=(\\w+)"
+                name:          TraceID
+                url:           "$${__value.raw}"
+                urlDisplayLabel: "View Trace"
+          secureJsonData:
+            tlsCACert:     "$__file{/etc/grafana/tls/ca.crt}"
+            tlsClientCert: "$__file{/etc/grafana/tls/tls.crt}"
+            tlsClientKey:  "$__file{/etc/grafana/tls/tls.key}"
+
+        - name: Tempo
+          type: tempo
+          uid: tempo
+          url: https://lgtm-tempo.monitoring.svc.cluster.local:3200
+          access: proxy
+          jsonData:
+            httpMethod:        GET
+            tlsAuthWithCACert: true
+            tlsAuth:           true
+            tracesToLogsV2:
+              datasourceUid: loki
+              tags:
+                - { key: 'service.name', value: 'app' }
+              filterByTraceID: true
+              filterBySpanID:  false
+            tracesToMetrics:
+              datasourceUid:      mimir
+              spanStartTimeShift: "-5m"
+              spanEndTimeShift:   "5m"
+            serviceMap:
+              datasourceUid: mimir
+            nodeGraph:
+              enabled: true
+          secureJsonData:
+            tlsCACert:     "$__file{/etc/grafana/tls/ca.crt}"
+            tlsClientCert: "$__file{/etc/grafana/tls/tls.crt}"
+            tlsClientKey:  "$__file{/etc/grafana/tls/tls.key}"

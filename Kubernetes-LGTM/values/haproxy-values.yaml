@@ -1,0 +1,133 @@
+controller:
+  replicaCount: 1
+
+  hostNetwork: true
+  hostPorts:
+    enable: true
+    http:   80
+    https:  443
+    stat:   1024
+
+  ingressClass: haproxy
+  ingressClassResource:
+    name:    haproxy
+    enabled: true
+    default: true
+
+  service:
+    type: ClusterIP
+
+  config:
+    timeout-connect: "10s"
+    timeout-client:  "60s"
+    timeout-server:  "60s"
+    timeout-http-request: "30s"
+    timeout-keep-alive: "30s"
+    timeout-tunnel: "3600s"
+    forwarded-for: "true"
+    ssl-redirect: "false"
+    use-forwarded-headers: "true"
+    http-server-close: "true"
+    option: "httpchk forwardfor httplog dontlognull redispatch"
+    default-server: "inter 3s rise 2 fall 3"
+    maxconn: "4000"
+
+  extraConfig: |
+    # Rate limiting stick table
+    stick-table type ip size 100k expire 30s store conn_rate(30s),http_req_rate(30s)
+    
+    # Security headers
+    http-response set-header X-Frame-Options "SAMEORIGIN"
+    http-response set-header X-Content-Type-Options "nosniff"
+    http-response set-header X-XSS-Protection "1; mode=block"
+    http-response set-header Referrer-Policy "strict-origin-when-cross-origin"
+    http-response set-header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    http-response set-header Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https: wss:;"
+
+  extraBackendConfig:
+    annotations:
+      haproxy.org/rate-limit: "100"
+      haproxy.org/rate-limit-requests: "50"
+
+  extraService:
+    enabled: true
+    annotations:
+      haproxy.org/rate-limit: "100"
+
+  # Path-based routing backends
+  extraBackends:
+    # Mimir API
+    mimir-backend:
+      enabled: true
+      endpoints:
+        - https://lgtm-mimir-gateway.monitoring.svc.cluster.local:443
+      port: 443
+      backendServerProtocol: HTTPS
+      pathRewrite: "/mimir(.*) /$1"
+    # Loki
+    loki-backend:
+      enabled: true
+      endpoints:
+        - https://lgtm-loki.monitoring.svc.cluster.local:3100
+      port: 3100
+      backendServerProtocol: HTTPS
+      pathRewrite: "/loki(.*) /$1"
+    # Tempo
+    tempo-backend:
+      enabled: true
+      endpoints:
+        - https://lgtm-tempo.monitoring.svc.cluster.local:3200
+      port: 3200
+      backendServerProtocol: HTTPS
+      pathRewrite: "/tempo(.*) /$1"
+
+  resources:
+    requests:
+      cpu:    250m
+      memory: 256Mi
+    limits:
+      cpu:    1000m
+      memory: 512Mi
+
+  healthCheck:
+    nodePort: 0
+
+  stats:
+    enabled: true
+    port: 1024
+    auth: "admin:admin"
+
+  metrics:
+    enabled: true
+
+  podAnnotations:
+    cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+
+  tolerations:
+    - key: "node-role.kubernetes.io/master"
+      operator: "Exists"
+      effect: "NoSchedule"
+    - key: "node-role.kubernetes.io/control-plane"
+      operator: "Exists"
+      effect: "NoSchedule"
+
+  nodeSelector:
+    node-role.kubernetes.io/master: ""
+
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAntiAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: haproxy
+          topologyKey: kubernetes.io/hostname
+
+defaultBackend:
+  enabled: true
+  replicaCount: 1
+  resources:
+    requests: { cpu: 10m,  memory: 32Mi }
+    limits:   { cpu: 100m,  memory: 128Mi }
+  podAnnotations:
+    cluster-autoscaler.kubernetes.io/safe-to-evict: "false"

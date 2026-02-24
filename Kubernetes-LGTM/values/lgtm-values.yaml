@@ -1,0 +1,452 @@
+# ==============================================================================
+# values/lgtm-values.yaml
+# Base Helm values for the LGTM stack.
+#
+# Target  : k0s single node · t4g.xlarge (4 vCPU / 16 GB ARM64)
+# Auth    : AWS EC2 instance profile — no credentials in this file
+# S3      : Single bucket "lgtm-observability" with per-service key prefixes
+# mTLS    : TLS listeners configured here; cert mounts in mtls-patch.yaml
+#
+# Before deploying, replace the two placeholders:
+#   grafana.example.com  →  your real domain
+#   us-east-1            →  your S3 bucket region
+#
+# Quick replace:
+#   sed -i "s/grafana.example.com/YOUR_DOMAIN/g"  values/lgtm-values.yaml
+#   sed -i "s/us-east-1/YOUR_REGION/g"            values/lgtm-values.yaml
+#
+# S3 bucket layout (one bucket: lgtm-observability)
+#   lgtm-observability/loki-index_*     (Loki TSDB index prefix)
+#   lgtm-observability/loki-chunks/     (Loki object chunks)
+#   lgtm-observability/tempo-traces/    (Tempo trace blocks)
+#   lgtm-observability/mimir-blocks/    (Mimir TSDB blocks)
+#   lgtm-observability/mimir-ruler/     (Mimir ruler storage)
+#   lgtm-observability/mimir-alertmgr/  (Mimir alertmanager storage)
+#
+# Resource budget (16 GB RAM total, ~1.5 GB for OS/k0s = ~14.5 GB for workloads):
+#   k0s/kube-proxy     ~1.0 Gi
+#   CoreDNS            ~100 Mi
+#   HAProxy            ~256 Mi
+#   Loki               ~800 Mi
+#   Tempo              ~512 Mi
+#   Mimir (ingester)  ~2.0 Gi
+#   Mimir (other)     ~600 Mi
+#   Grafana            ~256 Mi
+#   Cert-manager       ~150 Mi
+#   Total: ~5.7 Gi leaving ~8+ Gi for burst/caching
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Global defaults for single-node battle-readiness
+# ------------------------------------------------------------------------------
+global:
+  priorityClassName: system-cluster-critical
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# ------------------------------------------------------------------------------
+# 1. LOKI  —  grafana/loki chart
+# Mode: SingleBinary (all components in one pod).
+# Data durability via S3. PVC is WAL only.
+# ------------------------------------------------------------------------------
+loki:
+  deploymentMode: SingleBinary
+
+  global:
+    dnsService: "coredns"   # k0s uses CoreDNS
+
+  loki:
+    auth_enabled: false
+
+    commonConfig:
+      replication_factor: 1
+
+    storage:
+      type: s3
+      s3:
+        region: us-east-1   # <── change if needed
+      bucketNames:
+        chunks: "lgtm-observability"
+        ruler:  "lgtm-observability"
+        admin:  "lgtm-observability"
+
+    storage_config:
+      aws:
+        bucketnames:      "lgtm-observability"
+        region:           "us-east-1"   # <── change if needed
+        s3forcepathstyle: false
+      tsdb_shipper:
+        active_index_directory: /var/loki/index
+        cache_location:         /var/loki/cache
+
+    schemaConfig:
+      configs:
+        - from: "2024-01-01"
+          store: tsdb
+          object_store: s3
+          schema: v13
+          index:
+            prefix: loki-index_   # Scopes Loki indexes within the shared bucket
+            period: 24h
+
+    limits_config:
+      retention_period:        720h   # 30 days
+      ingestion_rate_mb:       16
+      ingestion_burst_size_mb: 32
+      max_query_series:        10000
+      max_cache_freshness_for_per_metric_query: 10m
+      split_queries_by_interval: 24h
+
+    compactor:
+      retention_enabled:    true
+      delete_request_store: s3
+      working_directory:    /var/loki/compactor
+
+  singleBinary:
+    replicas: 1
+
+    resources:
+      requests:
+        cpu:    250m
+        memory: 512Mi
+      limits:
+        cpu:    1000m
+        memory: 1Gi
+
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClass: null
+
+    podAnnotations:
+      cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAntiAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: loki
+            topologyKey: kubernetes.io/hostname
+
+    topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: loki
+
+  read:    { replicas: 0 }
+  write:   { replicas: 0 }
+  backend: { replicas: 0 }
+  minio:   { enabled: false }
+
+# ------------------------------------------------------------------------------
+# 2. TEMPO  —  grafana/tempo chart (monolithic)
+# Note: Tempo monolithic listens on port 3200, NOT 3100.
+# WAL on PVC prevents trace loss on pod restart.
+# ------------------------------------------------------------------------------
+tempo:
+  replicas: 1
+
+  tempo:
+    repository: grafana/tempo
+    tag: ""   # Tracks chart appVersion — pin to a tag for strict prod control
+
+    retention: 720h   # 30 days
+
+    storage:
+      trace:
+        backend: s3
+        s3:
+          bucket:   "lgtm-observability"
+          prefix:   "tempo-traces"
+          endpoint: "s3.us-east-1.amazonaws.com"   # <── change if needed
+          region:   "us-east-1"                    # <── change if needed
+
+    receivers:
+      otlp:
+        protocols:
+          grpc: { endpoint: "0.0.0.0:4317" }
+          http: { endpoint: "0.0.0.0:4318" }
+
+    # Generates RED metrics (rate/error/duration) from spans → pushes to Mimir
+    metricsGenerator:
+      enabled: true
+      remoteWriteUrl: "http://lgtm-mimir-gateway.monitoring.svc.cluster.local:80/api/v1/push"
+
+    global_limits:
+      max_bytes_per_trace: 5000000   # 5 MB hard cap per trace
+
+  resources:
+    requests:
+      cpu:    250m
+      memory: 512Mi
+    limits:
+      cpu:    1000m
+      memory: 1Gi
+
+  persistence:
+    enabled: true
+    size: 20Gi
+    storageClass: null
+
+  podAnnotations:
+    cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAntiAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: tempo
+          topologyKey: kubernetes.io/hostname
+
+# ------------------------------------------------------------------------------
+# 3. MIMIR  —  grafana/mimir-distributed chart
+# All components at 1 replica. Zone-aware replication explicitly disabled
+# (single node — enabling it causes misleading warnings).
+# Ingester gets the most RAM: holds active TSDB series in memory.
+# ------------------------------------------------------------------------------
+mimir:
+  mimir:
+    structuredConfig:
+      multitenancy_enabled: false
+
+      common:
+        storage:
+          backend: s3
+          s3:
+            endpoint: "s3.us-east-1.amazonaws.com"   # <── change if needed
+            region:   "us-east-1"                    # <── change if needed
+
+      blocks_storage:
+        backend: s3
+        s3:
+          bucket_name: "lgtm-observability"
+          prefix:      "mimir-blocks"
+        tsdb:
+          retention_period: 2h
+          dir: /data/tsdb
+
+      alertmanager_storage:
+        backend: s3
+        s3:
+          bucket_name: "lgtm-observability"
+          prefix:      "mimir-alertmanager"
+
+      ruler_storage:
+        backend: s3
+        s3:
+          bucket_name: "lgtm-observability"
+          prefix:      "mimir-ruler"
+
+      limits:
+        ingestion_rate:                    30000
+        ingestion_burst_size:              50000
+        max_global_series_per_user:        1500000
+        compactor_blocks_retention_period: 720h
+
+  ingester:
+    replicas: 1
+    zoneAwareReplication: { enabled: false }
+    persistentVolume: { enabled: true, size: 30Gi, storageClass: null }
+    resources:
+      requests: { cpu: 500m, memory: 2Gi }
+      limits:   { cpu: 2000m, memory: 4Gi }
+    podAnnotations:
+      cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAntiAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/component: ingester
+            topologyKey: kubernetes.io/hostname
+
+  distributor:
+    replicas: 1
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits:   { cpu: 500m, memory: 512Mi }
+
+  querier:
+    replicas: 1
+    resources:
+      requests: { cpu: 200m, memory: 512Mi }
+      limits:   { cpu: 1000m, memory: 1Gi }
+
+  query_frontend:
+    replicas: 1
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits:   { cpu: 500m, memory: 512Mi }
+
+  store_gateway:
+    replicas: 1
+    zoneAwareReplication: { enabled: false }
+    persistentVolume: { enabled: true, size: 10Gi, storageClass: null }
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits:   { cpu: 500m, memory: 512Mi }
+    podAnnotations:
+      cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+
+  compactor:
+    replicas: 1
+    persistentVolume: { enabled: true, size: 10Gi, storageClass: null }
+    resources:
+      requests: { cpu: 200m, memory: 512Mi }
+      limits:   { cpu: 1000m, memory: 1Gi }
+
+  ruler:
+    replicas: 1
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits:   { cpu: 500m, memory: 512Mi }
+
+  alertmanager:
+    replicas: 1
+    resources:
+      requests: { cpu: 50m, memory: 128Mi }
+      limits:   { cpu: 200m, memory: 256Mi }
+
+  gateway:
+    replicas: 1
+    resources:
+      requests: { cpu: 100m, memory: 128Mi }
+      limits:   { cpu: 200m, memory: 256Mi }
+
+  memcached:           { enabled: false }
+  memcached-queries:   { enabled: false }
+  memcached-metadata:  { enabled: false }
+  memcached-chunks:    { enabled: false }
+  minio:               { enabled: false }
+
+# ------------------------------------------------------------------------------
+# 4. GRAFANA  —  grafana/grafana chart
+# Admin credentials come from the 'grafana-admin' k8s Secret (never in values).
+# Datasource URLs use https:// — TLS config in mtls-patch.yaml.
+# ------------------------------------------------------------------------------
+grafana:
+  replicas: 1
+
+  admin:
+    existingSecret: grafana-admin
+    userKey:        admin-user
+    passwordKey:    admin-password
+
+  resources:
+    requests:
+      cpu:    100m
+      memory: 256Mi
+    limits:
+      cpu:    500m
+      memory: 1Gi
+
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: null
+
+  podAnnotations:
+    cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAntiAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: grafana
+          topologyKey: kubernetes.io/hostname
+
+  grafana.ini:
+    server:
+      domain:   grafana.example.com   # <── change to your domain
+      root_url: "https://grafana.example.com"
+    analytics:
+      reporting_enabled: false
+      check_for_updates: false
+    auth.anonymous:
+      enabled: false
+    users:
+      allow_sign_up: false
+    log:
+      mode: console
+      level: info
+    security:
+      allow_embedding: false
+      cookie_secure: true
+      cookie_samesite: strict
+    session:
+      provider: memory
+      provider_config: "{}"
+
+  ingress:
+    enabled: false
+
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+
+        - name: Mimir
+          type: prometheus
+          uid: mimir
+          url: https://lgtm-mimir-gateway.monitoring.svc.cluster.local:443/prometheus
+          access: proxy
+          isDefault: true
+          jsonData:
+            timeInterval: "60s"
+            tlsAuthWithCACert: true
+            tlsAuth:           true
+            exemplarTraceIdDestinations:
+              - name: trace_id
+                datasourceUid: tempo
+
+        - name: Loki
+          type: loki
+          uid: loki
+          url: https://lgtm-loki.monitoring.svc.cluster.local:3100
+          access: proxy
+          jsonData:
+            maxLines:          1000
+            tlsAuthWithCACert: true
+            tlsAuth:           true
+            derivedFields:
+              - datasourceUid: tempo
+                matcherRegex:  "trace_id=(\\w+)"
+                name:          TraceID
+                url:           "$${__value.raw}"
+                urlDisplayLabel: "View Trace"
+
+        - name: Tempo
+          type: tempo
+          uid: tempo
+          url: https://lgtm-tempo.monitoring.svc.cluster.local:3200
+          access: proxy
+          jsonData:
+            httpMethod:        GET
+            tlsAuthWithCACert: true
+            tlsAuth:           true
+            tracesToLogsV2:
+              datasourceUid: loki
+              tags:
+                - { key: 'service.name', value: 'app' }
+              filterByTraceID: true
+              filterBySpanID:  false
+            tracesToMetrics:
+              datasourceUid:      mimir
+              spanStartTimeShift: "-5m"
+              spanEndTimeShift:   "5m"
+            serviceMap:
+              datasourceUid: mimir
+            nodeGraph:
+              enabled: true

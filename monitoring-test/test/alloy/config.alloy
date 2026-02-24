@@ -1,0 +1,47 @@
+logging {
+  level  = "info"
+  format = "json"
+}
+
+prometheus.scrape "python_metrics" {
+  targets = [
+    {__address__ = "python_app:8000", job = "python"},
+  ]
+  forward_to = [prometheus.relabel.add_labels.receiver]
+  scrape_interval = "30s"
+  scrape_timeout = "10s"
+}
+
+prometheus.relabel "add_labels" {
+  rule {
+    target_label = "service"
+    replacement  = "python_app"
+  }
+  rule {
+    target_label = "service_name"
+    replacement  = sys.env("ALLOY_SERVICE_NAME")
+  }
+  rule {
+    target_label = "environment"
+    replacement  = sys.env("ALLOY_ENVIRONMENT")
+  }
+  rule {
+    target_label = "source"
+    replacement  = "python"
+  }
+  forward_to = [prometheus.remote_write.lgtm.receiver]
+}
+
+prometheus.remote_write "lgtm" {
+  endpoint {
+    url = sys.env("ALLOY_MIMIR_URL")
+    tls_config {
+      insecure_skip_verify = false
+    }
+    basic_auth {
+      username = sys.env("ALLOY_AUTH_USERNAME")
+      password = sys.env("ALLOY_AUTH_PASSWORD")
+    }
+    remote_timeout = "15s"
+  }
+}
