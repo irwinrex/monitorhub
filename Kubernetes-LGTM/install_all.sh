@@ -15,12 +15,17 @@
 # Non-interactive mode (skip confirmation):
 #   YES=true sudo bash install_all.sh
 #
+# Linkerd mTLS (optional):
+#   SKIP_LINKERD=true       skip Linkerd installation
+#   LINKERD_VIZ=false       skip Linkerd viz (~150MB)
+#
 # Available skip flags:
 #   SKIP_K0S=true        skip scripts/install_k0s.sh
 #   SKIP_HAPROXY=true    skip scripts/install_HAProxy.sh
 #   SKIP_MTLS=true       skip scripts/install_mTLS.sh
 #   SKIP_SECRETS=true    skip scripts/install_secrets.sh
 #   SKIP_LGTM=true       skip scripts/install_LGTM.sh
+#   SKIP_LINKERD=true    skip scripts/install_Linkerd.sh
 #
 # Project structure expected:
 #   install_all.sh          ← this file
@@ -53,6 +58,7 @@ SKIP_HAPROXY="${SKIP_HAPROXY:-false}"
 SKIP_MTLS="${SKIP_MTLS:-false}"
 SKIP_SECRETS="${SKIP_SECRETS:-false}"
 SKIP_LGTM="${SKIP_LGTM:-false}"
+SKIP_LINKERD="${SKIP_LINKERD:-false}"
 YES="${YES:-false}"
 
 # ── Phase runner helpers ──────────────────────────────────────────────────────
@@ -81,7 +87,7 @@ _run_phase() {
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}║  LGTM Full Stack Install                                 ║${NC}"
-echo -e "${BOLD}║  k0s · HAProxy · cert-manager mTLS · Loki/Tempo/Mimir   ║${NC}"
+echo -e "${BOLD}║  k0s · HAProxy · cert-manager · Linkerd · Loki/Tempo/Mimir║${NC}"
 echo -e "${BOLD}║  Target: t4g.xlarge · Debian 12 ARM64 · Single Node      ║${NC}"
 echo -e "${BOLD}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
@@ -95,6 +101,7 @@ for script in \
   "${SCRIPTS_DIR}/install_HAProxy.sh" \
   "${SCRIPTS_DIR}/install_mTLS.sh" \
   "${SCRIPTS_DIR}/install_secrets.sh" \
+  "${SCRIPTS_DIR}/install_Linkerd.sh" \
   "${SCRIPTS_DIR}/install_LGTM.sh"; do
   if [[ -f "$script" ]]; then
     info "  found: ${script##"${ROOT_DIR}/"}"
@@ -106,7 +113,9 @@ done
 
 for vfile in \
   "${VALUES_DIR}/lgtm-values.yaml" \
-  "${VALUES_DIR}/mtls-patch.yaml"; do
+  "${VALUES_DIR}/mtls-patch.yaml" \
+  "${VALUES_DIR}/haproxy-values.yaml" \
+  "${VALUES_DIR}/cert-manager-values.yaml"; do
   if [[ -f "$vfile" ]]; then
     info "  found: ${vfile##"${ROOT_DIR}/"}"
   else
@@ -118,26 +127,63 @@ done
 [[ "${MISSING}" == "false" ]] || die "Missing files detected — ensure the full project is uploaded."
 success "All required files present"
 
-# ── Node resource check ─────────────────────────────────────────────────────────
-info "Checking node resources..."
-NODE_CPU=$(k0s kubectl get nodes -o jsonpath='{.items[0].status.capacity.cpu}' 2>/dev/null || echo "0")
-NODE_MEM=$(k0s kubectl get nodes -o jsonpath='{.items[0].status.capacity.memory}' 2>/dev/null | sed 's/Ki//' || echo "0")
-NODE_MEM_GB=$((NODE_MEM / 1024 / 1024))
+# ── Battle-ready pre-flight checks ───────────────────────────────────────────────
+info "Running battle-ready pre-flight checks..."
 
-info "  Detected: ${NODE_CPU} vCPUs, ~${NODE_MEM_GB} GB RAM"
+# Check disk space (100GB required for LGTM with persistence)
+check_disk_space 100
 
-if [[ "${NODE_CPU}" -lt 4 ]]; then
-  warn "  WARNING: Recommended minimum is 4 vCPUs (t4g.xlarge has 4)"
+# Check ports 80, 443 for HAProxy
+if [[ "${SKIP_HAPROXY}" != "true" ]]; then
+  check_ports 80 || warn "Port 80 may be in use - HAProxy installation could fail"
+  check_ports 443 || warn "Port 443 may be in use - HAProxy installation could fail"
 fi
-if [[ "${NODE_MEM_GB}" -lt 14 ]]; then
-  warn "  WARNING: Recommended minimum is 14 GB RAM (t4g.xlarge has 16)"
+
+# Check k0s not already installed (unless skipping)
+if [[ "${SKIP_K0S}" != "true" ]]; then
+  check_k0s_not_installed || {
+    if [[ "${YES}" != "true" ]]; then
+      read -r -p "  Continue anyway? [y/N] " confirm
+      [[ "${confirm,,}" == "y" ]] || { info "Aborted."; exit 0; }
+    fi
+  }
+  
+  # Backup existing kubeconfig
+  backup_kubeconfig
+fi
+
+# Check memory
+info "Checking available memory..."
+AVAILABLE_MEM=$(free -g | awk 'NR==2 {print $7}')
+info "  Available: ${AVAILABLE_MEM}GB free memory"
+if [[ "${AVAILABLE_MEM}" -lt 8 ]]; then
+  warn "  WARNING: Less than 8GB free memory - installation may fail"
+fi
+
+# DNS check for Grafana domain
+if [[ "${SKIP_LGTM}" != "true" ]]; then
+  check_dns_resolution "${GRAFANA_DOMAIN}" || warn "DNS not resolved - ensure ${GRAFANA_DOMAIN} points to this server"
+fi
+
+# ── Node resource check (only if k0s already running) ───────────────────────────
+if [[ "${SKIP_K0S}" == "true" ]]; then
+  info "Skipping k0s - checking existing cluster resources..."
+  if k0s kubectl get nodes &>/dev/null 2>&1; then
+    NODE_CPU=$(k0s kubectl get nodes -o jsonpath='{.items[0].status.capacity.cpu}' 2>/dev/null || echo "0")
+    NODE_MEM=$(k0s kubectl get nodes -o jsonpath='{.items[0].status.capacity.memory}' 2>/dev/null | sed 's/Ki//' || echo "0")
+    NODE_MEM_GB=$((NODE_MEM / 1024 / 1024))
+    info "  Detected: ${NODE_CPU} vCPUs, ~${NODE_MEM_GB} GB RAM"
+  else
+    info "  No existing cluster detected - will install k0s"
+  fi
 fi
 
 # ── Confirm ───────────────────────────────────────────────────────────────────
 if [[ "${YES}" != "true" ]]; then
   echo ""
-  warn "This will install k0s, HAProxy, cert-manager mTLS, and the LGTM stack."
+  warn "This will install k0s, HAProxy, cert-manager, Linkerd (optional), and LGTM stack."
   warn "Intended for a FRESH Debian 12 ARM64 instance (t4g.xlarge)."
+  warn "Skip Linkerd: SKIP_LINKERD=true"
   echo ""
   read -r -p "  Continue? [y/N] " confirm
   [[ "${confirm,,}" == "y" ]] || {
@@ -162,10 +208,13 @@ _run_phase 2 "HAProxy — Ingress Controller" \
 _run_phase 3 "mTLS — cert-manager + PKI + Certificates" \
   "${SKIP_MTLS}" "${SCRIPTS_DIR}/install_mTLS.sh"
 
-_run_phase 4 "Secrets — Grafana admin credentials" \
+_run_phase 4 "Secrets — Grafana admin credentials + Basic Auth" \
   "${SKIP_SECRETS}" "${SCRIPTS_DIR}/install_secrets.sh"
 
-_run_phase 5 "LGTM — Loki · Tempo · Mimir · Grafana" \
+_run_phase 5 "Linkerd — Service Mesh mTLS (optional)" \
+  "${SKIP_LINKERD}" "${SCRIPTS_DIR}/install_Linkerd.sh"
+
+_run_phase 6 "LGTM — Loki · Tempo · Mimir · Grafana" \
   "${SKIP_LGTM}" "${SCRIPTS_DIR}/install_LGTM.sh"
 
 # ══════════════════════════════════════════════════════════════════════════════

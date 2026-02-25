@@ -26,12 +26,38 @@ require_helm
 
 header "Phase 5 — LGTM Stack  |  Loki · Tempo · Mimir · Grafana"
 
+# Ensure monitoring namespace exists
+if ! k0s kubectl get namespace "${MONITORING_NS}" &>/dev/null 2>&1; then
+  die "Namespace '${MONITORING_NS}' does not exist. Run install_k0s.sh first."
+fi
+
 VALUES_DIR="$(resolve_values_dir)"
 BASE="${VALUES_DIR}/lgtm-values.yaml"
 MTLS="${VALUES_DIR}/mtls-patch.yaml"
 
 require_file "${BASE}"
 require_file "${MTLS}"
+
+# ── S3 bucket validation ────────────────────────────────────────────────────────
+info "Validating S3 bucket configuration..."
+S3_BUCKET="${S3_BUCKET:-lgtm-observability}"
+S3_REGION="${S3_REGION:-us-east-1}"
+
+if command -v aws &>/dev/null; then
+  info "Checking S3 bucket '${S3_BUCKET}' exists..."
+  if aws s3api head-bucket --bucket "${S3_BUCKET}" 2>/dev/null; then
+    success "S3 bucket '${S3_BUCKET}' exists"
+  else
+    warn "S3 bucket '${S3_BUCKET}' not found or not accessible"
+    warn "Create bucket first: aws s3 mb s3://${S3_BUCKET} --region ${S3_REGION}"
+    if [[ "${FORCE:-false}" != "true" ]]; then
+      die "S3 bucket validation failed. Set FORCE=true to skip."
+    fi
+  fi
+else
+  warn "AWS CLI not installed - skipping S3 validation"
+  warn "Ensure bucket '${S3_BUCKET}' exists before deploying"
+fi
 
 # ── Pre-flight: all mTLS certs must be Ready ──────────────────────────────────
 info "Pre-flight: checking mTLS certificates..."
@@ -72,15 +98,24 @@ helm_deploy() {
   local version
   version="$(_helm_chart_version "${chart}")"
 
-  info "Deploying ${release} (${chart} ${version})..."
-  helm upgrade --install "${release}" "${chart}" \
+  # Check if release exists
+  if helm list -n "${MONITORING_NS}" -q 2>/dev/null | grep -q "^${release}$"; then
+    info "Release '${release}' exists - upgrading..."
+    local action="upgrade"
+  else
+    info "Deploying ${release} (${chart} ${version})..."
+    local action="install"
+  fi
+
+  helm ${action} "${release}" "${chart}" \
     --namespace "${MONITORING_NS}" \
     --version "${version}" \
     --values "${BASE}" \
     --values "${MTLS}" \
     --wait \
     --timeout "${timeout}" \
-    --atomic
+    --atomic \
+    --cleanup-on-fail
   success "${release} deployed"
 }
 
@@ -128,6 +163,10 @@ spec:
                 name: lgtm-grafana
                 port:
                   number: 3000
+  tls:
+    - secretName: grafana-ingress-tls-secret
+      hosts:
+        - ${GRAFANA_DOMAIN}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -155,6 +194,10 @@ spec:
                 name: lgtm-mimir-gateway
                 port:
                   number: 443
+  tls:
+    - secretName: grafana-ingress-tls-secret
+      hosts:
+        - ${GRAFANA_DOMAIN}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -182,6 +225,10 @@ spec:
                 name: lgtm-loki
                 port:
                   number: 3100
+  tls:
+    - secretName: grafana-ingress-tls-secret
+      hosts:
+        - ${GRAFANA_DOMAIN}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -209,6 +256,10 @@ spec:
                 name: lgtm-tempo
                 port:
                   number: 3200
+  tls:
+    - secretName: grafana-ingress-tls-secret
+      hosts:
+        - ${GRAFANA_DOMAIN}
 INGRESSEOF
 
 success "Path-based Ingress resources created"

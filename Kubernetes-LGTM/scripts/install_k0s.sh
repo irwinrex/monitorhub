@@ -182,8 +182,12 @@ success "Helm repos: haproxytech, jetstack, grafana"
 # ── 11. Namespaces ────────────────────────────────────────────────────────────
 info "Creating namespaces..."
 for ns in "${MONITORING_NS}" "${CERTMANAGER_NS}"; do
-  k0s kubectl create namespace "$ns" --dry-run=client -o yaml |
-    k0s kubectl apply -f -
+  if k0s kubectl get namespace "$ns" &>/dev/null 2>&1; then
+    info "Namespace '$ns' already exists"
+  else
+    k0s kubectl create namespace "$ns"
+    success "Created namespace: $ns"
+  fi
 done
 success "Namespaces: ${MONITORING_NS}, ${CERTMANAGER_NS}"
 

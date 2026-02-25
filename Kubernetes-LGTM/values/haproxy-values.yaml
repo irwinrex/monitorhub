@@ -102,6 +102,7 @@ controller:
 
   podAnnotations:
     cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+    linkerd.io/inject: "disabled"
 
   tolerations:
     - key: "node-role.kubernetes.io/master"
@@ -131,3 +132,4 @@ defaultBackend:
     limits:   { cpu: 100m,  memory: 128Mi }
   podAnnotations:
     cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+    linkerd.io/inject: "disabled"

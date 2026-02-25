@@ -31,6 +31,11 @@ require_kubeconfig
 
 header "Phase 4 — Secrets"
 
+# Ensure monitoring namespace exists
+if ! k0s kubectl get namespace "${MONITORING_NS}" &>/dev/null 2>&1; then
+  die "Namespace '${MONITORING_NS}' does not exist. Run install_k0s.sh first."
+fi
+
 FORCE_RECREATE="${FORCE_RECREATE:-false}"
 SECRET_NAME="grafana-admin"
 

@@ -31,9 +31,16 @@ require_root
 require_kubeconfig
 require_helm
 
-GRAFANA_DOMAIN="${GRAFANA_DOMAIN:-grafana.example.com}"
+GRAFANA_DOMAIN="${GRAFANA_DOMAIN:-${GRAFANA_DOMAIN}}"
 
 header "Phase 3 — cert-manager ${CERTMANAGER_VERSION} + mTLS PKI"
+
+# Ensure required namespaces exist
+for ns in "${MONITORING_NS}" "${CERTMANAGER_NS}"; do
+  if ! k0s kubectl get namespace "$ns" &>/dev/null 2>&1; then
+    die "Namespace '$ns' does not exist. Run install_k0s.sh first."
+  fi
+done
 
 # ── 1. cert-manager ───────────────────────────────────────────────────────────
 info "Installing cert-manager ${CERTMANAGER_VERSION}..."

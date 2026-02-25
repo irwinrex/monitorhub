@@ -23,6 +23,12 @@ require_helm
 
 header "Phase 2 — HAProxy Ingress Controller ${HAPROXY_CHART_VERSION}"
 
+# Ensure kube-system namespace exists
+if ! k0s kubectl get namespace kube-system &>/dev/null 2>&1; then
+  info "Creating kube-system namespace..."
+  k0s kubectl create namespace kube-system
+fi
+
 HAPROXY_VALUES="${SCRIPT_DIR}/../values/haproxy-values.yaml"
 
 if [[ -f "${HAPROXY_VALUES}" ]]; then
