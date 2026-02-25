@@ -81,7 +81,7 @@ _run_phase() {
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}║  LGTM Full Stack Install                                 ║${NC}"
-echo -e "${BOLD}║  k0s · HAProxy · PostgreSQL · Loki/Tempo/Mimir           ║${NC}"
+echo -e "${BOLD}║  k0s · HAProxy · PostgreSQL · Loki/Tempo/Mimir/Grafana   ║${NC}"
 echo -e "${BOLD}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -106,7 +106,8 @@ done
 for vfile in \
   "${VALUES_DIR}/lgtm-values.yaml" \
   "${VALUES_DIR}/haproxy-values.yaml" \
-  "${VALUES_DIR}/ingress-values.yaml"; do
+  "${VALUES_DIR}/ingress-values.yaml" \
+  "${VALUES_DIR}/postgres-values.yaml"; do
   if [[ -f "$vfile" ]]; then
     info "  found: ${vfile##"${ROOT_DIR}/"}"
   else
