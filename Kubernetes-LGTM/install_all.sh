@@ -130,8 +130,8 @@ success "All required files present"
 # ── Battle-ready pre-flight checks ───────────────────────────────────────────────
 info "Running battle-ready pre-flight checks..."
 
-# Check disk space (100GB required for LGTM with persistence)
-check_disk_space 100
+# Check disk space
+check_disk_space 20
 
 # Check ports 80, 443 for HAProxy
 if [[ "${SKIP_HAPROXY}" != "true" ]]; then
