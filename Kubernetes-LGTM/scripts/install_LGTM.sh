@@ -42,26 +42,28 @@ BASE="${VALUES_DIR}/lgtm-values.yaml"
 
 require_file "${BASE}"
 
-# ── S3 bucket validation ────────────────────────────────────────────────────────
-info "Validating S3 bucket configuration..."
-S3_BUCKET="${S3_BUCKET:-lgtm-observability}"
-S3_REGION="${S3_REGION:-us-east-1}"
-
-if command -v aws &>/dev/null; then
-  info "Checking S3 bucket '${S3_BUCKET}' exists..."
-  if aws s3api head-bucket --bucket "${S3_BUCKET}" 2>/dev/null; then
-    success "S3 bucket '${S3_BUCKET}' exists"
-  else
-    warn "S3 bucket '${S3_BUCKET}' not found or not accessible"
-    warn "Create bucket first: aws s3 mb s3://${S3_BUCKET} --region ${S3_REGION}"
-    if [[ "${FORCE:-false}" != "true" ]]; then
-      die "S3 bucket validation failed. Set FORCE=true to skip."
-    fi
-  fi
+# ── S3 bucket configuration ─────────────────────────────────────────────────────
+info "Configuring S3 bucket..."
+if [[ -n "${S3_BUCKET:-}" ]]; then
+  info "Using S3 bucket: ${S3_BUCKET}"
 else
-  warn "AWS CLI not installed - skipping S3 validation"
-  warn "Ensure bucket '${S3_BUCKET}' exists before deploying"
+  echo ""
+  read -r -p "Enter S3 bucket name [default: lgtm-observability]: " S3_BUCKET
+  S3_BUCKET="${S3_BUCKET:-lgtm-observability}"
 fi
+
+if [[ -n "${S3_REGION:-}" ]]; then
+  info "Using S3 region: ${S3_REGION}"
+else
+  echo ""
+  read -r -p "Enter S3 region [default: us-east-1]: " S3_REGION
+  S3_REGION="${S3_REGION:-us-east-1}"
+fi
+
+# Update values file with bucket name
+sed -i "s/lgtm-observability/${S3_BUCKET}/g" "${BASE}" 2>/dev/null || true
+sed -i "s/us-east-1/${S3_REGION}/g" "${BASE}" 2>/dev/null || true
+info "S3 bucket: ${S3_BUCKET}, region: ${S3_REGION}"
 
 # ── Pre-flight: all mTLS certs must be Ready ──────────────────────────────────
 info "Pre-flight: checking mTLS certificates..."
