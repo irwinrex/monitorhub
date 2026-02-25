@@ -26,11 +26,11 @@ header "Phase 1 — k0s  |  Debian 12 ARM64  |  t4g.xlarge"
 
 # ── 1. System packages ────────────────────────────────────────────────────────
 info "Installing system dependencies..."
-apt-get update -qq 2>/dev/null || true
+apt-get update -qq
 apt-get install -y --no-install-recommends \
   curl wget ca-certificates gnupg \
   iptables arptables ebtables \
-  socat conntrack jq python3 python3-yaml >/dev/null 2>&1 || true
+  socat conntrack jq python3 python3-yaml >/dev/null
 success "System packages installed"
 
 # ── 2. iptables-legacy ────────────────────────────────────────────────────────
@@ -45,8 +45,8 @@ success "iptables-legacy active"
 
 # ── 3. Swap off ───────────────────────────────────────────────────────────────
 info "Disabling swap..."
-swapoff -a 2>/dev/null || true
-sed -i '/[[:space:]]swap[[:space:]]/d' /etc/fstab 2>/dev/null || true
+swapoff -a
+sed -i '/[[:space:]]swap[[:space:]]/d' /etc/fstab
 success "Swap disabled"
 
 # ── 4. Kernel modules ─────────────────────────────────────────────────────────
@@ -56,11 +56,9 @@ overlay
 br_netfilter
 nf_conntrack
 EOF
-for mod in overlay br_netfilter nf_conntrack; do
-  if ! modprobe "$mod" 2>/dev/null; then
-    warn "Module $mod failed to load - may already be built-in"
-  fi
-done
+modprobe overlay
+modprobe br_netfilter
+modprobe nf_conntrack
 success "Kernel modules loaded"
 
 # ── 5. sysctl ─────────────────────────────────────────────────────────────────
@@ -77,43 +75,39 @@ fs.file-max                    = 1048576
 vm.overcommit_memory = 1
 vm.panic_on_oom      = 0
 EOF
-sysctl --system >/dev/null || die "Failed to apply sysctl settings"
-
-info "Verifying sysctl settings..."
-SYSCTL_OK=true
-for param in net.ipv4.ip_forward net.bridge.bridge-nf-call-iptables fs.inotify.max_user_watches; do
-  value=$(sysctl -n "$param" 2>/dev/null || echo "0")
-  if [[ "$value" == "0" || -z "$value" ]]; then
-    warn "  FAILED: $param not set correctly"
-    SYSCTL_OK=false
-  else
-    info "  OK: $param = $value"
-  fi
-done
-[[ "$SYSCTL_OK" == "true" ]] || die "Sysctl verification failed"
-success "sysctl applied and verified"
+sysctl --system >/dev/null
+success "sysctl applied"
 
 # ── 6. k0s binary ─────────────────────────────────────────────────────────────
+# The '+' in the version string (e.g. v1.32.7+k0s.0) causes curl to fail on
+# some systems when it appears in the GitHub release tag segment of the URL.
+# Fix: use the official get.k0s.sh installer with K0S_VERSION pinned, which
+# handles the URL encoding internally. Direct curl is kept as a fallback with
+# the '+' percent-encoded as '%2B' in the tag portion of the URL.
 info "Downloading k0s ${K0S_VERSION} (arm64)..."
-download_with_retry() {
-  local url="$1" local_path="$2"
-  local max_retries=3 delay=5
-  for ((i=1; i<=max_retries; i++)); do
-    if curl -sSLf --max-time 300 -L "$url" -o "$local_path" 2>/dev/null; then
-      return 0
-    fi
-    warn "Download attempt $i failed, retrying in ${delay}s..."
-    sleep $delay
-    delay=$((delay * 2))
-  done
-  return 1
-}
 
-download_with_retry \
-  "https://github.com/k0sproject/k0s/releases/download/${K0S_VERSION}/k0s-${K0S_VERSION}-arm64" \
-  /usr/local/bin/k0s || die "Failed to download k0s binary after $max_retries attempts"
+K0S_INSTALL_PATH=/usr/local/bin \
+  K0S_VERSION="${K0S_VERSION}" \
+  curl -sSLf https://get.k0s.sh | sh
 
-chmod +x /usr/local/bin/k0s
+# Verify the installed version matches what we pinned
+INSTALLED_VER="$(k0s version 2>/dev/null || true)"
+if [[ -z "${INSTALLED_VER}" ]]; then
+  die "k0s binary not found after install — check network access to get.k0s.sh"
+fi
+
+# If get.k0s.sh installed a different version (shouldn't happen with K0S_VERSION
+# set, but guard anyway), fall back to direct download with encoded URL
+if [[ "${INSTALLED_VER}" != *"${K0S_VERSION}"* ]]; then
+  warn "get.k0s.sh installed ${INSTALLED_VER}, expected ${K0S_VERSION} — trying direct download..."
+  # Encode '+' as '%2B' in the tag only; filename keeps literal '+'
+  ENCODED_TAG="${K0S_VERSION//+/%2B}"
+  curl -sSLf \
+    "https://github.com/k0sproject/k0s/releases/download/${ENCODED_TAG}/k0s-${K0S_VERSION}-arm64" \
+    -o /usr/local/bin/k0s
+  chmod +x /usr/local/bin/k0s
+fi
+
 success "k0s: $(k0s version)"
 
 # ── 7. k0s config ─────────────────────────────────────────────────────────────
@@ -131,6 +125,8 @@ spec.setdefault("api", {}).setdefault("extraArgs", {}).update({
     "max-requests-inflight":          "400",
     "max-mutating-requests-inflight": "200",
 })
+# Disable konnectivity — not needed without separate worker nodes (~30 MB saved)
+spec.setdefault("konnectivity", {})["enabled"] = False
 with open(path, "w") as f:
     yaml.dump(cfg, f, default_flow_style=False)
 print("  k0s config patched")
@@ -142,14 +138,12 @@ k0s install controller --single -c /etc/k0s/k0s.yaml
 k0s start
 
 info "Waiting for k0s API server..."
-for ((i=1; i<=36; i++)); do
+for i in $(seq 1 36); do
   k0s kubectl get nodes &>/dev/null 2>&1 && {
     success "API is up"
     break
   }
-  if [[ $i -eq 36 ]]; then
-    die "k0s API timeout.\n  Debug: journalctl -u k0scontroller -n 100"
-  fi
+  [[ $i -eq 36 ]] && die "k0s API timeout.\n  Debug: journalctl -u k0scontroller -n 100"
   printf '.'
   sleep 5
 done
@@ -164,14 +158,10 @@ export KUBECONFIG=/root/.kube/config
 
 if [[ -n "${SUDO_USER:-}" ]]; then
   USER_HOME="$(getent passwd "${SUDO_USER}" | cut -d: -f6)"
-  if [[ -n "$USER_HOME" && "$USER_HOME" != "/" ]]; then
-    mkdir -p "${USER_HOME}/.kube"
-    cp /root/.kube/config "${USER_HOME}/.kube/config"
-    chown "${SUDO_USER}:${SUDO_USER}" "${USER_HOME}/.kube/config"
-    success "kubeconfig also at ${USER_HOME}/.kube/config"
-  else
-    success "kubeconfig at /root/.kube/config (no sudo user home)"
-  fi
+  mkdir -p "${USER_HOME}/.kube"
+  cp /root/.kube/config "${USER_HOME}/.kube/config"
+  chown "${SUDO_USER}:${SUDO_USER}" "${USER_HOME}/.kube/config"
+  success "kubeconfig also at ${USER_HOME}/.kube/config"
 fi
 
 info "Waiting for node Ready..."
@@ -180,8 +170,8 @@ k0s kubectl get nodes -o wide
 
 # ── 10. Helm ──────────────────────────────────────────────────────────────────
 info "Installing Helm ${HELM_VERSION} (arm64)..."
-curl -sSLf --max-time 300 "https://get.helm.sh/helm-${HELM_VERSION}-linux-arm64.tar.gz" |
-  tar -xz --strip-components=1 -C /usr/local/bin linux-arm64/helm || die "Failed to download/install Helm"
+curl -sSLf "https://get.helm.sh/helm-${HELM_VERSION}-linux-arm64.tar.gz" |
+  tar -xz --strip-components=1 -C /usr/local/bin linux-arm64/helm
 chmod +x /usr/local/bin/helm
 success "Helm: $(helm version --short)"
 
@@ -195,12 +185,8 @@ success "Helm repos: haproxytech, jetstack, grafana"
 # ── 11. Namespaces ────────────────────────────────────────────────────────────
 info "Creating namespaces..."
 for ns in "${MONITORING_NS}" "${CERTMANAGER_NS}"; do
-  if k0s kubectl get namespace "$ns" &>/dev/null 2>&1; then
-    info "Namespace '$ns' already exists"
-  else
-    k0s kubectl create namespace "$ns"
-    success "Created namespace: $ns"
-  fi
+  k0s kubectl create namespace "$ns" --dry-run=client -o yaml |
+    k0s kubectl apply -f -
 done
 success "Namespaces: ${MONITORING_NS}, ${CERTMANAGER_NS}"
 

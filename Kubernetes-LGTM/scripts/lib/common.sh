@@ -7,29 +7,18 @@
 
 # ── Pinned versions ────────────────────────────────────────────────────────────
 # All version bumps happen here. Check release pages in README.md.
-export K0S_VERSION="v1.33.1+k0s.0"
-export HELM_VERSION="v3.17.2"
-export HAPROXY_CHART_VERSION="1.44.0" # haproxytech/kubernetes-ingress
-export CERTMANAGER_VERSION="v1.17.2"  # jetstack/cert-manager
-export LINKERD_VERSION="stable-2.16.1" # Linkerd
+export K0S_VERSION="v1.32.7+k0s.0"
+export HELM_VERSION="v3.17.1"
+export HAPROXY_CHART_VERSION="1.42.2"   # haproxytech/kubernetes-ingress
+export CERTMANAGER_VERSION="v1.17.1"    # jetstack/cert-manager
+export LINKERD_VERSION="stable-2.14.10" # linkerd/linkerd2 — ARM64 supported from 2.12+
 
-export LOKI_CHART_VERSION="6.32.0"
-export TEMPO_CHART_VERSION="1.22.0"
-export MIMIR_CHART_VERSION="5.7.0"
-export GRAFANA_CHART_VERSION="9.1.0"
+export LOKI_CHART_VERSION="6.29.0"
+export TEMPO_CHART_VERSION="1.21.1"
+export MIMIR_CHART_VERSION="5.6.0"
+export GRAFANA_CHART_VERSION="8.9.1"
 
-# ── S3 Configuration (can be overridden via env) ─────────────────────────────
-export S3_BUCKET="${S3_BUCKET:-lgtm-observability}"
-export S3_REGION="${S3_REGION:-us-east-1}"
-export S3_ENDPOINT="${S3_ENDPOINT:-}"  # For MinIO/custom S3-compatible
-export S3_ACCESS_KEY_ID="${S3_ACCESS_KEY_ID:-}"
-export S3_SECRET_ACCESS_KEY="${S3_SECRET_ACCESS_KEY:-}"
-export S3_FORCE_PATH_STYLE="${S3_FORCE_PATH_STYLE:-false}"
-
-# ── Domain Configuration ──────────────────────────────────────────────────────────
-export GRAFANA_DOMAIN="${GRAFANA_DOMAIN:-grafana.example.com}"
-
-# ── Namespace ─────────────────────────────────────────────────────────────────
+# ── Namespaces ────────────────────────────────────────────────────────────────
 export MONITORING_NS="monitoring"
 export CERTMANAGER_NS="cert-manager"
 
@@ -109,6 +98,35 @@ wait_cert_ready() {
   echo
 }
 
+# ── Linkerd CLI helper ────────────────────────────────────────────────────────
+require_linkerd() {
+  command -v linkerd &>/dev/null || die "linkerd CLI not found.\n  Run: sudo bash scripts/install_linkerd.sh first"
+}
+
+# wait_linkerd_ready — polls until all Linkerd control plane pods are Running
+wait_linkerd_ready() {
+  info "Waiting for Linkerd control plane to be ready..."
+  for i in $(seq 1 36); do
+    if linkerd check --pre 2>/dev/null | grep -q "Status check results are √"; then
+      success "Linkerd control plane is healthy"
+      return 0
+    fi
+    # Fallback: just wait for deployments directly
+    if k0s kubectl get deploy -n linkerd 2>/dev/null | grep -v "0/"; then
+      if k0s kubectl rollout status deploy/linkerd-destination -n linkerd --timeout=10s &>/dev/null &&
+        k0s kubectl rollout status deploy/linkerd-identity -n linkerd --timeout=10s &>/dev/null &&
+        k0s kubectl rollout status deploy/linkerd-proxy-injector -n linkerd --timeout=10s &>/dev/null; then
+        success "Linkerd control plane rollouts complete"
+        return 0
+      fi
+    fi
+    [[ $i -eq 36 ]] && die "Linkerd did not become ready.\n  Debug: linkerd check\n  Pods:  kubectl get pods -n linkerd"
+    printf '.'
+    sleep 5
+  done
+  echo
+}
+
 # ── Resolve VALUES_DIR from caller's location ─────────────────────────────────
 # Scripts live in scripts/ — values live in ../values/
 # This works whether a script is called from install_all.sh (project root)
@@ -126,144 +144,4 @@ resolve_values_dir() {
   else
     die "Cannot locate values/ directory relative to ${caller_dir}"
   fi
-}
-
-# ── Battle-ready checks ─────────────────────────────────────────────────────────
-check_disk_space() {
-  local required_gb="${1:-100}"
-  local available_gb
-  available_gb=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
-  
-  info "Checking disk space: ${available_gb}GB available, ${required_gb}GB required..."
-  if [[ "$available_gb" -lt "$required_gb" ]]; then
-    die "Insufficient disk space: ${available_gb}GB available, ${required_gb}GB required"
-  fi
-  success "Disk space OK: ${available_gb}GB available"
-}
-
-check_ports() {
-  local port="$1"
-  if ss -tuln 2>/dev/null | grep -q ":${port} "; then
-    warn "Port ${port} is already in use"
-    return 1
-  fi
-  info "Port ${port} is available"
-  return 0
-}
-
-check_k0s_not_installed() {
-  if command -v k0s &>/dev/null || [[ -f /usr/local/bin/k0s ]]; then
-    warn "k0s is already installed"
-    info "To reinstall: k0s reset or SKIP_K0S=true to skip"
-    return 1
-  fi
-  success "k0s not found - safe to install"
-  return 0
-}
-
-retry_kubectl() {
-  local max_attempts="${1:-5}"
-  local delay="${2:-10}"
-  local cmd="${3:-}"
-  
-  for ((i=1; i<=max_attempts; i++)); do
-    if eval "$cmd" &>/dev/null; then
-      return 0
-    fi
-    warn "Attempt $i/$max_attempts failed, retrying in ${delay}s..."
-    sleep "$delay"
-  done
-  return 1
-}
-
-check_helm_release() {
-  local release="$1"
-  local namespace="${2:-default}"
-  
-  if helm list -n "$namespace" -q 2>/dev/null | grep -q "^${release}$"; then
-    info "Helm release '${release}' already exists in ${namespace}"
-    return 1
-  fi
-  return 0
-}
-
-check_namespace_exists() {
-  local ns="$1"
-  if k0s kubectl get namespace "$ns" &>/dev/null 2>&1; then
-    return 0
-  fi
-  return 1
-}
-
-check_dns_resolution() {
-  local domain="${1:-}"
-  if [[ -z "$domain" ]]; then
-    return 0
-  fi
-  
-  if [[ "$domain" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    success "Using IP address: ${domain}"
-    return 0
-  fi
-  
-  info "Checking DNS resolution for '${domain}'..."
-  if command -v nslookup &>/dev/null; then
-    if nslookup "$domain" &>/dev/null; then
-      success "DNS resolved: ${domain}"
-      return 0
-    else
-      warn "DNS not resolved: ${domain}"
-      return 1
-    fi
-  elif command -v dig &>/dev/null; then
-    if dig +short "$domain" | grep -q '^[0-9]'; then
-      success "DNS resolved: ${domain}"
-      return 0
-    else
-      warn "DNS not resolved: ${domain}"
-      return 1
-    fi
-  fi
-  return 0
-}
-
-backup_kubeconfig() {
-  local backup_dir="/root/.kube/backups"
-  local timestamp=$(date +%Y%m%d_%H%M%S)
-  
-  if [[ -f /root/.kube/config ]]; then
-    mkdir -p "$backup_dir"
-    cp /root/.kube/config "${backup_dir}/config.${timestamp}"
-    info "Backed up kubeconfig to ${backup_dir}/config.${timestamp}"
-  fi
-}
-
-cleanup_on_failure() {
-  local exit_code=$?
-  if [[ $exit_code -ne 0 ]]; then
-    echo ""
-    warn "Installation failed with exit code: ${exit_code}"
-    info "To debug: check logs above, or run 'journalctl -u k0s -n 50'"
-    info "To reset: k0s reset"
-  fi
-}
-
-log_to_file() {
-  local log_file="${LOG_FILE:-/var/log/lgtm-install.log}"
-  exec > >(tee -a "$log_file") 2>&1
-}
-
-wait_for_service() {
-  local service="$1"
-  local timeout="${2:-60}"
-  local count=0
-  
-  while [[ $count -lt $timeout ]]; do
-    if systemctl is-active --quiet "$service"; then
-      return 0
-    fi
-    sleep 1
-    ((count++))
-  done
-  return 1
 }
