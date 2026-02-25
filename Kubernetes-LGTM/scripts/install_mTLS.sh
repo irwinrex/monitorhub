@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # scripts/install_mTLS.sh
-# Installs Linkerd for pod-to-pod mTLS with automatic certificate management.
+# Installs Linkerd for pod-to-pod mTLS.
+# Uses OpenSSL to generate the required identity certificates for Helm.
 # ==============================================================================
 set -euo pipefail
 IFS=$'\n\t'
@@ -12,6 +13,10 @@ source "${SCRIPT_DIR}/lib/common.sh"
 require_root
 require_kubeconfig
 require_helm
+
+if ! command -v openssl &>/dev/null; then
+  die "openssl is required to generate Linkerd certificates."
+fi
 
 : "${LINKERD_VERSION:=stable-2.16.1}"
 
@@ -31,58 +36,54 @@ for ns in "${MONITORING_NS}" linkerd; do
   kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null || true
 done
 
-# ── 1. Generate Certificates ───────────────────────────────────────────────────
-info "Generating Linkerd certificates..."
+# ── 1. Generate Linkerd Identity Certificates ─────────────────────────────────
+info "Generating Linkerd identity certificates..."
 
 CERT_DIR=$(mktemp -d)
-TRUST_ANCHOR_CERT="${CERT_DIR}/ca.crt"
-TRUST_ANCHOR_KEY="${CERT_DIR}/ca.key"
-ISSUER_CERT="${CERT_DIR}/issuer.crt"
-ISSUER_KEY="${CERT_DIR}/issuer.key"
+trap 'rm -rf "$CERT_DIR"' EXIT
 
-# Generate Trust Anchor (Root CA) - 10 years
-openssl ecparam -genkey -name prime256v1 -out "${TRUST_ANCHOR_KEY}"
-openssl req -x509 -new -nodes -key "${TRUST_ANCHOR_KEY}" -sha256 -days 3650 \
-  -out "${TRUST_ANCHOR_CERT}" \
+# Generate CA (Trust Anchor)
+openssl genrsa -out "${CERT_DIR}/ca.key" 2048
+openssl req -x509 -new -nodes -key "${CERT_DIR}/ca.key" -sha256 -days 3650 \
+  -out "${CERT_DIR}/ca.crt" \
   -subj "/CN=linkerd-root-ca/O=Linkerd"
 
-# Generate Issuer (Intermediate CA) - 1 year
-openssl ecparam -genkey -name prime256v1 -out "${ISSUER_KEY}"
-openssl req -new -key "${ISSUER_KEY}" -out "${CERT_DIR}/issuer.csr" \
+# Generate Issuer
+openssl genrsa -out "${CERT_DIR}/issuer.key" 2048
+openssl req -new -key "${CERT_DIR}/issuer.key" -out "${CERT_DIR}/issuer.csr" \
   -subj "/CN=identity.linkerd.cluster.local/O=Linkerd"
 
-openssl x509 -req -in "${CERT_DIR}/issuer.csr" -CA "${TRUST_ANCHOR_CERT}" -CAkey "${TRUST_ANCHOR_KEY}" \
-  -CAcreateserial -out "${ISSUER_CERT}" -days 365 -sha256
+openssl x509 -req -in "${CERT_DIR}/issuer.csr" -CA "${CERT_DIR}/ca.crt" \
+  -CAkey "${CERT_DIR}/ca.key" -CAcreateserial -out "${CERT_DIR}/issuer.crt" \
+  -days 365 -sha256
 
-success "Certificates generated"
+# Get expiry
+EXPIRY=$(openssl x509 -enddate -noout -in "${CERT_DIR}/issuer.crt" | cut -d= -f2)
+EXPIRY_UTC=$(date -u -d "${EXPIRY}" +"%Y-%m-%dT%H:%M:%SZ")
 
-# ── 2. Install Linkerd with certificates ────────────────────────────────────────
+success "Certificates generated (expires: ${EXPIRY_UTC})"
+
+# ── 2. Install Linkerd ─────────────────────────────────────────────────────────
 info "Installing Linkerd ${LINKERD_VERSION}..."
 
 helm repo add linkerd https://helm.linkerd.io/stable --force-update
 helm repo update linkerd >/dev/null
 
-# Install CRDs
 helm upgrade --install linkerd-crds linkerd/linkerd-crds \
   --namespace linkerd \
   --wait
 
-# Install Control Plane with certificates
 helm upgrade --install linkerd-control-plane linkerd/linkerd-control-plane \
   --namespace linkerd \
-  --set-file identityTrustAnchorsPEM="${TRUST_ANCHOR_CERT}" \
-  --set-file identity.issuer.tls.crtPEM="${ISSUER_CERT}" \
-  --set-file identity.issuer.tls.keyPEM="${ISSUER_KEY}" \
+  --set-file identityTrustAnchorsPEM="${CERT_DIR}/ca.crt" \
+  --set-file identity.issuer.tls.crtPEM="${CERT_DIR}/issuer.crt" \
+  --set-file identity.issuer.tls.keyPEM="${CERT_DIR}/issuer.key" \
+  --set identity.issuer.crtExpiry="${EXPIRY_UTC}" \
   --set identity.issuer.clockSkewAllowance=60s \
   --wait --timeout 5m
 
-# Cleanup temp files
-rm -rf "${CERT_DIR}"
-
 # Inject into monitoring namespace
-kubectl label namespace "${MONITORING_NS}" linkerd.io/inject=enabled --overwrite
-
-# Exclude system namespaces
+kubectl label namespace "${MONITORING_NS}" linkerd.io/inject=enabled --overwrite 2>/dev/null || true
 kubectl label namespace kube-system linkerd.io/is-control-plane=true --overwrite 2>/dev/null || true
 
 info "Waiting for Linkerd to be ready..."
@@ -92,5 +93,4 @@ success "Linkerd mTLS enabled"
 
 echo ""
 success "install_mTLS.sh complete"
-info "Linkerd: Running (pod-to-pod mTLS)"
 echo ""
