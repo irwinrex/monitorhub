@@ -74,6 +74,10 @@ kubectl create secret tls linkerd-identity-issuer \
   --key="$ISSUER_KEY" \
   --dry-run=client -o yaml | kubectl apply -f -
 
+# Read cert content before cleanup
+TRUST_ANCHOR_PEM=$(cat "$TRUST_ANCHOR_CERT")
+
+# Cleanup temp files
 rm -f /tmp/linkerd-*.{crt,key,csr} /tmp/linkerd-trust-anchor.srl
 
 success "Linkerd certificates created"
@@ -94,7 +98,7 @@ helm upgrade --install linkerd-control-plane linkerd/linkerd-control-plane \
   --namespace linkerd \
   --set identity.issuer.scheme=kubernetes.io/tls \
   --set identity.issuer.tls.existingSecret=linkerd-identity-issuer \
-  --set identity.trustAnchorsPEM=$(cat "$TRUST_ANCHOR_CERT") \
+  --set identity.trustAnchorsPEM="$TRUST_ANCHOR_PEM" \
   --set identity.issuer.clockSkewAllowance=20s \
   --wait --timeout 5m
 
