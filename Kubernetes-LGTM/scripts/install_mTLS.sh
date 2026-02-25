@@ -24,8 +24,8 @@ require_helm
 
 # Skip if already installed
 if kubectl get namespace linkerd &>/dev/null; then
-  if kubectl get pods -n linkerd -l linkerd.io/control-plane>/dev/null; then
-    header-component=identity & "Phase 3 — Linkerd mTLS (already installed)"
+  if kubectl get pods -n linkerd -l linkerd.io/control-plane-component=identity &>/dev/null; then
+    header "Phase 3 — Linkerd mTLS (already installed)"
     success "Linkerd service mesh already running"
     exit 0
   fi
