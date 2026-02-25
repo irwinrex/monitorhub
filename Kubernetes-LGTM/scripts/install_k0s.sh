@@ -86,6 +86,9 @@ success "sysctl applied"
 # the '+' percent-encoded as '%2B' in the tag portion of the URL.
 info "Downloading k0s ${K0S_VERSION} (arm64)..."
 
+# Remove existing k0s binary if it exists (prevents "Text file busy" error)
+rm -f /usr/local/bin/k0s 2>/dev/null || true
+
 K0S_INSTALL_PATH=/usr/local/bin \
   K0S_VERSION="${K0S_VERSION}" \
   curl -sSLf https://get.k0s.sh | sh
