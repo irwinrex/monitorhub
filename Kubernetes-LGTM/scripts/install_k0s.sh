@@ -128,8 +128,6 @@ spec.setdefault("api", {}).setdefault("extraArgs", {}).update({
     "max-requests-inflight":          "400",
     "max-mutating-requests-inflight": "200",
 })
-# Disable konnectivity — not needed without separate worker nodes (~30 MB saved)
-spec.setdefault("konnectivity", {})["enabled"] = False
 with open(path, "w") as f:
     yaml.dump(cfg, f, default_flow_style=False)
 print("  k0s config patched")
