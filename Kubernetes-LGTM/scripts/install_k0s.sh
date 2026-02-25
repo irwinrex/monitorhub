@@ -182,14 +182,11 @@ fi
 
 info "Updating Helm repos..."
 helm repo add haproxytech https://haproxytech.github.io/helm-charts --force-update
-helm repo add jetstack https://charts.jetstack.io --force-update
 helm repo add grafana https://grafana.github.io/helm-charts --force-update
 helm repo update >/dev/null
 
 info "Creating namespaces..."
-for ns in "${MONITORING_NS}" "${CERTMANAGER_NS}"; do
-  kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f -
-done
+kubectl create namespace "${MONITORING_NS}" --dry-run=client -o yaml | kubectl apply -f -
 
 echo ""
 success "install_k0s.sh complete"

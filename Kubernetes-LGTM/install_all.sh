@@ -81,7 +81,7 @@ _run_phase() {
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}║  LGTM Full Stack Install                                 ║${NC}"
-echo -e "${BOLD}║  k0s · HAProxy · cert-manager · Linkerd · Loki/Tempo/Mimir║${NC}"
+echo -e "${BOLD}║  k0s · HAProxy · Linkerd · Loki/Tempo/Mimir    ║${NC}"
 echo -e "${BOLD}║  Target: t4g.xlarge · Debian 12 ARM64 · Single Node      ║${NC}"
 echo -e "${BOLD}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
@@ -122,7 +122,7 @@ success "All required files present"
 # ── Confirm ───────────────────────────────────────────────────────────────────
 if [[ "${YES}" != "true" ]]; then
   echo ""
-  warn "This will install k0s, HAProxy, cert-manager, Linkerd (mTLS), and LGTM stack."
+  warn "This will install k0s, HAProxy, Linkerd (mTLS), and LGTM stack."
   warn "Intended for a FRESH Debian 12 ARM64 instance (t4g.xlarge)."
   echo ""
   read -r -p "  Continue? [y/N] " confirm

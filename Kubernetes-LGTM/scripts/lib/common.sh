@@ -10,8 +10,7 @@
 export K0S_VERSION="v1.32.7+k0s.0"
 export HELM_VERSION="v3.17.1"
 export HAPROXY_CHART_VERSION="1.44.3"   # haproxytech/kubernetes-ingress
-export CERTMANAGER_VERSION="v1.17.1"    # jetstack/cert-manager
-export LINKERD_VERSION="stable-2.14.10" # linkerd/linkerd2 — ARM64 supported from 2.12+
+export LINKERD_VERSION="stable-2.14.10" # linkerd/linkerd2
 
 export LOKI_CHART_VERSION="6.29.0"
 export TEMPO_CHART_VERSION="1.21.1"
@@ -20,7 +19,6 @@ export GRAFANA_CHART_VERSION="8.9.1"
 
 # ── Namespaces ────────────────────────────────────────────────────────────────
 export MONITORING_NS="monitoring"
-export CERTMANAGER_NS="cert-manager"
 
 # ── Colours ───────────────────────────────────────────────────────────────────
 RED='\033[0;31m'

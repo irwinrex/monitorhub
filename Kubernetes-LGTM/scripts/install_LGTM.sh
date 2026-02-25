@@ -71,10 +71,23 @@ if [[ -z "${S3_REGION:-}" ]]; then
   S3_REGION="${REGION_INPUT:-us-east-1}"
 fi
 
-# Update values file
-sed -i "s/bucketNames: chunks: .*/bucketNames: chunks: \"${S3_BUCKET}\"/" "${BASE_VALUES}"
-sed -i "s/bucket_name: .*/bucket_name: \"${S3_BUCKET}\"/" "${BASE_VALUES}"
-sed -i "s/region: .*/region: \"${S3_REGION}\"/" "${BASE_VALUES}"
+# Create minimal overrides file instead of modifying base
+OVERRIDES=$(mktemp)
+cat > "${OVERRIDES}" <<EOF
+loki:
+  loki:
+    storage:
+      s3:
+        bucketnames: "${S3_BUCKET}"
+        region: "${S3_REGION}"
+mimir:
+  mimir:
+    storage:
+      bucket_name: "${S3_BUCKET}"
+    common:
+      storage:
+        bucket_name: "${S3_BUCKET}"
+EOF
 
 info "Configuration: Bucket='${S3_BUCKET}', Region='${S3_REGION}'"
 
@@ -98,6 +111,7 @@ helm_deploy() {
     --namespace "${MONITORING_NS}" \
     --version "${version}" \
     --values "${BASE_VALUES}" \
+    --values "${OVERRIDES}" \
     --wait \
     --timeout "${timeout}" \
     --atomic
