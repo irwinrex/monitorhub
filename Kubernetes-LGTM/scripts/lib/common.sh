@@ -7,16 +7,16 @@
 
 # ── Pinned versions ────────────────────────────────────────────────────────────
 # All version bumps happen here. Check release pages in README.md.
-export K0S_VERSION="v1.32.2+k0s.0"
-export HELM_VERSION="v3.17.1"
-export HAPROXY_CHART_VERSION="1.42.2" # haproxytech/kubernetes-ingress
-export CERTMANAGER_VERSION="v1.17.1"  # jetstack/cert-manager
-export LINKERD_VERSION="stable-2.16.0" # Linkerd
+export K0S_VERSION="v1.33.1+k0s.0"
+export HELM_VERSION="v3.17.2"
+export HAPROXY_CHART_VERSION="1.44.0" # haproxytech/kubernetes-ingress
+export CERTMANAGER_VERSION="v1.17.2"  # jetstack/cert-manager
+export LINKERD_VERSION="stable-2.16.1" # Linkerd
 
-export LOKI_CHART_VERSION="6.29.0"
-export TEMPO_CHART_VERSION="1.21.1"
-export MIMIR_CHART_VERSION="5.6.0"
-export GRAFANA_CHART_VERSION="8.9.1"
+export LOKI_CHART_VERSION="6.32.0"
+export TEMPO_CHART_VERSION="1.22.0"
+export MIMIR_CHART_VERSION="5.7.0"
+export GRAFANA_CHART_VERSION="9.1.0"
 
 # ── S3 Configuration (can be overridden via env) ─────────────────────────────
 export S3_BUCKET="${S3_BUCKET:-lgtm-observability}"

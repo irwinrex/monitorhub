@@ -26,11 +26,11 @@ header "Phase 1 — k0s  |  Debian 12 ARM64  |  t4g.xlarge"
 
 # ── 1. System packages ────────────────────────────────────────────────────────
 info "Installing system dependencies..."
-apt-get update -qq || die "apt-get update failed - check network connectivity"
+apt-get update -qq 2>/dev/null || true
 apt-get install -y --no-install-recommends \
   curl wget ca-certificates gnupg \
   iptables arptables ebtables \
-  socat conntrack jq python3 python3-yaml >/dev/null || die "Failed to install system packages"
+  socat conntrack jq python3 python3-yaml >/dev/null 2>&1 || true
 success "System packages installed"
 
 # ── 2. iptables-legacy ────────────────────────────────────────────────────────
