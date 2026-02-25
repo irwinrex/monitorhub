@@ -29,8 +29,8 @@ if kubectl get cluster "${POSTGRES_CLUSTER}" -n "${POSTGRES_NS}" &>/dev/null; th
   exit 0
 fi
 
-# Generate password
-POSTGRES_PASSWORD=$(openssl rand -base64 16)
+# Generate password (use base64 for URL-safe characters)
+POSTGRES_PASSWORD=$(openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c 32)
 
 # Install CNPG operator
 info "Installing CloudNativePG operator..."
@@ -54,7 +54,7 @@ info "Creating PostgreSQL cluster..."
 VALUES_FILE="${SCRIPT_DIR}/../values/postgres-values.yaml"
 
 # Replace password placeholder
-sed "s/CHANGEME_PASSWORD/${POSTGRES_PASSWORD}/g" "${VALUES_FILE}" | kubectl apply -f -
+sed "s|CHANGEME_PASSWORD|${POSTGRES_PASSWORD}|g" "${VALUES_FILE}" | kubectl apply -f -
 
 # Wait for cluster
 info "Waiting for PostgreSQL cluster..."
