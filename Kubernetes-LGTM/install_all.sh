@@ -127,19 +127,6 @@ done
 [[ "${MISSING}" == "false" ]] || die "Missing files detected — ensure the full project is uploaded."
 success "All required files present"
 
-# ── Pre-flight checks (minimal) ───────────────────────────────────────────────
-if [[ "${SKIP_K0S}" != "true" ]]; then
-  check_k0s_not_installed || {
-    if [[ "${YES}" != "true" ]]; then
-      read -r -p "  Continue anyway? [y/N] " confirm
-      [[ "${confirm,,}" == "y" ]] || { info "Aborted."; exit 0; }
-    fi
-  }
-  
-  # Backup existing kubeconfig
-  backup_kubeconfig
-fi
-
 # ── Confirm ───────────────────────────────────────────────────────────────────
 if [[ "${YES}" != "true" ]]; then
   echo ""
