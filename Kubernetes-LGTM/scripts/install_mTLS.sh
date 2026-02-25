@@ -2,7 +2,6 @@
 # ==============================================================================
 # scripts/install_mTLS.sh
 # Installs Linkerd for pod-to-pod mTLS.
-# Uses OpenSSL to generate the required identity certificates for Helm.
 # ==============================================================================
 set -euo pipefail
 IFS=$'\n\t'
@@ -15,7 +14,7 @@ require_kubeconfig
 require_helm
 
 if ! command -v openssl &>/dev/null; then
-  die "openssl is required to generate Linkerd certificates."
+  die "openssl is required."
 fi
 
 : "${LINKERD_VERSION:=stable-2.16.1}"
@@ -36,26 +35,39 @@ for ns in "${MONITORING_NS}" linkerd; do
   kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null || true
 done
 
-# ── 1. Generate Linkerd Identity Certificates ─────────────────────────────────
+# ── 1. Generate Certificates ─────────────────────────────────────────────────
 info "Generating Linkerd identity certificates..."
 
 CERT_DIR=$(mktemp -d)
 trap 'rm -rf "$CERT_DIR"' EXIT
 
-# Generate CA (Trust Anchor)
+# Create extensions file for CA
+cat > "${CERT_DIR}/ca.ext" <<EOF
+basicConstraints=critical,CA:TRUE
+keyUsage=critical,keyCertSign,cRLSign
+EOF
+
+# Generate CA (Trust Anchor) - RSA 2048
 openssl genrsa -out "${CERT_DIR}/ca.key" 2048
 openssl req -x509 -new -nodes -key "${CERT_DIR}/ca.key" -sha256 -days 3650 \
   -out "${CERT_DIR}/ca.crt" \
-  -subj "/CN=linkerd-root-ca/O=Linkerd"
+  -subj "/CN=linkerd-root-ca/O=Linkerd" \
+  -extfile "${CERT_DIR}/ca.ext"
 
-# Generate Issuer
+# Generate Issuer with CA extension
+cat > "${CERT_DIR}/issuer.ext" <<EOF
+basicConstraints=critical,CA:TRUE,pathlen:0
+keyUsage=critical,keyCertSign,cRLSign
+extendedKeyUsage=serverAuth,clientAuth
+EOF
+
 openssl genrsa -out "${CERT_DIR}/issuer.key" 2048
 openssl req -new -key "${CERT_DIR}/issuer.key" -out "${CERT_DIR}/issuer.csr" \
   -subj "/CN=identity.linkerd.cluster.local/O=Linkerd"
 
 openssl x509 -req -in "${CERT_DIR}/issuer.csr" -CA "${CERT_DIR}/ca.crt" \
   -CAkey "${CERT_DIR}/ca.key" -CAcreateserial -out "${CERT_DIR}/issuer.crt" \
-  -days 365 -sha256
+  -days 365 -sha256 -extfile "${CERT_DIR}/issuer.ext"
 
 # Get expiry
 EXPIRY=$(openssl x509 -enddate -noout -in "${CERT_DIR}/issuer.crt" | cut -d= -f2)
@@ -86,7 +98,7 @@ helm upgrade --install linkerd-control-plane linkerd/linkerd-control-plane \
 kubectl label namespace "${MONITORING_NS}" linkerd.io/inject=enabled --overwrite 2>/dev/null || true
 kubectl label namespace kube-system linkerd.io/is-control-plane=true --overwrite 2>/dev/null || true
 
-info "Waiting for Linkerd to be ready..."
+info "Waiting for Linkerd..."
 sleep 30
 
 success "Linkerd mTLS enabled"
