@@ -26,6 +26,8 @@ header "Phase 1 — k0s  |  Debian 12 ARM64  |  t4g.xlarge"
 
 # ── 1. System packages ────────────────────────────────────────────────────────
 info "Installing system dependencies..."
+rm -f /etc/apt/sources.list.d/kubernetes*.list
+
 apt-get update -qq
 apt-get install -y --no-install-recommends \
   curl wget ca-certificates gnupg \
@@ -79,14 +81,8 @@ sysctl --system >/dev/null
 success "sysctl applied"
 
 # ── 6. k0s binary ─────────────────────────────────────────────────────────────
-# The '+' in the version string (e.g. v1.32.7+k0s.0) causes curl to fail on
-# some systems when it appears in the GitHub release tag segment of the URL.
-# Fix: use the official get.k0s.sh installer with K0S_VERSION pinned, which
-# handles the URL encoding internally. Direct curl is kept as a fallback with
-# the '+' percent-encoded as '%2B' in the tag portion of the URL.
 info "Downloading k0s ${K0S_VERSION} (arm64)..."
 
-# Remove existing k0s binary if it exists (prevents "Text file busy" error)
 rm -f /usr/local/bin/k0s 2>/dev/null || true
 
 K0S_INSTALL_PATH=/usr/local/bin \
@@ -99,8 +95,6 @@ if [[ -z "${INSTALLED_VER}" ]]; then
   die "k0s binary not found after install — check network access to get.k0s.sh"
 fi
 
-# If get.k0s.sh installed a different version (shouldn't happen with K0S_VERSION
-# set, but guard anyway), fall back to direct download with encoded URL
 if [[ "${INSTALLED_VER}" != *"${K0S_VERSION}"* ]]; then
   warn "get.k0s.sh installed ${INSTALLED_VER}, expected ${K0S_VERSION} — trying direct download..."
   # Encode '+' as '%2B' in the tag only; filename keeps literal '+'
@@ -135,7 +129,9 @@ PYEOF
 
 # ── 8. k0s systemd service ────────────────────────────────────────────────────
 info "Installing k0s systemd service..."
-k0s install controller --single -c /etc/k0s/k0s.yaml
+
+k0s install controller --single -c /etc/k0s/k0s.yaml --force || true
+systemctl daemon-reload || true
 k0s start
 
 info "Waiting for k0s API server..."
