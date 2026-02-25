@@ -2,7 +2,7 @@
 # ==============================================================================
 # scripts/install_LGTM.sh
 # Deploys Loki, Tempo, Mimir, Grafana via Helm.
-# FIX: splits lgtm-values.yaml to remove incorrect nesting for individual charts.
+# Configured for: Private IP, No Domain, No Cert-Manager, HTTP only.
 # ==============================================================================
 set -euo pipefail
 IFS=$'\n\t'
@@ -14,40 +14,36 @@ require_root
 require_kubeconfig
 require_helm
 
-# Use versions from common.sh
 : "${MONITORING_NS:=monitoring}"
 : "${LOKI_CHART_VERSION:=6.32.0}"
 : "${TEMPO_CHART_VERSION:=1.22.0}"
 : "${MIMIR_CHART_VERSION:=5.7.0}"
 : "${GRAFANA_CHART_VERSION:=9.1.0}"
 
-header "Phase 5 — LGTM Stack  |  Loki · Tempo · Mimir · Grafana"
+header "Phase 5 — LGTM Stack"
 
-# Skip if LGTM already deployed
+# Skip if already deployed
 if helm list -n "${MONITORING_NS}" 2>/dev/null | grep -q lgtm-grafana; then
   header "Phase 5 — LGTM Stack (already installed)"
   success "LGTM stack already deployed"
   exit 0
 fi
 
-# ── 1. Namespace & Linkerd Injection ───────────────────────────────────────────
+# ── 1. Namespace & Linkerd ─────────────────────────────────────────────────────
 info "Configuring Namespace '${MONITORING_NS}'..."
-
 kubectl create namespace "${MONITORING_NS}" --dry-run=client -o yaml | kubectl apply -f -
 
 if kubectl get ns linkerd &>/dev/null; then
   kubectl annotate namespace "${MONITORING_NS}" linkerd.io/inject=enabled --overwrite
   success "Enabled Linkerd mTLS injection"
-else
-  warn "Linkerd not found. mTLS will NOT be enabled."
 fi
 
-# ── 2. Pre-flight Checks ─────────────────────────────────────────────────────────
+# ── 2. Pre-flight ─────────────────────────────────────────────────────────────
 if ! kubectl get secret grafana-admin -n "${MONITORING_NS}" &>/dev/null; then
-  die "Secret 'grafana-admin' not found.\n  Run: sudo bash scripts/install_secrets.sh"
+  die "Secret 'grafana-admin' not found. Run: sudo bash scripts/install_secrets.sh"
 fi
 
-# ── 3. Configuration ────────────────────────────────────────────────────────────
+# ── 3. S3 Configuration ────────────────────────────────────────────────────────
 VALUES_DIR="$(resolve_values_dir)"
 BASE_VALUES="${VALUES_DIR}/lgtm-values.yaml"
 
@@ -55,38 +51,40 @@ if [[ ! -f "${BASE_VALUES}" ]]; then
   die "Values file not found: ${BASE_VALUES}"
 fi
 
-# Interactive S3 Configuration
 if [[ -z "${S3_BUCKET:-}" ]]; then
   echo ""
-  read -r -p "Enter S3 bucket name [default: lgtm-observability]: " S3_INPUT
-  S3_BUCKET="${S3_INPUT:-lgtm-observability}"
+  read -r -p "Enter S3 bucket name: " S3_BUCKET
 fi
+S3_BUCKET="${S3_BUCKET:-lgtm-observability}"
 
 if [[ -z "${S3_REGION:-}" ]]; then
-  echo ""
-  read -r -p "Enter S3 region [default: us-east-1]: " REGION_INPUT
-  S3_REGION="${REGION_INPUT:-us-east-1}"
+  read -r -p "Enter S3 region [default: us-east-1]: " S3_REGION
 fi
+S3_REGION="${S3_REGION:-us-east-1}"
 
-info "Using S3 Config: Bucket='${S3_BUCKET}', Region='${S3_REGION}'"
+info "S3: Bucket='${S3_BUCKET}', Region='${S3_REGION}'"
 
-# ── 4. Generate Values for Each Service ───────────────────────────────────────
+# ── 4. Generate Values ───────────────────────────────────────────────────────
 generate_values() {
   local service="$1"
   local outfile="/tmp/values-${service}.yaml"
   
   python3 -c "
 import yaml
-import os
 
 service = '${service}'
 bucket = '${S3_BUCKET}'
 region = '${S3_REGION}'
 
 with open('${BASE_VALUES}', 'r') as f:
-    data = yaml.safe_load(f)
+    docs = list(yaml.safe_load_all(f))
 
-config = data.get(service, {})
+full_config = {}
+for doc in docs:
+    if doc:
+        full_config.update(doc)
+
+config = full_config.get(service, {})
 
 def update_nested(d, keys, value):
     for key in keys[:-1]:
@@ -98,22 +96,18 @@ if service == 'loki':
     update_nested(config, ['storage', 'bucketNames', 'chunks'], bucket)
     update_nested(config, ['storage', 'bucketNames', 'ruler'], bucket)
     update_nested(config, ['storage', 'bucketNames', 'admin'], bucket)
-
 elif service == 'tempo':
     update_nested(config, ['storage', 'trace', 's3', 'bucket'], bucket)
     update_nested(config, ['storage', 'trace', 's3', 'region'], region)
-
 elif service == 'mimir':
-    update_nested(config, ['structuredConfig', 'blocks_storage', 's3', 'bucket_name'], bucket)
-    update_nested(config, ['structuredConfig', 'alertmanager_storage', 's3', 'bucket_name'], bucket)
-    update_nested(config, ['structuredConfig', 'ruler_storage', 's3', 'bucket_name'], bucket)
+    update_nested(config, ['storage', 'bucket_name'], bucket)
 
 with open('${outfile}', 'w') as f:
     yaml.dump(config, f)
 "
 }
 
-# ── 5. Helm Deployment ─────────────────────────────────────────────────────────
+# ── 5. Helm Deploy ─────────────────────────────────────────────────────────────
 helm repo add grafana https://grafana.github.io/helm-charts --force-update
 helm repo update grafana >/dev/null
 
@@ -127,13 +121,11 @@ helm_deploy() {
   generate_values "${service_key}"
   local values_file="/tmp/values-${service_key}.yaml"
 
-  if helm list -n "${MONITORING_NS}" -q | grep -q "^${release}$"; then
-    info "Upgrading ${release}..."
-  else
-    info "Installing ${release} (${chart} ${version})..."
-  fi
+  local action="install"
+  helm list -n "${MONITORING_NS}" -q | grep -q "^${release}$" && action="upgrade"
 
-  helm upgrade --install "${release}" "${chart}" \
+  info "${action^}ing ${release}..."
+  helm ${action} "${release}" "${chart}" \
     --namespace "${MONITORING_NS}" \
     --version "${version}" \
     --values "${values_file}" \
@@ -145,30 +137,65 @@ helm_deploy() {
   rm -f "${values_file}"
 }
 
-# ── 6. Deploy Components ─────────────────────────────────────────────────────────
-helm_deploy lgtm-loki    grafana/loki              "${LOKI_CHART_VERSION}"    "loki"    5m
-helm_deploy lgtm-tempo   grafana/tempo             "${TEMPO_CHART_VERSION}"    "tempo"   5m
-helm_deploy lgtm-mimir   grafana/mimir-distributed  "${MIMIR_CHART_VERSION}"   "mimir"   10m
+# Deploy
+helm_deploy lgtm-loki    grafana/loki               "${LOKI_CHART_VERSION}"    "loki"    5m
+helm_deploy lgtm-tempo   grafana/tempo              "${TEMPO_CHART_VERSION}"   "tempo"   5m
+helm_deploy lgtm-mimir   grafana/mimir-distributed  "${MIMIR_CHART_VERSION}"  "mimir"   10m
 helm_deploy lgtm-grafana grafana/grafana            "${GRAFANA_CHART_VERSION}"  "grafana" 5m
 
-# ── 7. Ingress Rules ────────────────────────────────────────────────────────────
+# ── 6. Ingress (HTTP) ─────────────────────────────────────────────────────────
 info "Applying Ingress Rules..."
 
-INGRESS_VALUES="${VALUES_DIR}/ingress-values.yaml"
-if [[ -f "${INGRESS_VALUES}" ]]; then
-  kubectl apply -f "${INGRESS_VALUES}"
-  success "Ingress rules applied"
-else
-  warn "Ingress values file not found"
-fi
+kubectl apply -f - <<EOF
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: lgtm-ingress
+  namespace: ${MONITORING_NS}
+  annotations:
+    haproxy.org/timeout-server: "60s"
+spec:
+  ingressClassName: haproxy
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: lgtm-grafana
+                port:
+                  number: 3000
+          - path: /api/v1/push
+            pathType: Prefix
+            backend:
+              service:
+                name: lgtm-mimir-gateway
+                port:
+                  number: 80
+          - path: /loki
+            pathType: Prefix
+            backend:
+              service:
+                name: lgtm-loki
+                port:
+                  number: 3100
+          - path: /tempo
+            pathType: Prefix
+            backend:
+              service:
+                name: lgtm-tempo
+                port:
+                  number: 3200
+EOF
 
-# ── Summary ───────────────────────────────────────────────────────────────────
+# ── Summary ─────────────────────────────────────────────────────────────────
 echo ""
-info "Status of ${MONITORING_NS}:"
 kubectl get pods -n "${MONITORING_NS}" -o wide | head -n 10
 
 echo ""
 success "install_LGTM.sh complete"
-info "Access: http://<IP>/ (Grafana)"
+info "Access: http://<instance-ip>/"
 info "Login:  admin / (check secret)"
 echo ""

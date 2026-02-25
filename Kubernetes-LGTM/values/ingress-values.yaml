@@ -1,17 +1,12 @@
-# Ingress values for HAProxy (path-based routing)
-# Applied automatically during LGTM deployment
-
+# Ingress values for HAProxy - HTTP only (path-based routing)
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: grafana-main
+  name: lgtm-ingress
   namespace: monitoring
   annotations:
-    haproxy.org/timeout-connect: "10s"
-    haproxy.org/timeout-client: "60s"
     haproxy.org/timeout-server: "60s"
-    haproxy.org/rate-limit: "100"
 spec:
   ingressClassName: haproxy
   rules:
@@ -24,45 +19,13 @@ spec:
                 name: lgtm-grafana
                 port:
                   number: 3000
-
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: mimir-api
-  namespace: monitoring
-  annotations:
-    haproxy.org/timeout-connect: "10s"
-    haproxy.org/timeout-server: "60s"
-    haproxy.org/path-rewrite: "/mimir(.*) /$1"
-spec:
-  ingressClassName: haproxy
-  rules:
-    - http:
-        paths:
-          - path: /mimir
+          - path: /api/v1/push
             pathType: Prefix
             backend:
               service:
                 name: lgtm-mimir-gateway
                 port:
                   number: 80
-
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: loki-api
-  namespace: monitoring
-  annotations:
-    haproxy.org/timeout-connect: "10s"
-    haproxy.org/timeout-server: "60s"
-    haproxy.org/path-rewrite: "/loki(.*) /$1"
-spec:
-  ingressClassName: haproxy
-  rules:
-    - http:
-        paths:
           - path: /loki
             pathType: Prefix
             backend:
@@ -70,22 +33,6 @@ spec:
                 name: lgtm-loki
                 port:
                   number: 3100
-
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: tempo-api
-  namespace: monitoring
-  annotations:
-    haproxy.org/timeout-connect: "10s"
-    haproxy.org/timeout-server: "60s"
-    haproxy.org/path-rewrite: "/tempo(.*) /$1"
-spec:
-  ingressClassName: haproxy
-  rules:
-    - http:
-        paths:
           - path: /tempo
             pathType: Prefix
             backend:

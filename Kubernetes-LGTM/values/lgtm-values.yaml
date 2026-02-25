@@ -1,8 +1,4 @@
-# Minimal LGTM values - Top-level keys for each chart
-# S3 bucket/region will be injected by install_LGTM.sh
-
----
-# Loki
+# Loki values - Single binary mode
 loki:
   auth_enabled: false
   commonConfig:
@@ -19,59 +15,47 @@ loki:
   storage:
     type: s3
     bucketNames:
-      chunks: "lgtm-observability"
-      ruler: "lgtm-observability"
-      admin: "lgtm-observability"
+      chunks: "loki-chunks"
+      ruler: "loki-ruler"
+      admin: "loki-admin"
     s3:
       region: us-east-1
       s3ForcePathStyle: false
   limits_config:
     retention_period: 720h
-    ingestion_rate_mb: 16
-    ingestion_burst_size_mb: 32
 
 singleBinary:
   replicas: 1
 
 ---
-# Tempo
+# Tempo values
 tempo:
   replicas: 1
   storage:
     trace:
       backend: s3
       s3:
-        bucket: lgtm-observability
+        bucket: tempo-traces
         region: us-east-1
 
 ---
-# Mimir
+# Mimir values
 mimir:
   enabled: true
+  storage:
+    bucket_name: mimir-data
   structuredConfig:
-    runtime_config:
-      file: /var/mimir/runtime.yaml
     limits:
       max_global_series_per_metric: 10000
-      max_global_bytes: 536870912
-    ingester:
-      max_ingested_series: 2000
     store_gateway:
       sharding_ring:
         replication_factor: 1
-    compactor:
-      retention_enabled: true
-    analytics:
-      enabled: false
-  storage:
-    bucket_name: lgtm-observability
 
 ---
-# Grafana
+# Grafana values
 grafana:
   replicas: 1
   admin:
     existingSecret: grafana-admin
   persistence:
-    type: pvc
     enabled: false
