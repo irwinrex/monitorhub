@@ -9,7 +9,7 @@
 # All version bumps happen here. Check release pages in README.md.
 export K0S_VERSION="v1.32.7+k0s.0"
 export HELM_VERSION="v3.17.1"
-export HAPROXY_CHART_VERSION="1.42.2"   # haproxytech/kubernetes-ingress
+export HAPROXY_CHART_VERSION="1.44.3"   # haproxytech/kubernetes-ingress
 export CERTMANAGER_VERSION="v1.17.1"    # jetstack/cert-manager
 export LINKERD_VERSION="stable-2.14.10" # linkerd/linkerd2 — ARM64 supported from 2.12+
 
