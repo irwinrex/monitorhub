@@ -5,14 +5,10 @@
 # Target  : k0s single node · t4g.xlarge (4 vCPU / 16 GB ARM64)
 # Auth    : AWS EC2 instance profile — no credentials in this file
 # S3      : Single bucket "lgtm-observability" with per-service key prefixes
-# mTLS    : TLS listeners configured here; cert mounts in mtls-patch.yaml
+# mTLS    : Handled by Linkerd service mesh (automatic pod-to-pod encryption)
 #
-# Before deploying, replace the two placeholders:
-#   grafana.example.com  →  your real domain
-#   us-east-1            →  your S3 bucket region
-#
-# Quick replace:
-#   sed -i "s/grafana.example.com/YOUR_DOMAIN/g"  values/lgtm-values.yaml
+# Deploy with: bash install_all.sh
+# ==============================================================================
 #   sed -i "s/us-east-1/YOUR_REGION/g"            values/lgtm-values.yaml
 #
 # S3 bucket layout (one bucket: lgtm-observability)
@@ -332,7 +328,7 @@ mimir:
 # ------------------------------------------------------------------------------
 # 4. GRAFANA  —  grafana/grafana chart
 # Admin credentials come from the 'grafana-admin' k8s Secret (never in values).
-# Datasource URLs use https:// — TLS config in mtls-patch.yaml.
+# Datasource URLs use http:// — mTLS handled by Linkerd.
 # ------------------------------------------------------------------------------
 grafana:
   replicas: 1
@@ -400,26 +396,19 @@ grafana:
         - name: Mimir
           type: prometheus
           uid: mimir
-          url: https://lgtm-mimir-gateway.monitoring.svc.cluster.local:443/prometheus
+          url: http://lgtm-mimir-gateway.monitoring.svc.cluster.local:80/prometheus
           access: proxy
           isDefault: true
           jsonData:
             timeInterval: "60s"
-            tlsAuthWithCACert: true
-            tlsAuth:           true
-            exemplarTraceIdDestinations:
-              - name: trace_id
-                datasourceUid: tempo
 
         - name: Loki
           type: loki
           uid: loki
-          url: https://lgtm-loki.monitoring.svc.cluster.local:3100
+          url: http://lgtm-loki.monitoring.svc.cluster.local:3100
           access: proxy
           jsonData:
             maxLines:          1000
-            tlsAuthWithCACert: true
-            tlsAuth:           true
             derivedFields:
               - datasourceUid: tempo
                 matcherRegex:  "trace_id=(\\w+)"
@@ -430,12 +419,10 @@ grafana:
         - name: Tempo
           type: tempo
           uid: tempo
-          url: https://lgtm-tempo.monitoring.svc.cluster.local:3200
+          url: http://lgtm-tempo.monitoring.svc.cluster.local:3200
           access: proxy
           jsonData:
             httpMethod:        GET
-            tlsAuthWithCACert: true
-            tlsAuth:           true
             tracesToLogsV2:
               datasourceUid: loki
               tags:

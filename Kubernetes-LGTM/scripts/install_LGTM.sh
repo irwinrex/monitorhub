@@ -6,18 +6,17 @@
 # Run standalone:   sudo bash scripts/install_LGTM.sh
 # Run via all:      called automatically by install_all.sh
 #
-# Values applied in order (later overrides earlier):
-#   values/lgtm-values.yaml  — base: S3, resources, single-bucket prefixes
-#   values/mtls-patch.yaml   — mTLS: cert mounts, TLS listeners, https:// URLs
+# Values:
+#   values/lgtm-values.yaml  — base: S3, resources, storage config
+#
+# mTLS: Handled automatically by Linkerd (pod-to-pod encryption)
 #
 # Deploy order: Loki → Tempo → Mimir → Grafana
-# Grafana last ensures datasource DNS names are resolvable at deploy time.
 # ==============================================================================
 set -euo pipefail
 IFS=$'\n\t'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=lib/common.sh
 source "${SCRIPT_DIR}/lib/common.sh"
 
 require_root
@@ -26,7 +25,7 @@ require_helm
 
 # Skip if LGTM already deployed
 if helm list -n "${MONITORING_NS}" 2>/dev/null | grep -q lgtm-grafana; then
-  header "Phase 6 — LGTM Stack (already installed)"
+  header "Phase 5 — LGTM Stack (already installed)"
   success "LGTM stack already deployed"
   exit 0
 fi
@@ -40,10 +39,8 @@ fi
 
 VALUES_DIR="$(resolve_values_dir)"
 BASE="${VALUES_DIR}/lgtm-values.yaml"
-MTLS="${VALUES_DIR}/mtls-patch.yaml"
 
 require_file "${BASE}"
-require_file "${MTLS}"
 
 # ── S3 bucket validation ────────────────────────────────────────────────────────
 info "Validating S3 bucket configuration..."
@@ -118,7 +115,6 @@ helm_deploy() {
     --namespace "${MONITORING_NS}" \
     --version "${version}" \
     --values "${BASE}" \
-    --values "${MTLS}" \
     --wait \
     --timeout "${timeout}" \
     --atomic \

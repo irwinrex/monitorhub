@@ -5,7 +5,7 @@ controller:
   hostPorts:
     enable: true
     http:   80
-    https:  443
+    https:  0
     stat:   1024
 
   ingressClass: haproxy
@@ -54,31 +54,31 @@ controller:
     annotations:
       haproxy.org/rate-limit: "100"
 
-  # Path-based routing backends
+  # Path-based routing backends (HTTP - mTLS handled by Linkerd)
   extraBackends:
     # Mimir API
     mimir-backend:
       enabled: true
       endpoints:
-        - https://lgtm-mimir-gateway.monitoring.svc.cluster.local:443
-      port: 443
-      backendServerProtocol: HTTPS
+        - http://lgtm-mimir-gateway.monitoring.svc.cluster.local:80
+      port: 80
+      backendServerProtocol: HTTP
       pathRewrite: "/mimir(.*) /$1"
     # Loki
     loki-backend:
       enabled: true
       endpoints:
-        - https://lgtm-loki.monitoring.svc.cluster.local:3100
+        - http://lgtm-loki.monitoring.svc.cluster.local:3100
       port: 3100
-      backendServerProtocol: HTTPS
+      backendServerProtocol: HTTP
       pathRewrite: "/loki(.*) /$1"
     # Tempo
     tempo-backend:
       enabled: true
       endpoints:
-        - https://lgtm-tempo.monitoring.svc.cluster.local:3200
+        - http://lgtm-tempo.monitoring.svc.cluster.local:3200
       port: 3200
-      backendServerProtocol: HTTPS
+      backendServerProtocol: HTTP
       pathRewrite: "/tempo(.*) /$1"
 
   resources:

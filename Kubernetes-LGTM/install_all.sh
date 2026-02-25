@@ -33,7 +33,7 @@
 #     install_LGTM.sh
 #   values/
 #     lgtm-values.yaml
-#     mtls-patch.yaml
+#     haproxy-values.yaml
 # ==============================================================================
 set -euo pipefail
 IFS=$'\n\t'
@@ -106,9 +106,7 @@ done
 
 for vfile in \
   "${VALUES_DIR}/lgtm-values.yaml" \
-  "${VALUES_DIR}/mtls-patch.yaml" \
-  "${VALUES_DIR}/haproxy-values.yaml" \
-  "${VALUES_DIR}/cert-manager-values.yaml"; do
+  "${VALUES_DIR}/haproxy-values.yaml"; do
   if [[ -f "$vfile" ]]; then
     info "  found: ${vfile##"${ROOT_DIR}/"}"
   else
