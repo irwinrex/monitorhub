@@ -2,16 +2,6 @@
 # ==============================================================================
 # scripts/install_k0s.sh
 # Debian 12 ARM64 system prep + k0s single-node install + Helm bootstrap.
-#
-# Run standalone:   sudo bash scripts/install_k0s.sh
-# Run via all:      called automatically by install_all.sh
-#
-# After this script:
-#   • k0s running as systemd service
-#   • /root/.kube/config populated
-#   • helm at /usr/local/bin/helm
-#   • Helm repos: haproxytech, jetstack, grafana
-#   • Namespaces: monitoring, cert-manager
 # ==============================================================================
 set -euo pipefail
 IFS=$'\n\t'
@@ -26,6 +16,7 @@ header "Phase 1 — k0s  |  Debian 12 ARM64  |  t4g.xlarge"
 
 # ── 1. System packages ────────────────────────────────────────────────────────
 info "Installing system dependencies..."
+# FIX: Remove legacy Kubernetes apt repo configs which fail GPG v3 verification in 2026
 rm -f /etc/apt/sources.list.d/kubernetes*.list
 
 apt-get update -qq
@@ -36,8 +27,6 @@ apt-get install -y --no-install-recommends \
 success "System packages installed"
 
 # ── 2. iptables-legacy ────────────────────────────────────────────────────────
-# Debian 12 defaults to nftables. k0s/kube-proxy require iptables-legacy
-# or NAT rules are silently broken and pods lose external connectivity.
 info "Switching to iptables-legacy (Debian 12 requirement)..."
 update-alternatives --set iptables /usr/sbin/iptables-legacy
 update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
@@ -83,21 +72,22 @@ success "sysctl applied"
 # ── 6. k0s binary ─────────────────────────────────────────────────────────────
 info "Downloading k0s ${K0S_VERSION} (arm64)..."
 
+# Remove existing k0s binary to avoid "Text file busy"
 rm -f /usr/local/bin/k0s 2>/dev/null || true
 
 K0S_INSTALL_PATH=/usr/local/bin \
   K0S_VERSION="${K0S_VERSION}" \
   curl -sSLf https://get.k0s.sh | sh
 
-# Verify the installed version matches what we pinned
+# Verify install
 INSTALLED_VER="$(k0s version 2>/dev/null || true)"
 if [[ -z "${INSTALLED_VER}" ]]; then
-  die "k0s binary not found after install — check network access to get.k0s.sh"
+  die "k0s binary not found after install."
 fi
 
+# Fallback if get.k0s.sh installed wrong version
 if [[ "${INSTALLED_VER}" != *"${K0S_VERSION}"* ]]; then
   warn "get.k0s.sh installed ${INSTALLED_VER}, expected ${K0S_VERSION} — trying direct download..."
-  # Encode '+' as '%2B' in the tag only; filename keeps literal '+'
   ENCODED_TAG="${K0S_VERSION//+/%2B}"
   curl -sSLf \
     "https://github.com/k0sproject/k0s/releases/download/${ENCODED_TAG}/k0s-${K0S_VERSION}-arm64" \
@@ -128,21 +118,32 @@ print("  k0s config patched")
 PYEOF
 
 # ── 8. k0s systemd service ────────────────────────────────────────────────────
-info "Installing k0s systemd service..."
+info "Resetting and Installing k0s systemd service..."
 
-k0s install controller --single -c /etc/k0s/k0s.yaml --force || true
-systemctl daemon-reload || true
+# FIX: Aggressively clean up previous installs to prevent "no matching resources" error
+# 1. Stop service if running
+k0s stop >/dev/null 2>&1 || true
+# 2. Reset (removes systemd service and some config)
+k0s reset >/dev/null 2>&1 || true
+# 3. CRITICAL: Wipe data directory to remove old certs/etcd data
+rm -rf /var/lib/k0s
+rm -rf /run/k0s
+# 4. Reload daemon to clear cached service state
+systemctl daemon-reload
+
+# Now install fresh
+k0s install controller --single -c /etc/k0s/k0s.yaml
 k0s start
 
 info "Waiting for k0s API server..."
-for i in $(seq 1 36); do
-  k0s kubectl get nodes &>/dev/null 2>&1 && {
+for i in $(seq 1 60); do
+  if k0s kubectl get nodes >/dev/null 2>&1; then
     success "API is up"
     break
-  }
-  [[ $i -eq 36 ]] && die "k0s API timeout.\n  Debug: journalctl -u k0scontroller -n 100"
+  fi
+  [[ $i -eq 60 ]] && die "k0s API timeout.\n  Debug: journalctl -u k0scontroller -n 100"
   printf '.'
-  sleep 5
+  sleep 2
 done
 echo
 
@@ -160,6 +161,19 @@ if [[ -n "${SUDO_USER:-}" ]]; then
   chown "${SUDO_USER}:${SUDO_USER}" "${USER_HOME}/.kube/config"
   success "kubeconfig also at ${USER_HOME}/.kube/config"
 fi
+
+info "Waiting for node registration..."
+# FIX: Wait for the node to actually appear in the list before checking condition
+# This prevents "error: no matching resources found"
+for i in $(seq 1 60); do
+  NODE_COUNT=$(k0s kubectl get nodes --no-headers 2>/dev/null | wc -l || echo 0)
+  if [[ "$NODE_COUNT" -gt 0 ]]; then
+    break
+  fi
+  printf '.'
+  sleep 2
+done
+echo
 
 info "Waiting for node Ready..."
 k0s kubectl wait node --all --for=condition=Ready --timeout=180s
