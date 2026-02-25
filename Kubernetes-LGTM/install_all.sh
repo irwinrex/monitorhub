@@ -18,7 +18,7 @@
 # Available skip flags:
 #   SKIP_K0S=true        skip scripts/install_k0s.sh
 #   SKIP_HAPROXY=true   skip scripts/install_HAProxy.sh
-#   SKIP_MTLS=true      skip scripts/install_mTLS.sh (Linkerd mTLS)
+#   SKIP_POSTGRES=true  skip scripts/install_Postgres.sh
 #   SKIP_SECRETS=true   skip scripts/install_secrets.sh
 #   SKIP_LGTM=true      skip scripts/install_LGTM.sh
 #
@@ -81,8 +81,7 @@ _run_phase() {
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}║  LGTM Full Stack Install                                 ║${NC}"
-echo -e "${BOLD}║  k0s · HAProxy · Linkerd · Loki/Tempo/Mimir    ║${NC}"
-echo -e "${BOLD}║  Target: t4g.xlarge · Debian 12 ARM64 · Single Node      ║${NC}"
+echo -e "${BOLD}║  k0s · HAProxy · PostgreSQL · Loki/Tempo/Mimir           ║${NC}"
 echo -e "${BOLD}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -93,7 +92,7 @@ for script in \
   "${SCRIPTS_DIR}/lib/common.sh" \
   "${SCRIPTS_DIR}/install_k0s.sh" \
   "${SCRIPTS_DIR}/install_HAProxy.sh" \
-  "${SCRIPTS_DIR}/install_mTLS.sh" \
+  "${SCRIPTS_DIR}/install_Postgres.sh" \
   "${SCRIPTS_DIR}/install_secrets.sh" \
   "${SCRIPTS_DIR}/install_LGTM.sh"; do
   if [[ -f "$script" ]]; then
