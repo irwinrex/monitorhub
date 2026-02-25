@@ -7,15 +7,15 @@
 
 # ── Pinned versions ────────────────────────────────────────────────────────────
 # All version bumps happen here. Check release pages in README.md.
-export K0S_VERSION="v1.32.7+k0s.0"
-export HELM_VERSION="v3.17.1"
-export HAPROXY_CHART_VERSION="1.44.3"   # haproxytech/kubernetes-ingress
-export LINKERD_VERSION="stable-2.14.10" # linkerd/linkerd2
+export K0S_VERSION="v1.34.3+k0s.0"      # Updated to latest 1.34.x stable
+export HELM_VERSION="v3.17.1"           # Latest Helm
+export HAPROXY_CHART_VERSION="1.48.0"   # Updated to latest (released Feb 2026)
+export LINKERD_VERSION="stable-2.14.11" # Updated to latest OSS stable branch (2.14.11)
 
-export LOKI_CHART_VERSION="6.29.0"
-export TEMPO_CHART_VERSION="1.21.1"
-export MIMIR_CHART_VERSION="5.6.0"
-export GRAFANA_CHART_VERSION="8.9.1"
+export LOKI_CHART_VERSION="6.53.0"     # Already at latest
+export TEMPO_CHART_VERSION="1.61.3"    # Already at latest (tempo-distributed)
+export MIMIR_CHART_VERSION="6.0.5"     # Already at latest stable
+export GRAFANA_CHART_VERSION="10.5.15" # Updated from 9.1.0 to the latest 10.x release
 
 # ── Namespaces ────────────────────────────────────────────────────────────────
 export MONITORING_NS="monitoring"

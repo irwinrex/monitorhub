@@ -69,6 +69,9 @@ generate_values() {
   local service="$1"
   local outfile="/tmp/values-${service}.yaml"
   
+  # Replace placeholder with actual bucket name in values file
+  sed "s/CHANGEME/${S3_BUCKET}/g" "${BASE_VALUES}" > /tmp/lgtm-temp.yaml
+  
   python3 -c "
 import yaml
 
@@ -76,7 +79,7 @@ service = '${service}'
 bucket = '${S3_BUCKET}'
 region = '${S3_REGION}'
 
-with open('${BASE_VALUES}', 'r') as f:
+with open('/tmp/lgtm-temp.yaml', 'r') as f:
     docs = list(yaml.safe_load_all(f))
 
 full_config = {}
@@ -86,25 +89,11 @@ for doc in docs:
 
 config = full_config.get(service, {})
 
-def update_nested(d, keys, value):
-    for key in keys[:-1]:
-        d = d.setdefault(key, {})
-    d[keys[-1]] = value
-
-if service == 'loki':
-    update_nested(config, ['storage', 's3', 'region'], region)
-    update_nested(config, ['storage', 'bucketNames', 'chunks'], bucket)
-    update_nested(config, ['storage', 'bucketNames', 'ruler'], bucket)
-    update_nested(config, ['storage', 'bucketNames', 'admin'], bucket)
-elif service == 'tempo':
-    update_nested(config, ['storage', 'trace', 's3', 'bucket'], bucket)
-    update_nested(config, ['storage', 'trace', 's3', 'region'], region)
-elif service == 'mimir':
-    update_nested(config, ['storage', 'bucket_name'], bucket)
-
 with open('${outfile}', 'w') as f:
     yaml.dump(config, f)
 "
+
+rm -f /tmp/lgtm-temp.yaml
 }
 
 # ── 5. Helm Deploy ─────────────────────────────────────────────────────────────

@@ -1,4 +1,8 @@
-# Loki values - Single binary mode
+# LGTM Stack Values - Using PostgreSQL for storage
+# PostgreSQL connection will be configured via environment variables
+
+---
+# Loki - Using PostgreSQL
 loki:
   auth_enabled: false
   commonConfig:
@@ -6,56 +10,158 @@ loki:
   schemaConfig:
     configs:
       - from: 2024-01-01
-        store: tsdb
+        store: postgres
         object_store: s3
         schema: v13
         index:
           prefix: loki_index_
           period: 24h
   storage:
-    type: s3
+    type: postgres
+    postgres:
+      host: "monitoring-pg.postgres.svc.cluster.local"
+      port: 5432
+      database: "grafana"
+      username: "grafana"
+      passwordSecretName: "postgres-connection"
+      sslmode: require
     bucketNames:
-      chunks: "loki-chunks"
-      ruler: "loki-ruler"
-      admin: "loki-admin"
+      chunks: CHANGEME
+      ruler: CHANGEME
+      admin: CHANGEME
     s3:
       region: us-east-1
-      s3ForcePathStyle: false
+  storage_config:
+    postgres:
+      connection_string: "host=monitoring-pg.postgres.svc.cluster.local port=5432 dbname=grafana user=grafana password=${POSTGRES_PASSWORD} sslmode=require"
   limits_config:
     retention_period: 720h
+    ingestion_rate_mb: 16
+    ingestion_burst_size_mb: 32
 
 singleBinary:
   replicas: 1
+  env:
+    - name: POSTGRES_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: postgres-connection
+          key: password
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
 
 ---
-# Tempo values
+# Tempo - Using PostgreSQL
 tempo:
   replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
   storage:
     trace:
-      backend: s3
-      s3:
-        bucket: tempo-traces
-        region: us-east-1
+      backend: postgres
+      postgres:
+        connection: "host=monitoring-pg.postgres.svc.cluster.local port=5432 dbname=grafana user=grafana password=${POSTGRES_PASSWORD} sslmode=require"
+  config:
+    auth_enabled: false
+    server:
+      http_listen_port: 3100
+      grpc_listen_port: 9096
+    distributor:
+      receivers:
+        jaeger:
+          protocols: thrift_http,grpc,thrift_binary
+        otlp:
+          protocols: http,grpc
+    ingester:
+      max_block_duration: 5m
+    compactor:
+      compaction:
+        block_retention: 1h
 
 ---
-# Mimir values
+# Mimir - Using PostgreSQL
 mimir:
   enabled: true
-  storage:
-    bucket_name: mimir-data
-  structuredConfig:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
     limits:
-      max_global_series_per_metric: 10000
+      cpu: 250m
+      memory: 256Mi
+  storage:
+    type: postgres
+    postgres:
+      connection_string: "host=monitoring-pg.postgres.svc.cluster.local port=5432 dbname=grafana user=grafana password=${POSTGRES_PASSWORD} sslmode=require"
+  structuredConfig:
+    runtime_config:
+      file: /var/mimir/runtime.yaml
+    limits:
+      max_global_series_per_metric: 5000
+      max_global_bytes: 268435456
+    ingester:
+      max_ingested_series: 1000
     store_gateway:
       sharding_ring:
         replication_factor: 1
+    compactor:
+      retention_enabled: true
+    analytics:
+      enabled: false
 
 ---
-# Grafana values
+# Grafana - Using PostgreSQL
 grafana:
   replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
   admin:
     existingSecret: grafana-admin
   persistence:
-    enabled: false
+    type: postgres
+    postgres:
+      host: monitoring-pg.postgres.svc.cluster.local
+      port: 5432
+      database: grafana
+      user: grafana
+      passwordSecretName: postgres-connection
+  grafana.ini:
+    analytics:
+      reporting_enabled: false
+    log:
+      mode: console
+    database:
+      type: postgres
+      host: monitoring-pg.postgres.svc.cluster.local:5432
+      name: grafana
+      user: grafana
+      password_secret: postgres-connection
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          url: http://lgtm-mimir-gateway.monitoring.svc.cluster.local:80/prometheus
+          isDefault: true
+        - name: Loki
+          type: loki
+          url: http://lgtm-loki.monitoring.svc.cluster.local:3100
+        - name: Tempo
+          type: tempo
+          url: http://lgtm-tempo.monitoring.svc.cluster.local:3200
