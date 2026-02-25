@@ -65,23 +65,13 @@ sed -i "s/lgtm-observability/${S3_BUCKET}/g" "${BASE}" 2>/dev/null || true
 sed -i "s/us-east-1/${S3_REGION}/g" "${BASE}" 2>/dev/null || true
 info "S3 bucket: ${S3_BUCKET}, region: ${S3_REGION}"
 
-# ── Pre-flight: all mTLS certs must be Ready ──────────────────────────────────
-info "Pre-flight: checking mTLS certificates..."
-CERTS_OK=true
-for cert in loki-tls tempo-tls mimir-gateway-tls mimir-ingester-tls \
-  grafana-client-tls grafana-ingress-tls; do
-  STATUS=$(kubectl get certificate "${cert}" -n "${MONITORING_NS}" \
-    -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
-  if [[ "$STATUS" != "True" ]]; then
-    warn "  NOT READY: ${cert} (status: ${STATUS})"
-    CERTS_OK=false
-  else
-    info "  Ready: ${cert}"
-  fi
-done
-[[ "${CERTS_OK}" == "true" ]] ||
-  die "One or more mTLS certs not Ready.\n  Fix: sudo bash scripts/install_mTLS.sh\n  Check: kubectl get certificates -n ${MONITORING_NS}"
-
+# ── Pre-flight: check Linkerd is installed ─────────────────────────────────────
+info "Pre-flight: checking Linkerd mesh..."
+if kubectl get namespace linkerd &>/dev/null; then
+  success "Linkerd is installed (pod-to-pod mTLS enabled)"
+else
+  warn "Linkerd not found - mTLS will not be enabled"
+fi
 # ── Pre-flight: Grafana admin secret must exist ───────────────────────────────
 kubectl get secret grafana-admin -n "${MONITORING_NS}" &>/dev/null ||
   die "Secret 'grafana-admin' not found.\n  Fix: sudo bash scripts/install_secrets.sh"
