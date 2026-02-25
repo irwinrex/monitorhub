@@ -23,15 +23,6 @@ resources:
 podAnnotations:
   cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
 
-podAntiAffinity:
-  preferredDuringSchedulingIgnoredDuringExecution:
-    - weight: 100
-      podAntiAffinityTerm:
-        labelSelector:
-          matchLabels:
-            app.kubernetes.io/name: cert-manager
-        topologyKey: kubernetes.io/hostname
-
 webhook:
   replicaCount: 1
   resources:

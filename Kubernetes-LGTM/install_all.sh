@@ -15,17 +15,12 @@
 # Non-interactive mode (skip confirmation):
 #   YES=true sudo bash install_all.sh
 #
-# Linkerd mTLS (optional):
-#   SKIP_LINKERD=true       skip Linkerd installation
-#   LINKERD_VIZ=false       skip Linkerd viz (~150MB)
-#
 # Available skip flags:
 #   SKIP_K0S=true        skip scripts/install_k0s.sh
-#   SKIP_HAPROXY=true    skip scripts/install_HAProxy.sh
-#   SKIP_MTLS=true       skip scripts/install_mTLS.sh
-#   SKIP_SECRETS=true    skip scripts/install_secrets.sh
-#   SKIP_LGTM=true       skip scripts/install_LGTM.sh
-#   SKIP_LINKERD=true    skip scripts/install_Linkerd.sh
+#   SKIP_HAPROXY=true   skip scripts/install_HAProxy.sh
+#   SKIP_MTLS=true      skip scripts/install_mTLS.sh (Linkerd mTLS)
+#   SKIP_SECRETS=true   skip scripts/install_secrets.sh
+#   SKIP_LGTM=true      skip scripts/install_LGTM.sh
 #
 # Project structure expected:
 #   install_all.sh          ← this file
@@ -58,7 +53,6 @@ SKIP_HAPROXY="${SKIP_HAPROXY:-false}"
 SKIP_MTLS="${SKIP_MTLS:-false}"
 SKIP_SECRETS="${SKIP_SECRETS:-false}"
 SKIP_LGTM="${SKIP_LGTM:-false}"
-SKIP_LINKERD="${SKIP_LINKERD:-false}"
 YES="${YES:-false}"
 
 # ── Phase runner helpers ──────────────────────────────────────────────────────
@@ -101,7 +95,6 @@ for script in \
   "${SCRIPTS_DIR}/install_HAProxy.sh" \
   "${SCRIPTS_DIR}/install_mTLS.sh" \
   "${SCRIPTS_DIR}/install_secrets.sh" \
-  "${SCRIPTS_DIR}/install_Linkerd.sh" \
   "${SCRIPTS_DIR}/install_LGTM.sh"; do
   if [[ -f "$script" ]]; then
     info "  found: ${script##"${ROOT_DIR}/"}"
@@ -150,19 +143,16 @@ TOTAL_START=$SECONDS
 _run_phase 1 "k0s — System prep + Kubernetes + Helm" \
   "${SKIP_K0S}" "${SCRIPTS_DIR}/install_k0s.sh"
 
-_run_phase 2 "HAProxy — Ingress Controller" \
+_run_phase 2 "HAProxy — Ingress Controller (HTTP 80)" \
   "${SKIP_HAPROXY}" "${SCRIPTS_DIR}/install_HAProxy.sh"
 
-_run_phase 3 "mTLS — cert-manager + PKI + Certificates" \
+_run_phase 3 "Linkerd — Pod-to-Pod mTLS" \
   "${SKIP_MTLS}" "${SCRIPTS_DIR}/install_mTLS.sh"
 
 _run_phase 4 "Secrets — Grafana admin credentials + Basic Auth" \
   "${SKIP_SECRETS}" "${SCRIPTS_DIR}/install_secrets.sh"
 
-_run_phase 5 "Linkerd — Service Mesh mTLS (optional)" \
-  "${SKIP_LINKERD}" "${SCRIPTS_DIR}/install_Linkerd.sh"
-
-_run_phase 6 "LGTM — Loki · Tempo · Mimir · Grafana" \
+_run_phase 5 "LGTM — Loki · Tempo · Mimir · Grafana" \
   "${SKIP_LGTM}" "${SCRIPTS_DIR}/install_LGTM.sh"
 
 # ══════════════════════════════════════════════════════════════════════════════
