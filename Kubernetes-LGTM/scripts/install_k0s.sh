@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # scripts/install_k0s.sh
-# Debian 12 ARM64 system prep + k0s single-node install + Helm bootstrap.
+# Debian 12 ARM64 system prep + k0s single-node install + Helm + kubectl.
 # ==============================================================================
 set -euo pipefail
 IFS=$'\n\t'
@@ -14,9 +14,21 @@ require_root
 
 header "Phase 1 — k0s  |  Debian 12 ARM64  |  t4g.xlarge"
 
-# ── 1. System packages ────────────────────────────────────────────────────────
-info "Installing system dependencies..."
-# FIX: Remove legacy Kubernetes apt repo configs which fail GPG v3 verification in 2026
+# ── 0. Check Existing Installation ────────────────────────────────────────────
+SKIP_INSTALL=false
+
+# Check if service is active and node is Ready
+if command -v k0s &>/dev/null && systemctl is-active --quiet k0scontroller; then
+  export KUBECONFIG=/var/lib/k0s/pki/admin.conf
+  if k0s kubectl get nodes --no-headers 2>/dev/null | grep -q " Ready"; then
+    success "k0s is already installed, running, and healthy. Skipping core installation."
+    SKIP_INSTALL=true
+  fi
+fi
+
+# ── 1. System Packages & Config (Always Run) ──────────────────────────────────
+info "Configuring system dependencies..."
+
 rm -f /etc/apt/sources.list.d/kubernetes*.list
 
 apt-get update -qq
@@ -24,24 +36,15 @@ apt-get install -y --no-install-recommends \
   curl wget ca-certificates gnupg \
   iptables arptables ebtables \
   socat conntrack jq python3 python3-yaml >/dev/null
-success "System packages installed"
 
-# ── 2. iptables-legacy ────────────────────────────────────────────────────────
-info "Switching to iptables-legacy (Debian 12 requirement)..."
-update-alternatives --set iptables /usr/sbin/iptables-legacy
-update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
-update-alternatives --set arptables /usr/sbin/arptables-legacy
-update-alternatives --set ebtables /usr/sbin/ebtables-legacy
-success "iptables-legacy active"
+update-alternatives --set iptables /usr/sbin/iptables-legacy &>/dev/null || true
+update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy &>/dev/null || true
+update-alternatives --set arptables /usr/sbin/arptables-legacy &>/dev/null || true
+update-alternatives --set ebtables /usr/sbin/ebtables-legacy &>/dev/null || true
 
-# ── 3. Swap off ───────────────────────────────────────────────────────────────
-info "Disabling swap..."
 swapoff -a
 sed -i '/[[:space:]]swap[[:space:]]/d' /etc/fstab
-success "Swap disabled"
 
-# ── 4. Kernel modules ─────────────────────────────────────────────────────────
-info "Loading kernel modules..."
 cat >/etc/modules-load.d/k0s.conf <<'EOF'
 overlay
 br_netfilter
@@ -50,10 +53,7 @@ EOF
 modprobe overlay
 modprobe br_netfilter
 modprobe nf_conntrack
-success "Kernel modules loaded"
 
-# ── 5. sysctl ─────────────────────────────────────────────────────────────────
-info "Applying sysctl tunables..."
 cat >/etc/sysctl.d/99-k0s.conf <<'EOF'
 net.ipv4.ip_forward                 = 1
 net.bridge.bridge-nf-call-iptables  = 1
@@ -67,42 +67,34 @@ vm.overcommit_memory = 1
 vm.panic_on_oom      = 0
 EOF
 sysctl --system >/dev/null
-success "sysctl applied"
 
-# ── 6. k0s binary ─────────────────────────────────────────────────────────────
-info "Downloading k0s ${K0S_VERSION} (arm64)..."
+success "System configuration applied"
 
-# Remove existing k0s binary to avoid "Text file busy"
-rm -f /usr/local/bin/k0s 2>/dev/null || true
+# ── 2. k0s Installation (Only if not healthy) ─────────────────────────────────
+if [[ "$SKIP_INSTALL" == "false" ]]; then
 
-K0S_INSTALL_PATH=/usr/local/bin \
-  K0S_VERSION="${K0S_VERSION}" \
-  curl -sSLf https://get.k0s.sh | sh
+  info "Downloading k0s ${K0S_VERSION} (arm64)..."
+  rm -f /usr/local/bin/k0s 2>/dev/null || true
+  
+  K0S_INSTALL_PATH=/usr/local/bin \
+    K0S_VERSION="${K0S_VERSION}" \
+    curl -sSLf https://get.k0s.sh | sh
 
-# Verify install
-INSTALLED_VER="$(k0s version 2>/dev/null || true)"
-if [[ -z "${INSTALLED_VER}" ]]; then
-  die "k0s binary not found after install."
-fi
+  # Fallback for version mismatch
+  INSTALLED_VER="$(k0s version 2>/dev/null || true)"
+  if [[ "${INSTALLED_VER}" != *"${K0S_VERSION}"* ]]; then
+    ENCODED_TAG="${K0S_VERSION//+/%2B}"
+    curl -sSLf \
+      "https://github.com/k0sproject/k0s/releases/download/${ENCODED_TAG}/k0s-${K0S_VERSION}-arm64" \
+      -o /usr/local/bin/k0s
+    chmod +x /usr/local/bin/k0s
+  fi
 
-# Fallback if get.k0s.sh installed wrong version
-if [[ "${INSTALLED_VER}" != *"${K0S_VERSION}"* ]]; then
-  warn "get.k0s.sh installed ${INSTALLED_VER}, expected ${K0S_VERSION} — trying direct download..."
-  ENCODED_TAG="${K0S_VERSION//+/%2B}"
-  curl -sSLf \
-    "https://github.com/k0sproject/k0s/releases/download/${ENCODED_TAG}/k0s-${K0S_VERSION}-arm64" \
-    -o /usr/local/bin/k0s
-  chmod +x /usr/local/bin/k0s
-fi
+  info "Generating k0s config..."
+  mkdir -p /etc/k0s
+  k0s config create >/etc/k0s/k0s.yaml
 
-success "k0s: $(k0s version)"
-
-# ── 7. k0s config ─────────────────────────────────────────────────────────────
-info "Generating k0s config..."
-mkdir -p /etc/k0s
-k0s config create >/etc/k0s/k0s.yaml
-
-python3 - <<'PYEOF'
+  python3 - <<'PYEOF'
 import yaml
 path = "/etc/k0s/k0s.yaml"
 with open(path) as f:
@@ -114,92 +106,90 @@ spec.setdefault("api", {}).setdefault("extraArgs", {}).update({
 })
 with open(path, "w") as f:
     yaml.dump(cfg, f, default_flow_style=False)
-print("  k0s config patched")
 PYEOF
 
-# ── 8. k0s systemd service ────────────────────────────────────────────────────
-info "Resetting and Installing k0s systemd service..."
+  info "Resetting and Installing k0s systemd service..."
+  k0s stop >/dev/null 2>&1 || true
+  k0s reset >/dev/null 2>&1 || true
+  rm -rf /var/lib/k0s /run/k0s
+  systemctl daemon-reload
 
-# FIX: Aggressively clean up previous installs to prevent "no matching resources" error
-# 1. Stop service if running
-k0s stop >/dev/null 2>&1 || true
-# 2. Reset (removes systemd service and some config)
-k0s reset >/dev/null 2>&1 || true
-# 3. CRITICAL: Wipe data directory to remove old certs/etcd data
-rm -rf /var/lib/k0s
-rm -rf /run/k0s
-# 4. Reload daemon to clear cached service state
-systemctl daemon-reload
+  k0s install controller --single -c /etc/k0s/k0s.yaml
+  k0s start
 
-# Now install fresh
-k0s install controller --single -c /etc/k0s/k0s.yaml
-k0s start
+  info "Waiting for k0s API server..."
+  for i in $(seq 1 60); do
+    if k0s kubectl get nodes >/dev/null 2>&1; then
+      success "API is up"
+      break
+    fi
+    [[ $i -eq 60 ]] && die "k0s API timeout."
+    printf '.'
+    sleep 2
+  done
+  echo
 
-info "Waiting for k0s API server..."
-for i in $(seq 1 60); do
-  if k0s kubectl get nodes >/dev/null 2>&1; then
-    success "API is up"
-    break
-  fi
-  [[ $i -eq 60 ]] && die "k0s API timeout.\n  Debug: journalctl -u k0scontroller -n 100"
-  printf '.'
-  sleep 2
-done
-echo
+  info "Waiting for node registration..."
+  for i in $(seq 1 60); do
+    NODE_COUNT=$(k0s kubectl get nodes --no-headers 2>/dev/null | wc -l || echo 0)
+    if [[ "$NODE_COUNT" -gt 0 ]]; then
+      break
+    fi
+    printf '.'
+    sleep 2
+  done
+  echo
+fi
 
-# ── 9. kubeconfig ─────────────────────────────────────────────────────────────
-info "Exporting kubeconfig..."
+# ── 3. Post-Install Config (Always Run) ───────────────────────────────────────
+
+info "Installing/Updating kubectl binary..."
+# Extract pure version (e.g. v1.32.7) from v1.32.7+k0s.0 by stripping everything after +
+KUBE_VERSION="${K0S_VERSION%+*}"
+if ! command -v kubectl &>/dev/null || [[ "$(kubectl version --client -o json | jq -r .clientVersion.gitVersion)" != "${KUBE_VERSION}" ]]; then
+  curl -sSLf "https://dl.k8s.io/release/${KUBE_VERSION}/bin/linux/arm64/kubectl" -o /usr/local/bin/kubectl
+  chmod +x /usr/local/bin/kubectl
+  success "kubectl ${KUBE_VERSION} installed"
+fi
+
+info "Configuring kubeconfig for kubectl..."
+# 1. Setup for Root
 mkdir -p /root/.kube
 k0s kubeconfig admin >/root/.kube/config
 chmod 600 /root/.kube/config
 export KUBECONFIG=/root/.kube/config
 
+# 2. Setup for Sudo User (if exists)
 if [[ -n "${SUDO_USER:-}" ]]; then
   USER_HOME="$(getent passwd "${SUDO_USER}" | cut -d: -f6)"
   mkdir -p "${USER_HOME}/.kube"
   cp /root/.kube/config "${USER_HOME}/.kube/config"
-  chown "${SUDO_USER}:${SUDO_USER}" "${USER_HOME}/.kube/config"
-  success "kubeconfig also at ${USER_HOME}/.kube/config"
+  chown -R "${SUDO_USER}:${SUDO_USER}" "${USER_HOME}/.kube"
+  chmod 600 "${USER_HOME}/.kube/config"
+  success "kubeconfig configured for user: ${SUDO_USER}"
 fi
 
-info "Waiting for node registration..."
-# FIX: Wait for the node to actually appear in the list before checking condition
-# This prevents "error: no matching resources found"
-for i in $(seq 1 60); do
-  NODE_COUNT=$(k0s kubectl get nodes --no-headers 2>/dev/null | wc -l || echo 0)
-  if [[ "$NODE_COUNT" -gt 0 ]]; then
-    break
-  fi
-  printf '.'
-  sleep 2
-done
-echo
+info "Verifying node status (via kubectl)..."
+kubectl wait node --all --for=condition=Ready --timeout=180s >/dev/null
+kubectl get nodes -o wide
 
-info "Waiting for node Ready..."
-k0s kubectl wait node --all --for=condition=Ready --timeout=180s
-k0s kubectl get nodes -o wide
+info "Installing Helm..."
+if ! command -v helm &>/dev/null; then
+  curl -sSLf "https://get.helm.sh/helm-${HELM_VERSION}-linux-arm64.tar.gz" |
+    tar -xz --strip-components=1 -C /usr/local/bin linux-arm64/helm
+  chmod +x /usr/local/bin/helm
+fi
 
-# ── 10. Helm ──────────────────────────────────────────────────────────────────
-info "Installing Helm ${HELM_VERSION} (arm64)..."
-curl -sSLf "https://get.helm.sh/helm-${HELM_VERSION}-linux-arm64.tar.gz" |
-  tar -xz --strip-components=1 -C /usr/local/bin linux-arm64/helm
-chmod +x /usr/local/bin/helm
-success "Helm: $(helm version --short)"
-
-info "Adding Helm repos..."
+info "Updating Helm repos..."
 helm repo add haproxytech https://haproxytech.github.io/helm-charts --force-update
 helm repo add jetstack https://charts.jetstack.io --force-update
 helm repo add grafana https://grafana.github.io/helm-charts --force-update
 helm repo update >/dev/null
-success "Helm repos: haproxytech, jetstack, grafana"
 
-# ── 11. Namespaces ────────────────────────────────────────────────────────────
 info "Creating namespaces..."
 for ns in "${MONITORING_NS}" "${CERTMANAGER_NS}"; do
-  k0s kubectl create namespace "$ns" --dry-run=client -o yaml |
-    k0s kubectl apply -f -
+  kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f -
 done
-success "Namespaces: ${MONITORING_NS}, ${CERTMANAGER_NS}"
 
 echo ""
 success "install_k0s.sh complete"

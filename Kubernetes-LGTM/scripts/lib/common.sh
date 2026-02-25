@@ -66,7 +66,7 @@ require_file() {
 
 # ── kubectl via k0s (no separate kubectl binary needed) ──────────────────────
 # All scripts use k() instead of kubectl directly.
-k() { k0s kubectl "$@"; }
+k() { kubectl "$@"; }
 
 # ── Wait helpers ──────────────────────────────────────────────────────────────
 
@@ -74,7 +74,7 @@ k() { k0s kubectl "$@"; }
 wait_rollout() {
   local ns="$1" resource="$2" timeout="${3:-120s}"
   info "Waiting for rollout: ${resource} (${ns})..."
-  k0s kubectl rollout status "${resource}" -n "${ns}" --timeout="${timeout}"
+  kubectl rollout status "${resource}" -n "${ns}" --timeout="${timeout}"
 }
 
 # wait_cert_ready <cert-name> <namespace> [max-retries]
@@ -83,7 +83,7 @@ wait_cert_ready() {
   info "Waiting for certificate: ${name} (${ns})..."
   for i in $(seq 1 "${retries}"); do
     local status
-    status=$(k0s kubectl get certificate "${name}" -n "${ns}" \
+    status=$(kubectl get certificate "${name}" -n "${ns}" \
       -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' \
       2>/dev/null || true)
     if [[ "$status" == "True" ]]; then
@@ -112,10 +112,10 @@ wait_linkerd_ready() {
       return 0
     fi
     # Fallback: just wait for deployments directly
-    if k0s kubectl get deploy -n linkerd 2>/dev/null | grep -v "0/"; then
-      if k0s kubectl rollout status deploy/linkerd-destination -n linkerd --timeout=10s &>/dev/null &&
-        k0s kubectl rollout status deploy/linkerd-identity -n linkerd --timeout=10s &>/dev/null &&
-        k0s kubectl rollout status deploy/linkerd-proxy-injector -n linkerd --timeout=10s &>/dev/null; then
+    if kubectl get deploy -n linkerd 2>/dev/null | grep -v "0/"; then
+      if kubectl rollout status deploy/linkerd-destination -n linkerd --timeout=10s &>/dev/null &&
+        kubectl rollout status deploy/linkerd-identity -n linkerd --timeout=10s &>/dev/null &&
+        kubectl rollout status deploy/linkerd-proxy-injector -n linkerd --timeout=10s &>/dev/null; then
         success "Linkerd control plane rollouts complete"
         return 0
       fi

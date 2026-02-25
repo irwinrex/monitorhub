@@ -24,10 +24,17 @@ require_root
 require_kubeconfig
 require_helm
 
+# Skip if LGTM already deployed
+if helm list -n "${MONITORING_NS}" 2>/dev/null | grep -q lgtm-grafana; then
+  header "Phase 6 — LGTM Stack (already installed)"
+  success "LGTM stack already deployed"
+  exit 0
+fi
+
 header "Phase 5 — LGTM Stack  |  Loki · Tempo · Mimir · Grafana"
 
 # Ensure monitoring namespace exists
-if ! k0s kubectl get namespace "${MONITORING_NS}" &>/dev/null 2>&1; then
+if ! kubectl get namespace "${MONITORING_NS}" &>/dev/null 2>&1; then
   die "Namespace '${MONITORING_NS}' does not exist. Run install_k0s.sh first."
 fi
 
@@ -64,7 +71,7 @@ info "Pre-flight: checking mTLS certificates..."
 CERTS_OK=true
 for cert in loki-tls tempo-tls mimir-gateway-tls mimir-ingester-tls \
   grafana-client-tls grafana-ingress-tls; do
-  STATUS=$(k0s kubectl get certificate "${cert}" -n "${MONITORING_NS}" \
+  STATUS=$(kubectl get certificate "${cert}" -n "${MONITORING_NS}" \
     -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
   if [[ "$STATUS" != "True" ]]; then
     warn "  NOT READY: ${cert} (status: ${STATUS})"
@@ -77,7 +84,7 @@ done
   die "One or more mTLS certs not Ready.\n  Fix: sudo bash scripts/install_mTLS.sh\n  Check: kubectl get certificates -n ${MONITORING_NS}"
 
 # ── Pre-flight: Grafana admin secret must exist ───────────────────────────────
-k0s kubectl get secret grafana-admin -n "${MONITORING_NS}" &>/dev/null ||
+kubectl get secret grafana-admin -n "${MONITORING_NS}" &>/dev/null ||
   die "Secret 'grafana-admin' not found.\n  Fix: sudo bash scripts/install_secrets.sh"
 
 success "Pre-flight checks passed"
@@ -130,7 +137,7 @@ info "Creating path-based Ingress resources..."
 
 GRAFANA_DOMAIN="${GRAFANA_DOMAIN:-grafana.example.com}"
 
-k0s kubectl apply -f - <<INGRESSEOF
+kubectl apply -f - <<INGRESSEOF
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -258,7 +265,7 @@ success "Path-based Ingress resources created"
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo ""
 info "Pods in ${MONITORING_NS}:"
-k0s kubectl get pods -n "${MONITORING_NS}" -o wide
+kubectl get pods -n "${MONITORING_NS}" -o wide
 
 echo ""
 info "Helm releases:"

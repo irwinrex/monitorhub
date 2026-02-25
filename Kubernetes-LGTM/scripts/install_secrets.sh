@@ -29,10 +29,17 @@ source "${SCRIPT_DIR}/lib/common.sh"
 require_root
 require_kubeconfig
 
+# Skip if secrets already exist
+if kubectl get secret grafana-admin -n "${MONITORING_NS}" &>/dev/null; then
+  header "Phase 4 — Secrets (already installed)"
+  success "Grafana admin secret already exists"
+  exit 0
+fi
+
 header "Phase 4 — Secrets"
 
 # Ensure monitoring namespace exists
-if ! k0s kubectl get namespace "${MONITORING_NS}" &>/dev/null 2>&1; then
+if ! kubectl get namespace "${MONITORING_NS}" &>/dev/null 2>&1; then
   die "Namespace '${MONITORING_NS}' does not exist. Run install_k0s.sh first."
 fi
 
@@ -40,10 +47,10 @@ FORCE_RECREATE="${FORCE_RECREATE:-false}"
 SECRET_NAME="grafana-admin"
 
 # ── Check existing secret ─────────────────────────────────────────────────────
-if k0s kubectl get secret "${SECRET_NAME}" -n "${MONITORING_NS}" &>/dev/null; then
+if kubectl get secret "${SECRET_NAME}" -n "${MONITORING_NS}" &>/dev/null; then
   if [[ "${FORCE_RECREATE}" == "true" ]]; then
     warn "FORCE_RECREATE=true — deleting existing secret..."
-    k0s kubectl delete secret "${SECRET_NAME}" -n "${MONITORING_NS}"
+    kubectl delete secret "${SECRET_NAME}" -n "${MONITORING_NS}"
   else
     success "Secret '${SECRET_NAME}' already exists — skipping"
     info "To regenerate: FORCE_RECREATE=true sudo bash scripts/install_secrets.sh"
@@ -61,7 +68,7 @@ else
   info "Generated random Grafana admin password"
 fi
 
-k0s kubectl create secret generic "${SECRET_NAME}" \
+kubectl create secret generic "${SECRET_NAME}" \
   --namespace "${MONITORING_NS}" \
   --from-literal=admin-user=admin \
   --from-literal=admin-password="${GRAFANA_PASS}"
@@ -80,10 +87,10 @@ else
   HTPASSWD="${BASIC_AUTH_USER}:${HTPASSWD}"
 fi
 
-k0s kubectl create secret generic "${BASIC_AUTH_SECRET}" \
+kubectl create secret generic "${BASIC_AUTH_SECRET}" \
   --namespace "${MONITORING_NS}" \
   --from-literal=auth="${HTPASSWD}" \
-  --dry-run=client -o yaml | k0s kubectl apply -f -
+  --dry-run=client -o yaml | kubectl apply -f -
 
 success "HAProxy basic auth configured (${BASIC_AUTH_USER})"
 

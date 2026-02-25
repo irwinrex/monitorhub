@@ -31,13 +31,24 @@ require_root
 require_kubeconfig
 require_helm
 
+# Skip if cert-manager already installed
+if kubectl get crd certificates.cert-manager.io &>/dev/null; then
+  header "Phase 3 — cert-manager (already installed)"
+  
+  # Check if root CA exists
+  if kubectl get secret lgtm-root-ca-secret -n "${MONITORING_NS}" &>/dev/null; then
+    success "mTLS certificates already exist"
+    exit 0
+  fi
+fi
+
 GRAFANA_DOMAIN="${GRAFANA_DOMAIN:-${GRAFANA_DOMAIN}}"
 
 header "Phase 3 — cert-manager ${CERTMANAGER_VERSION} + mTLS PKI"
 
 # Ensure required namespaces exist
 for ns in "${MONITORING_NS}" "${CERTMANAGER_NS}"; do
-  if ! k0s kubectl get namespace "$ns" &>/dev/null 2>&1; then
+  if ! kubectl get namespace "$ns" &>/dev/null 2>&1; then
     die "Namespace '$ns' does not exist. Run install_k0s.sh first."
   fi
 done
@@ -87,7 +98,7 @@ success "cert-manager ready"
 # ── 2. mTLS PKI ───────────────────────────────────────────────────────────────
 info "Applying mTLS PKI..."
 
-k0s kubectl apply -f - <<PKIEOF
+kubectl apply -f - <<PKIEOF
 ---
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer

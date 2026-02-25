@@ -26,13 +26,20 @@ source "${SCRIPT_DIR}/lib/common.sh"
 require_root
 require_kubeconfig
 
+# Skip if Linkerd already installed
+if kubectl get crd linkerd.io &>/dev/null; then
+  header "Phase 5 — Linkerd (already installed)"
+  success "Linkerd service mesh already deployed"
+  exit 0
+fi
+
 LINKERD_VIZ="${LINKERD_VIZ:-true}"
 
 header "Phase X — Linkerd mTLS ${LINKERD_VERSION}"
 
 # Check cluster connectivity
 info "Verifying cluster connectivity..."
-if ! k0s kubectl get nodes &>/dev/null 2>&1; then
+if ! kubectl get nodes &>/dev/null 2>&1; then
   die "Cannot connect to cluster. Run install_k0s.sh first."
 fi
 
@@ -49,8 +56,8 @@ success "Linkerd: $(linkerd version --client 2>/dev/null || echo ${LINKERD_VERSI
 
 # ── 2. Install Linkerd control plane ─────────────────────────────────────────
 info "Installing Linkerd control plane..."
-linkerd install --crds | k0s kubectl apply -f -
-linkerd install | k0s kubectl apply -f -
+linkerd install --crds | kubectl apply -f -
+linkerd install | kubectl apply -f -
 
 info "Waiting for Linkerd control plane to be ready..."
 linkerd check --expected-version "${LINKERD_VERSION}" --wait 2m
@@ -58,21 +65,21 @@ success "Linkerd control plane ready"
 
 # ── 3. Exclude system namespaces ──────────────────────────────────────────────
 info "Excluding kube-system from mesh..."
-k0s kubectl label namespace kube-system linkerd.io/is-control-plane=true --overwrite
-k0s kubectl label namespace kube-system linkerd.io/control-plane-ns=linkerd --overwrite
+kubectl label namespace kube-system linkerd.io/is-control-plane=true --overwrite
+kubectl label namespace kube-system linkerd.io/control-plane-ns=linkerd --overwrite
 
 info "Excluding cert-manager from mesh..."
-k0s kubectl label namespace cert-manager linkerd.io/is-control-plane=true --overwrite
-k0s kubectl label namespace cert-manager linkerd.io/control-plane-ns=linkerd --overwrite
+kubectl label namespace cert-manager linkerd.io/is-control-plane=true --overwrite
+kubectl label namespace cert-manager linkerd.io/control-plane-ns=linkerd --overwrite
 
 # ── 4. Inject monitoring namespace ────────────────────────────────────────────
 info "Injecting monitoring namespace for mTLS..."
-k0s kubectl label namespace monitoring linkerd.io/inject=enabled --overwrite
+kubectl label namespace monitoring linkerd.io/inject=enabled --overwrite
 
 # ── 5. Install Linkerd Viz (optional) ────────────────────────────────────────
 if [[ "${LINKERD_VIZ}" == "true" ]]; then
   info "Installing Linkerd viz extension..."
-  linkerd viz install | k0s kubectl apply -f -
+  linkerd viz install | kubectl apply -f -
   
   info "Waiting for Linkerd viz to be ready..."
   linkerd viz check --wait 2m
