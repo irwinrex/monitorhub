@@ -1,14 +1,8 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # scripts/install_mTLS.sh
-# Installs Linkerd for pod-to-pod mTLS (using openssl-generated certs).
-#
-# Run standalone:   sudo bash scripts/install_mTLS.sh
-#
-# What this does:
-#   1. Generate long-lived (10yr) issuer certificate with openssl
-#   2. Install Linkerd for pod-to-pod mTLS
-#   3. No cert-manager - HAProxy on HTTP 80 (HTTPS later via ALB)
+# Installs Linkerd for pod-to-pod mTLS.
+# Uses Linkerd's built-in certificate management (auto-rotation).
 # ==============================================================================
 set -euo pipefail
 IFS=$'\n\t'
@@ -38,51 +32,7 @@ for ns in "${MONITORING_NS}" linkerd; do
   kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null || true
 done
 
-# ── 1. Generate Linkerd Issuer Certificate (10yr with openssl) ──────────────────
-info "Generating Linkerd issuer certificate (10yr validity)..."
-
-LINKERD_NS="linkerd"
-TRUST_ANCHOR_CERT="/tmp/linkerd-trust-anchor.crt"
-TRUST_ANCHOR_KEY="/tmp/linkerd-trust-anchor.key"
-ISSUER_CERT="/tmp/linkerd-issuer.crt"
-ISSUER_KEY="/tmp/linkerd-issuer.key"
-
-# Generate Trust Anchor (Root CA) - 10 years
-openssl ecparam -genkey -name prime256v1 -out "$TRUST_ANCHOR_KEY"
-openssl req -x509 -new -nodes -key "$TRUST_ANCHOR_KEY" -sha256 -days 3650 \
-  -out "$TRUST_ANCHOR_CERT" \
-  -subj "/CN=linkerd-root-ca/O=Linkerd"
-
-# Generate Issuer (Intermediate CA) - 10 years
-openssl ecparam -genkey -name prime256v1 -out "$ISSUER_KEY"
-openssl req -new -key "$ISSUER_KEY" -out /tmp/linkerd-issuer.csr \
-  -subj "/CN=identity.linkerd.cluster.local/O=Linkerd"
-
-openssl x509 -req -in /tmp/linkerd-issuer.csr -CA "$TRUST_ANCHOR_CERT" -CAkey "$TRUST_ANCHOR_KEY" \
-  -CAcreateserial -out "$ISSUER_CERT" -days 3650 -sha256
-
-# Create Kubernetes secrets
-kubectl create secret generic linkerd-trust-anchor \
-  -n "$LINKERD_NS" \
-  --from-file=tls.crt="$TRUST_ANCHOR_CERT" \
-  --from-file=tls.key="$TRUST_ANCHOR_KEY" \
-  --dry-run=client -o yaml | kubectl apply -f -
-
-kubectl create secret tls linkerd-identity-issuer \
-  -n "$LINKERD_NS" \
-  --cert="$ISSUER_CERT" \
-  --key="$ISSUER_KEY" \
-  --dry-run=client -o yaml | kubectl apply -f -
-
-# Read cert content before cleanup
-TRUST_ANCHOR_PEM=$(cat "$TRUST_ANCHOR_CERT")
-
-# Cleanup temp files
-rm -f /tmp/linkerd-*.{crt,key,csr} /tmp/linkerd-trust-anchor.srl
-
-success "Linkerd certificates created"
-
-# ── 2. Install Linkerd with custom certificates ───────────────────────────────
+# ── 1. Install Linkerd with built-in PKI ────────────────────────────────────────
 info "Installing Linkerd ${LINKERD_VERSION}..."
 
 helm repo add linkerd https://helm.linkerd.io/stable --force-update
@@ -93,28 +43,25 @@ helm upgrade --install linkerd-crds linkerd/linkerd-crds \
   --namespace linkerd \
   --wait
 
-# Install Control Plane with custom certificates
+# Install Control Plane with automatic certificate management
 helm upgrade --install linkerd-control-plane linkerd/linkerd-control-plane \
   --namespace linkerd \
-  --set identity.issuer.scheme=kubernetes.io/tls \
-  --set identity.issuer.tls.existingSecret=linkerd-identity-issuer \
-  --set identity.trustAnchorsPEM="$TRUST_ANCHOR_PEM" \
-  --set identity.issuer.clockSkewAllowance=20s \
+  --set identity.issuer.clockSkewAllowance=60s \
   --wait --timeout 5m
 
 # Inject into monitoring namespace
+kubectl annotate namespace "${MONITORING_NS}" linkerd.io/inject=enabled --overwrite 2>/dev/null || \
 kubectl label namespace "${MONITORING_NS}" linkerd.io/inject=enabled --overwrite
 
 # Exclude system namespaces
-kubectl label namespace kube-system linkerd.io/is-control-plane=true --overwrite
+kubectl label namespace kube-system linkerd.io/is-control-plane=true --overwrite 2>/dev/null || true
 
 info "Waiting for Linkerd to be ready..."
-sleep 10
+sleep 30
 
 success "Linkerd mTLS enabled"
 
 echo ""
 success "install_mTLS.sh complete"
-info "Linkerd: Running (pod-to-pod mTLS with 10yr issuer cert)"
-info "HAProxy: HTTP 80 (HTTPS via ALB later)"
+info "Linkerd: Running (automatic pod-to-pod mTLS)"
 echo ""

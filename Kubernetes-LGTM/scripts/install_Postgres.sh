@@ -13,7 +13,7 @@ require_root
 require_kubeconfig
 require_helm
 
-: "${POSTGRES_VERSION:=1.24.0}"
+: "${POSTGRES_VERSION:=0.27.1}"
 : "${POSTGRES_NS:=postgres}"
 : "${POSTGRES_CLUSTER:=monitoring-pg}"
 : "${POSTGRES_DB:=grafana}"
@@ -40,6 +40,7 @@ kubectl create namespace "${POSTGRES_NS}" --dry-run=client -o yaml | kubectl app
 helm upgrade --install cloudnative-pg cloudnative-pg/cloudnative-pg \
   --namespace "${POSTGRES_NS}" \
   --version "${POSTGRES_VERSION}" \
+  --create-namespace \
   --wait --timeout 5m
 
 success "CloudNativePG operator installed"
