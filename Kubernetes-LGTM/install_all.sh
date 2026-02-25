@@ -50,7 +50,6 @@ require_root
 # ── Skip flags ────────────────────────────────────────────────────────────────────
 SKIP_K0S="${SKIP_K0S:-false}"
 SKIP_HAPROXY="${SKIP_HAPROXY:-false}"
-SKIP_MTLS="${SKIP_MTLS:-false}"
 SKIP_POSTGRES="${SKIP_POSTGRES:-false}"
 SKIP_SECRETS="${SKIP_SECRETS:-false}"
 SKIP_LGTM="${SKIP_LGTM:-false}"
@@ -146,16 +145,13 @@ _run_phase 1 "k0s — System prep + Kubernetes + Helm" \
 _run_phase 2 "HAProxy — Ingress Controller (HTTP 80)" \
   "${SKIP_HAPROXY}" "${SCRIPTS_DIR}/install_HAProxy.sh"
 
-_run_phase 3 "Linkerd — Pod-to-Pod mTLS" \
-  "${SKIP_MTLS}" "${SCRIPTS_DIR}/install_mTLS.sh"
-
-_run_phase 4 "PostgreSQL — Database for HA" \
+_run_phase 3 "PostgreSQL — Database for HA" \
   "${SKIP_POSTGRES}" "${SCRIPTS_DIR}/install_Postgres.sh"
 
-_run_phase 5 "Secrets — Grafana admin credentials + Basic Auth" \
+_run_phase 4 "Secrets — Grafana admin credentials" \
   "${SKIP_SECRETS}" "${SCRIPTS_DIR}/install_secrets.sh"
 
-_run_phase 6 "LGTM — Loki · Tempo · Mimir · Grafana" \
+_run_phase 5 "LGTM — Loki · Tempo · Mimir · Grafana" \
   "${SKIP_LGTM}" "${SCRIPTS_DIR}/install_LGTM.sh"
 
 # ══════════════════════════════════════════════════════════════════════════════

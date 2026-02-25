@@ -96,35 +96,6 @@ wait_cert_ready() {
   echo
 }
 
-# ── Linkerd CLI helper ────────────────────────────────────────────────────────
-require_linkerd() {
-  command -v linkerd &>/dev/null || die "linkerd CLI not found.\n  Run: sudo bash scripts/install_linkerd.sh first"
-}
-
-# wait_linkerd_ready — polls until all Linkerd control plane pods are Running
-wait_linkerd_ready() {
-  info "Waiting for Linkerd control plane to be ready..."
-  for i in $(seq 1 36); do
-    if linkerd check --pre 2>/dev/null | grep -q "Status check results are √"; then
-      success "Linkerd control plane is healthy"
-      return 0
-    fi
-    # Fallback: just wait for deployments directly
-    if kubectl get deploy -n linkerd 2>/dev/null | grep -v "0/"; then
-      if kubectl rollout status deploy/linkerd-destination -n linkerd --timeout=10s &>/dev/null &&
-        kubectl rollout status deploy/linkerd-identity -n linkerd --timeout=10s &>/dev/null &&
-        kubectl rollout status deploy/linkerd-proxy-injector -n linkerd --timeout=10s &>/dev/null; then
-        success "Linkerd control plane rollouts complete"
-        return 0
-      fi
-    fi
-    [[ $i -eq 36 ]] && die "Linkerd did not become ready.\n  Debug: linkerd check\n  Pods:  kubectl get pods -n linkerd"
-    printf '.'
-    sleep 5
-  done
-  echo
-}
-
 # ── Resolve VALUES_DIR from caller's location ─────────────────────────────────
 # Scripts live in scripts/ — values live in ../values/
 # This works whether a script is called from install_all.sh (project root)

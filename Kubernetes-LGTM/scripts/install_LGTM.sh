@@ -33,11 +33,6 @@ fi
 info "Configuring Namespace '${MONITORING_NS}'..."
 kubectl create namespace "${MONITORING_NS}" --dry-run=client -o yaml | kubectl apply -f -
 
-if kubectl get ns linkerd &>/dev/null; then
-  kubectl annotate namespace "${MONITORING_NS}" linkerd.io/inject=enabled --overwrite
-  success "Enabled Linkerd mTLS injection"
-fi
-
 # ── 2. Pre-flight ─────────────────────────────────────────────────────────────
 if ! kubectl get secret grafana-admin -n "${MONITORING_NS}" &>/dev/null; then
   die "Secret 'grafana-admin' not found. Run: sudo bash scripts/install_secrets.sh"
