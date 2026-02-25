@@ -95,9 +95,24 @@ success "sysctl applied and verified"
 
 # ── 6. k0s binary ─────────────────────────────────────────────────────────────
 info "Downloading k0s ${K0S_VERSION} (arm64)..."
-curl -sSLf --max-time 300 \
+download_with_retry() {
+  local url="$1" local_path="$2"
+  local max_retries=3 delay=5
+  for ((i=1; i<=max_retries; i++)); do
+    if curl -sSLf --max-time 300 -L "$url" -o "$local_path" 2>/dev/null; then
+      return 0
+    fi
+    warn "Download attempt $i failed, retrying in ${delay}s..."
+    sleep $delay
+    delay=$((delay * 2))
+  done
+  return 1
+}
+
+download_with_retry \
   "https://github.com/k0sproject/k0s/releases/download/${K0S_VERSION}/k0s-${K0S_VERSION}-arm64" \
-  -o /usr/local/bin/k0s || die "Failed to download k0s binary"
+  /usr/local/bin/k0s || die "Failed to download k0s binary after $max_retries attempts"
+
 chmod +x /usr/local/bin/k0s
 success "k0s: $(k0s version)"
 
