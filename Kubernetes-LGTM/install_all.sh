@@ -106,7 +106,8 @@ done
 
 for vfile in \
   "${VALUES_DIR}/lgtm-values.yaml" \
-  "${VALUES_DIR}/haproxy-values.yaml"; do
+  "${VALUES_DIR}/haproxy-values.yaml" \
+  "${VALUES_DIR}/ingress-values.yaml"; do
   if [[ -f "$vfile" ]]; then
     info "  found: ${vfile##"${ROOT_DIR}/"}"
   else

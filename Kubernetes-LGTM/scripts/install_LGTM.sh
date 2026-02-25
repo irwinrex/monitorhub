@@ -5,13 +5,6 @@
 #
 # Run standalone:   sudo bash scripts/install_LGTM.sh
 # Run via all:      called automatically by install_all.sh
-#
-# Values:
-#   values/lgtm-values.yaml  — base: S3, resources, storage config
-#
-# mTLS: Handled automatically by Linkerd (pod-to-pod encryption)
-#
-# Deploy order: Loki → Tempo → Mimir → Grafana
 # ==============================================================================
 set -euo pipefail
 IFS=$'\n\t'
@@ -23,6 +16,16 @@ require_root
 require_kubeconfig
 require_helm
 
+# Default Chart Versions
+: "${LOKI_CHART_VERSION:=6.32.0}"
+: "${TEMPO_CHART_VERSION:=1.22.0}"
+: "${MIMIR_CHART_VERSION:=5.7.0}"
+: "${GRAFANA_CHART_VERSION:=9.1.0}"
+: "${MONITORING_NS:=monitoring}"
+: "${GRAFANA_DOMAIN:=grafana.example.com}"
+
+header "Phase 5 — LGTM Stack  |  Loki · Tempo · Mimir · Grafana"
+
 # Skip if LGTM already deployed
 if helm list -n "${MONITORING_NS}" 2>/dev/null | grep -q lgtm-grafana; then
   header "Phase 5 — LGTM Stack (already installed)"
@@ -30,242 +33,106 @@ if helm list -n "${MONITORING_NS}" 2>/dev/null | grep -q lgtm-grafana; then
   exit 0
 fi
 
-header "Phase 5 — LGTM Stack  |  Loki · Tempo · Mimir · Grafana"
+# ── 1. Namespace & Linkerd Injection ────────────────────────────────────────────
+info "Configuring Namespace '${MONITORING_NS}'..."
 
-# Ensure monitoring namespace exists
-if ! kubectl get namespace "${MONITORING_NS}" &>/dev/null 2>&1; then
-  die "Namespace '${MONITORING_NS}' does not exist. Run install_k0s.sh first."
+kubectl create namespace "${MONITORING_NS}" --dry-run=client -o yaml | kubectl apply -f -
+
+if kubectl get ns linkerd &>/dev/null; then
+  kubectl annotate namespace "${MONITORING_NS}" linkerd.io/inject=enabled --overwrite
+  success "Enabled Linkerd mTLS injection for ${MONITORING_NS}"
+else
+  warn "Linkerd not found. mTLS will NOT be enabled."
 fi
 
-VALUES_DIR="$(resolve_values_dir)"
-BASE="${VALUES_DIR}/lgtm-values.yaml"
+# ── 2. Pre-flight: Grafana Secret ───────────────────────────────────────────────
+if ! kubectl get secret grafana-admin -n "${MONITORING_NS}" &>/dev/null; then
+  die "Secret 'grafana-admin' not found.\n  Run: sudo bash scripts/install_secrets.sh"
+fi
 
-require_file "${BASE}"
+# ── 3. Configuration (S3) ───────────────────────────────────────────────────
+VALUES_DIR="${SCRIPT_DIR}/../values"
+BASE_VALUES="${VALUES_DIR}/lgtm-values.yaml"
 
-# ── S3 bucket configuration ─────────────────────────────────────────────────────
-info "Configuring S3 bucket..."
-if [[ -n "${S3_BUCKET:-}" ]]; then
-  info "Using S3 bucket: ${S3_BUCKET}"
-else
+if [[ ! -f "${BASE_VALUES}" ]]; then
+  die "Values file not found: ${BASE_VALUES}"
+fi
+
+# Interactive S3 Configuration
+if [[ -z "${S3_BUCKET:-}" ]]; then
   echo ""
-  read -r -p "Enter S3 bucket name [default: lgtm-observability]: " S3_BUCKET
-  S3_BUCKET="${S3_BUCKET:-lgtm-observability}"
+  read -r -p "Enter S3 bucket name [default: lgtm-observability]: " S3_INPUT
+  S3_BUCKET="${S3_INPUT:-lgtm-observability}"
 fi
 
-if [[ -n "${S3_REGION:-}" ]]; then
-  info "Using S3 region: ${S3_REGION}"
-else
+if [[ -z "${S3_REGION:-}" ]]; then
   echo ""
-  read -r -p "Enter S3 region [default: us-east-1]: " S3_REGION
-  S3_REGION="${S3_REGION:-us-east-1}"
+  read -r -p "Enter S3 region [default: us-east-1]: " REGION_INPUT
+  S3_REGION="${REGION_INPUT:-us-east-1}"
 fi
 
-# Update values file with bucket name
-sed -i "s/lgtm-observability/${S3_BUCKET}/g" "${BASE}" 2>/dev/null || true
-sed -i "s/us-east-1/${S3_REGION}/g" "${BASE}" 2>/dev/null || true
-info "S3 bucket: ${S3_BUCKET}, region: ${S3_REGION}"
+# Update values file
+sed -i "s/bucketNames: chunks: .*/bucketNames: chunks: \"${S3_BUCKET}\"/" "${BASE_VALUES}"
+sed -i "s/bucket_name: .*/bucket_name: \"${S3_BUCKET}\"/" "${BASE_VALUES}"
+sed -i "s/region: .*/region: \"${S3_REGION}\"/" "${BASE_VALUES}"
 
-# ── Pre-flight: check Linkerd is installed ─────────────────────────────────────
-info "Pre-flight: checking Linkerd mesh..."
-if kubectl get namespace linkerd &>/dev/null; then
-  success "Linkerd is installed (pod-to-pod mTLS enabled)"
-else
-  warn "Linkerd not found - mTLS will not be enabled"
-fi
-# ── Pre-flight: Grafana admin secret must exist ───────────────────────────────
-kubectl get secret grafana-admin -n "${MONITORING_NS}" &>/dev/null ||
-  die "Secret 'grafana-admin' not found.\n  Fix: sudo bash scripts/install_secrets.sh"
+info "Configuration: Bucket='${S3_BUCKET}', Region='${S3_REGION}'"
 
-success "Pre-flight checks passed"
-
-# ── Helm install helper ───────────────────────────────────────────────────────
-_helm_chart_version() {
-  case "$1" in
-  grafana/loki) echo "${LOKI_CHART_VERSION}" ;;
-  grafana/tempo) echo "${TEMPO_CHART_VERSION}" ;;
-  grafana/mimir-distributed) echo "${MIMIR_CHART_VERSION}" ;;
-  grafana/grafana) echo "${GRAFANA_CHART_VERSION}" ;;
-  *) die "Unknown chart: $1" ;;
-  esac
-}
+# ── 4. Helm Deployment ───────────────────────────────────────────────────────────
+helm repo add grafana https://grafana.github.io/helm-charts --force-update
+helm repo update grafana >/dev/null
 
 helm_deploy() {
-  local release="$1" chart="$2" timeout="${3:-5m}"
-  local version
-  version="$(_helm_chart_version "${chart}")"
+  local release="$1"
+  local chart="$2"
+  local version="$3"
+  local timeout="${4:-10m}"
 
-  # Check if release exists
-  if helm list -n "${MONITORING_NS}" -q 2>/dev/null | grep -q "^${release}$"; then
-    info "Release '${release}' exists - upgrading..."
-    local action="upgrade"
+  if helm list -n "${MONITORING_NS}" -q | grep -q "^${release}$"; then
+    info "Upgrading ${release}..."
   else
-    info "Deploying ${release} (${chart} ${version})..."
-    local action="install"
+    info "Installing ${release} (${chart} ${version})..."
   fi
 
-  helm ${action} "${release}" "${chart}" \
+  helm upgrade --install "${release}" "${chart}" \
     --namespace "${MONITORING_NS}" \
     --version "${version}" \
-    --values "${BASE}" \
+    --values "${BASE_VALUES}" \
     --wait \
     --timeout "${timeout}" \
-    --atomic \
-    --cleanup-on-fail
-  success "${release} deployed"
+    --atomic
+
+  success "${release} Ready"
 }
 
-# ── Deploy in order ───────────────────────────────────────────────────────────
-helm_deploy lgtm-loki grafana/loki 5m
-helm_deploy lgtm-tempo grafana/tempo 5m
-helm_deploy lgtm-mimir grafana/mimir-distributed 10m
-helm_deploy lgtm-grafana grafana/grafana 5m
+# Deploy in order
+helm_deploy lgtm-loki    grafana/loki              "${LOKI_CHART_VERSION}"    5m
+helm_deploy lgtm-tempo   grafana/tempo             "${TEMPO_CHART_VERSION}"    5m
+helm_deploy lgtm-mimir   grafana/mimir-distributed  "${MIMIR_CHART_VERSION}"   10m
+helm_deploy lgtm-grafana grafana/grafana            "${GRAFANA_CHART_VERSION}" 5m
 
-# ── Path-based Ingress for /mimir, /loki, /tempo ──────────────────────────────
-info "Creating path-based Ingress resources..."
+# ── 5. Apply Ingress Rules ───────────────────────────────────────────────────────
+info "Applying Ingress Rules..."
 
-GRAFANA_DOMAIN="${GRAFANA_DOMAIN:-grafana.example.com}"
-
-kubectl apply -f - <<INGRESSEOF
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: grafana-main
-  namespace: ${MONITORING_NS}
-  annotations:
-    haproxy.org/timeout-connect: "10s"
-    haproxy.org/timeout-client: "60s"
-    haproxy.org/timeout-server: "60s"
-    haproxy.org/rate-limit: "100"
-    haproxy.org/ssl-redirect: "true"
-    haproxy.org/force-ssl-redirect: "true"
-    haproxy.org/body-max-size: "20480"
-    haproxy.org/auth-type: "basic"
-    haproxy.org/auth-secret: "grafana-basic-auth"
-    haproxy.org/backend-config-snippet: |
-      http-response set-header X-Frame-Options "SAMEORIGIN"
-      http-response set-header X-Content-Type-Options "nosniff"
-spec:
-  ingressClassName: haproxy
-  rules:
-    - http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: lgtm-grafana
-                port:
-                  number: 3000
-  tls:
-    - secretName: grafana-ingress-tls-secret
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: mimir-api
-  namespace: ${MONITORING_NS}
-  annotations:
-    haproxy.org/timeout-connect: "10s"
-    haproxy.org/timeout-client: "60s"
-    haproxy.org/timeout-server: "60s"
-    haproxy.org/rate-limit: "100"
-    haproxy.org/ssl-redirect: "true"
-    haproxy.org/force-ssl-redirect: "true"
-    haproxy.org/body-max-size: "20480"
-    haproxy.org/path-rewrite: "/mimir(.*) /\$1"
-spec:
-  ingressClassName: haproxy
-  rules:
-    - http:
-        paths:
-          - path: /mimir
-            pathType: Prefix
-            backend:
-              service:
-                name: lgtm-mimir-gateway
-                port:
-                  number: 443
-  tls:
-    - secretName: grafana-ingress-tls-secret
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: loki-api
-  namespace: ${MONITORING_NS}
-  annotations:
-    haproxy.org/timeout-connect: "10s"
-    haproxy.org/timeout-client: "60s"
-    haproxy.org/timeout-server: "60s"
-    haproxy.org/rate-limit: "100"
-    haproxy.org/ssl-redirect: "true"
-    haproxy.org/force-ssl-redirect: "true"
-    haproxy.org/body-max-size: "20480"
-    haproxy.org/path-rewrite: "/loki(.*) /\$1"
-spec:
-  ingressClassName: haproxy
-  rules:
-    - http:
-        paths:
-          - path: /loki
-            pathType: Prefix
-            backend:
-              service:
-                name: lgtm-loki
-                port:
-                  number: 3100
-  tls:
-    - secretName: grafana-ingress-tls-secret
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: tempo-api
-  namespace: ${MONITORING_NS}
-  annotations:
-    haproxy.org/timeout-connect: "10s"
-    haproxy.org/timeout-client: "60s"
-    haproxy.org/timeout-server: "60s"
-    haproxy.org/rate-limit: "100"
-    haproxy.org/ssl-redirect: "true"
-    haproxy.org/force-ssl-redirect: "true"
-    haproxy.org/body-max-size: "20480"
-    haproxy.org/path-rewrite: "/tempo(.*) /\$1"
-spec:
-  ingressClassName: haproxy
-  rules:
-    - http:
-        paths:
-          - path: /tempo
-            pathType: Prefix
-            backend:
-              service:
-                name: lgtm-tempo
-                port:
-                  number: 3200
-  tls:
-    - secretName: grafana-ingress-tls-secret
-INGRESSEOF
-
-success "Path-based Ingress resources created"
+INGRESS_VALUES="${VALUES_DIR}/ingress-values.yaml"
+if [[ -f "${INGRESS_VALUES}" ]]; then
+  kubectl apply -f "${INGRESS_VALUES}"
+  success "Ingress rules applied"
+else
+  warn "Ingress values file not found: ${INGRESS_VALUES}"
+fi
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo ""
-info "Pods in ${MONITORING_NS}:"
-kubectl get pods -n "${MONITORING_NS}" -o wide
-
-echo ""
-info "Helm releases:"
-helm list -n "${MONITORING_NS}"
+info "Status of ${MONITORING_NS}:"
+kubectl get pods -n "${MONITORING_NS}" -o wide | head -n 10
 
 echo ""
 success "install_LGTM.sh complete"
-GRAFANA_DOMAIN="${GRAFANA_DOMAIN:-grafana.example.com}"
-info "Access points:"
-info "  Grafana: https://${GRAFANA_DOMAIN}/"
-info "  Mimir:    https://${GRAFANA_DOMAIN}/mimir"
-info "  Loki:     https://${GRAFANA_DOMAIN}/loki"
-info "  Tempo:    https://${GRAFANA_DOMAIN}/tempo"
-info "  Basic Auth: admin / (GRAFANA_ADMIN_PASSWORD or auto-generated)"
+info "Access points (HTTP):"
+info "  Grafana: http://<IP>/"
+info "  Mimir:   http://<IP>/mimir"
+info "  Loki:    http://<IP>/loki"
+info "  Tempo:   http://<IP>/tempo"
+info "  Login:   admin / (check secret)"
 echo ""
