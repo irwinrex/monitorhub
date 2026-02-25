@@ -160,9 +160,9 @@ if [[ "${AVAILABLE_MEM}" -lt 8 ]]; then
   warn "  WARNING: Less than 8GB free memory - installation may fail"
 fi
 
-# DNS check for Grafana domain
+# DNS check for Grafana domain (optional - works with IP addresses too)
 if [[ "${SKIP_LGTM}" != "true" ]]; then
-  check_dns_resolution "${GRAFANA_DOMAIN}" || warn "DNS not resolved - ensure ${GRAFANA_DOMAIN} points to this server"
+  check_dns_resolution "${GRAFANA_DOMAIN}" || info "DNS not resolved - IP-based access will work on ports 80/443"
 fi
 
 # ── Node resource check (only if k0s already running) ───────────────────────────

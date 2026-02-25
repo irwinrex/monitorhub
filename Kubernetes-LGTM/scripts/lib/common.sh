@@ -201,6 +201,11 @@ check_dns_resolution() {
     return 0
   fi
   
+  if [[ "$domain" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    success "Using IP address: ${domain}"
+    return 0
+  fi
+  
   info "Checking DNS resolution for '${domain}'..."
   if command -v nslookup &>/dev/null; then
     if nslookup "$domain" &>/dev/null; then

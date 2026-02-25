@@ -153,8 +153,7 @@ metadata:
 spec:
   ingressClassName: haproxy
   rules:
-    - host: ${GRAFANA_DOMAIN}
-      http:
+    - http:
         paths:
           - path: /
             pathType: Prefix
@@ -165,8 +164,6 @@ spec:
                   number: 3000
   tls:
     - secretName: grafana-ingress-tls-secret
-      hosts:
-        - ${GRAFANA_DOMAIN}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -196,8 +193,6 @@ spec:
                   number: 443
   tls:
     - secretName: grafana-ingress-tls-secret
-      hosts:
-        - ${GRAFANA_DOMAIN}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -227,8 +222,6 @@ spec:
                   number: 3100
   tls:
     - secretName: grafana-ingress-tls-secret
-      hosts:
-        - ${GRAFANA_DOMAIN}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -258,8 +251,6 @@ spec:
                   number: 3200
   tls:
     - secretName: grafana-ingress-tls-secret
-      hosts:
-        - ${GRAFANA_DOMAIN}
 INGRESSEOF
 
 success "Path-based Ingress resources created"
