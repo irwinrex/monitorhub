@@ -12,8 +12,6 @@ source "${SCRIPT_DIR}/lib/common.sh"
 
 require_root
 
-header "Phase 1 — k0s  |  Debian 12 ARM64  |  t4g.xlarge"
-
 # ── 0. Check Existing Installation ────────────────────────────────────────────
 SKIP_INSTALL=false
 

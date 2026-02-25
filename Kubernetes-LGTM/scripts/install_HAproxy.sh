@@ -30,8 +30,6 @@ if [[ ! -f "${HAPROXY_VALUES}" ]]; then
   die "Values file not found: ${HAPROXY_VALUES}"
 fi
 
-header "Phase 2 — HAProxy Ingress Controller ${HAPROXY_CHART_VERSION}"
-
 # 2. Check & Clean Previous Installs (The Fix)
 # ------------------------------------------------------------------------------
 # If a previous install failed, Helm upgrade often gets stuck.

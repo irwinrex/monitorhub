@@ -20,11 +20,8 @@ require_helm
 : "${POSTGRES_USER:=grafana}"
 : "${MONITORING_NS:=monitoring}"
 
-header "Phase 3 — PostgreSQL for HA (2 Instances)"
-
 # Skip if already installed
 if kubectl get cluster "${POSTGRES_CLUSTER}" -n "${POSTGRES_NS}" &>/dev/null; then
-  header "PostgreSQL (already installed)"
   success "PostgreSQL cluster already running"
   exit 0
 fi

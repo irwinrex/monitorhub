@@ -38,7 +38,7 @@ spec:
   
   storage:
     size: 10Gi
-    storageClass: standard
+    storageClassName: ""
 
   superuserSecret:
     name: monitoring-pg-superuser

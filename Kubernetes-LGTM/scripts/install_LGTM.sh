@@ -20,11 +20,8 @@ require_helm
 : "${MIMIR_CHART_VERSION:=5.7.0}"
 : "${GRAFANA_CHART_VERSION:=9.1.0}"
 
-header "Phase 5 — LGTM Stack"
-
 # Skip if already deployed
 if helm list -n "${MONITORING_NS}" 2>/dev/null | grep -q lgtm-grafana; then
-  header "Phase 5 — LGTM Stack (already installed)"
   success "LGTM stack already deployed"
   exit 0
 fi

@@ -31,12 +31,9 @@ require_kubeconfig
 
 # Skip if secrets already exist
 if kubectl get secret grafana-admin -n "${MONITORING_NS}" &>/dev/null; then
-  header "Phase 4 — Secrets (already installed)"
   success "Grafana admin secret already exists"
   exit 0
 fi
-
-header "Phase 4 — Secrets"
 
 # Ensure monitoring namespace exists
 if ! kubectl get namespace "${MONITORING_NS}" &>/dev/null 2>&1; then
