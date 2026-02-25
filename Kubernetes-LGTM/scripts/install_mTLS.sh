@@ -42,8 +42,6 @@ if kubectl get crd certificates.cert-manager.io &>/dev/null; then
   fi
 fi
 
-GRAFANA_DOMAIN="${GRAFANA_DOMAIN:-${GRAFANA_DOMAIN}}"
-
 header "Phase 3 — cert-manager ${CERTMANAGER_VERSION} + mTLS PKI"
 
 # Ensure required namespaces exist
@@ -270,8 +268,7 @@ spec:
     group: cert-manager.io
 
 ---
-# Server cert — HAProxy presents this to browsers for the public domain.
-# For Let's Encrypt: replace issuerRef with an ACME ClusterIssuer.
+# Server cert for external HTTPS via HAProxy (self-signed, browser warning expected)
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -287,7 +284,7 @@ spec:
     rotationPolicy: Always
   usages: [server auth]
   dnsNames:
-    - ${GRAFANA_DOMAIN}
+    - "*"
   issuerRef:
     name:  lgtm-ca-issuer
     kind:  Issuer
