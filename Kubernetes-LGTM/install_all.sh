@@ -160,10 +160,8 @@ if [[ "${AVAILABLE_MEM}" -lt 8 ]]; then
   warn "  WARNING: Less than 8GB free memory - installation may fail"
 fi
 
-# DNS check for Grafana domain (optional - works with IP addresses too)
-if [[ "${SKIP_LGTM}" != "true" ]]; then
-  check_dns_resolution "${GRAFANA_DOMAIN}" || info "DNS not resolved - IP-based access will work on ports 80/443"
-fi
+# DNS check disabled - HAProxy now works with IP addresses on ports 80/443
+# Domain-based access will work after DNS is configured via LoadBalancer
 
 # ── Node resource check (only if k0s already running) ───────────────────────────
 if [[ "${SKIP_K0S}" == "true" ]]; then
@@ -181,9 +179,8 @@ fi
 # ── Confirm ───────────────────────────────────────────────────────────────────
 if [[ "${YES}" != "true" ]]; then
   echo ""
-  warn "This will install k0s, HAProxy, cert-manager, Linkerd (optional), and LGTM stack."
+  warn "This will install k0s, HAProxy, cert-manager, Linkerd (mTLS), and LGTM stack."
   warn "Intended for a FRESH Debian 12 ARM64 instance (t4g.xlarge)."
-  warn "Skip Linkerd: SKIP_LINKERD=true"
   echo ""
   read -r -p "  Continue? [y/N] " confirm
   [[ "${confirm,,}" == "y" ]] || {
