@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # scripts/install_Postgres.sh
-# Installs PostgreSQL for HA using CloudNativePG (CNPG).
+# Installs PostgreSQL for HA on k0s using CloudNativePG (CNPG).
+# - Automatically installs the Rancher Local Path Provisioner for storage.
 # ==============================================================================
 set -euo pipefail
 IFS=$'\n\t'
@@ -9,7 +10,7 @@ IFS=$'\n\t'
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/common.sh"
 
-# require_root # Uncomment if your environment requires root
+# require_root # Not needed for k0s default setup
 require_kubeconfig
 require_helm
 
@@ -22,34 +23,48 @@ require_helm
 
 header "Phase 3 — PostgreSQL for HA (2 Instances)"
 
-# Check if StorageClass exists
-if [ -z "$(kubectl get sc -o name 2>/dev/null)" ]; then
-  echo "Error: No StorageClass found in the cluster."
-  echo "You must install a storage provisioner (e.g., local-path, longhorn, or cloud provider storage)."
-  exit 1
-fi
+# --- Add-on: Install Local Path Provisioner, essential for k0s ---
+info "Ensuring a default StorageClass exists..."
+if ! kubectl get sc local-path &>/dev/null; then
+  info "Local Path Provisioner not found. Installing for k0s..."
 
-# Detect Default Storage Class
+  # 1. Install the Local Path Provisioner from the official YAML
+  kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
+
+  # 2. Wait for the provisioner deployment to be ready
+  info "Waiting for provisioner to become ready..."
+  kubectl -n local-path-storage rollout status deployment/local-path-provisioner --timeout=2m
+
+  # 3. Mark its storageclass as the default for the cluster
+  info "Marking 'local-path' as the default StorageClass..."
+  kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+
+  success "Local Path Provisioner installed."
+else
+  info "Local Path Provisioner already installed. Skipping."
+fi
+# --- End Add-on ---
+
+# Detect the cluster's default StorageClass (will be 'local-path' now)
 DEFAULT_SC=$(kubectl get sc -o jsonpath='{.items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")].metadata.name}')
 
-# If no default is marked, pick the first one available
 if [ -z "${DEFAULT_SC}" ]; then
-  DEFAULT_SC=$(kubectl get sc -o jsonpath='{.items[0].metadata.name}')
-  echo "Warning: No default StorageClass marked. Using '${DEFAULT_SC}'."
+  echo "Error: Could not find any default StorageClass even after installation attempt." >&2
+  exit 1
 fi
 info "Using StorageClass: ${DEFAULT_SC}"
 
-# Skip if already installed
+# Skip if postgres cluster is already installed
 if kubectl get cluster "${POSTGRES_CLUSTER}" -n "${POSTGRES_NS}" &>/dev/null; then
   header "PostgreSQL (already installed)"
   success "PostgreSQL cluster already running"
   exit 0
 fi
 
-# Generate password (48 bytes -> ~32 chars alphanumeric)
+# Generate a secure password
 POSTGRES_PASSWORD=$(openssl rand -base64 48 | tr -dc 'a-zA-Z0-9' | head -c 32)
 
-# Install CNPG operator
+# Install CloudNativePG operator
 info "Installing CloudNativePG operator..."
 helm repo add cloudnative-pg https://cloudnative-pg.github.io/charts --force-update
 helm repo update >/dev/null
@@ -73,15 +88,14 @@ if [[ ! -f "${VALUES_FILE}" ]]; then
   exit 1
 fi
 
-# 1. Replace password
+# 1. Replace password placeholder
 # 2. Replace 'storageClassName: <any>' with 'storageClass: <actual_sc_name>'
-#    This fixes both the key name (CNPG requirement) AND the value (Cluster requirement).
 MANIFEST=$(sed \
   -e "s|CHANGEME_PASSWORD|${POSTGRES_PASSWORD}|g" \
   -e "s|storageClassName:.*|storageClass: ${DEFAULT_SC}|g" \
   "${VALUES_FILE}")
 
-# Apply with retry logic for Webhook readiness
+# Apply the cluster manifest with a retry loop to handle the webhook delay
 info "Applying cluster manifest..."
 MAX_RETRIES=15
 RETRY_COUNT=0
@@ -95,15 +109,14 @@ until echo "${MANIFEST}" | kubectl apply -f -; do
   sleep 5
 done
 
-# Wait for cluster
+# Wait for the PostgreSQL cluster to become ready
 info "Waiting for PostgreSQL cluster to be Ready..."
-# We wait for the 'Cluster' object, but if PVC binding fails, this will time out.
 kubectl wait --for=condition=Ready cluster/"${POSTGRES_CLUSTER}" -n "${POSTGRES_NS}" --timeout=5m
 
 # Connection info
 POSTGRES_HOST="${POSTGRES_CLUSTER}-rw.${POSTGRES_NS}.svc.cluster.local"
 
-# Save connection info
+# Save connection info into a secret for other apps to use
 info "Saving PostgreSQL credentials to Secret..."
 kubectl create namespace "${MONITORING_NS}" --dry-run=client -o yaml | kubectl apply -f -
 
@@ -120,5 +133,5 @@ success "PostgreSQL installed (HA instances applied)"
 echo ""
 info "Connection:"
 echo "  Host: ${POSTGRES_HOST}"
-echo "  Storage Class: ${DEFAULT_SC}"
+echo "  Storage Class used: ${DEFAULT_SC}"
 echo ""
