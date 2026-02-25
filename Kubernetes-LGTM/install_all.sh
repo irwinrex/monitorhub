@@ -127,19 +127,7 @@ done
 [[ "${MISSING}" == "false" ]] || die "Missing files detected — ensure the full project is uploaded."
 success "All required files present"
 
-# ── Battle-ready pre-flight checks ───────────────────────────────────────────────
-info "Running battle-ready pre-flight checks..."
-
-# Check disk space
-check_disk_space 20
-
-# Check ports 80, 443 for HAProxy
-if [[ "${SKIP_HAPROXY}" != "true" ]]; then
-  check_ports 80 || warn "Port 80 may be in use - HAProxy installation could fail"
-  check_ports 443 || warn "Port 443 may be in use - HAProxy installation could fail"
-fi
-
-# Check k0s not already installed (unless skipping)
+# ── Pre-flight checks (minimal) ───────────────────────────────────────────────
 if [[ "${SKIP_K0S}" != "true" ]]; then
   check_k0s_not_installed || {
     if [[ "${YES}" != "true" ]]; then
@@ -150,30 +138,6 @@ if [[ "${SKIP_K0S}" != "true" ]]; then
   
   # Backup existing kubeconfig
   backup_kubeconfig
-fi
-
-# Check memory
-info "Checking available memory..."
-AVAILABLE_MEM=$(free -g | awk 'NR==2 {print $7}')
-info "  Available: ${AVAILABLE_MEM}GB free memory"
-if [[ "${AVAILABLE_MEM}" -lt 8 ]]; then
-  warn "  WARNING: Less than 8GB free memory - installation may fail"
-fi
-
-# DNS check disabled - HAProxy now works with IP addresses on ports 80/443
-# Domain-based access will work after DNS is configured via LoadBalancer
-
-# ── Node resource check (only if k0s already running) ───────────────────────────
-if [[ "${SKIP_K0S}" == "true" ]]; then
-  info "Skipping k0s - checking existing cluster resources..."
-  if k0s kubectl get nodes &>/dev/null 2>&1; then
-    NODE_CPU=$(k0s kubectl get nodes -o jsonpath='{.items[0].status.capacity.cpu}' 2>/dev/null || echo "0")
-    NODE_MEM=$(k0s kubectl get nodes -o jsonpath='{.items[0].status.capacity.memory}' 2>/dev/null | sed 's/Ki//' || echo "0")
-    NODE_MEM_GB=$((NODE_MEM / 1024 / 1024))
-    info "  Detected: ${NODE_CPU} vCPUs, ~${NODE_MEM_GB} GB RAM"
-  else
-    info "  No existing cluster detected - will install k0s"
-  fi
 fi
 
 # ── Confirm ───────────────────────────────────────────────────────────────────
