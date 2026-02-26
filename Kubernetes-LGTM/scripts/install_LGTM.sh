@@ -70,16 +70,8 @@ apply_values() {
 helm repo add grafana https://grafana.github.io/helm-charts --force-update
 helm repo update grafana >/dev/null
 
-# Loki
-info "Installing Loki..."
-apply_values "${VALUES_DIR}/loki-values.yaml" /tmp/loki-values.yaml
-helm upgrade --install loki grafana/loki \
-  --namespace "${MONITORING_NS}" \
-  --version "${LOKI_CHART_VERSION}" \
-  --values /tmp/loki-values.yaml \
-  --wait --timeout 10m
-
-info "Creating PV for Loki PVC..."
+# Create PV BEFORE Loki installation
+info "Creating PV for Loki..."
 kubectl apply -f - <<EOF
 apiVersion: v1
 kind: PersistentVolume
@@ -93,9 +85,18 @@ spec:
   storageClassName: local-path
   persistentVolumeReclaimPolicy: Retain
   hostPath:
-    path: /var/local-path-provisioner/loki-data
+    path: /mnt/loki-data
     type: DirectoryOrCreate
 EOF
+
+# Loki
+info "Installing Loki..."
+apply_values "${VALUES_DIR}/loki-values.yaml" /tmp/loki-values.yaml
+helm upgrade --install loki grafana/loki \
+  --namespace "${MONITORING_NS}" \
+  --version "${LOKI_CHART_VERSION}" \
+  --values /tmp/loki-values.yaml \
+  --wait --timeout 10m
 
 info "Waiting for Loki PVC to bind..."
 for i in $(seq 1 30); do
