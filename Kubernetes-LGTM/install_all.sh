@@ -78,7 +78,7 @@ _run_phase() {
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}║  LGTM Full Stack Install                                 ║${NC}"
-echo -e "${BOLD}║  k0s · HAProxy · PostgreSQL · Loki/Tempo/Mimir/Grafana   ║${NC}"
+echo -e "${BOLD}║  k0s · HAProxy · Loki/Tempo/Mimir/Grafana             ║${NC}"
 echo -e "${BOLD}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -89,7 +89,6 @@ for script in \
   "${SCRIPTS_DIR}/lib/common.sh" \
   "${SCRIPTS_DIR}/install_k0s.sh" \
   "${SCRIPTS_DIR}/install_HAProxy.sh" \
-  "${SCRIPTS_DIR}/install_Postgres.sh" \
   "${SCRIPTS_DIR}/install_secrets.sh" \
   "${SCRIPTS_DIR}/install_LGTM.sh" \
   "${SCRIPTS_DIR}/backup_all.sh"; do
@@ -122,7 +121,7 @@ success "All required files present"
 # ── Confirm ───────────────────────────────────────────────────────────────────
 if [[ "${YES}" != "true" ]]; then
   echo ""
-  warn "This will install k0s, HAProxy, PostgreSQL, and LGTM stack."
+  warn "This will install k0s, HAProxy, and LGTM stack."
   warn "Intended for a FRESH Debian 12 ARM64 instance (t4g.xlarge)."
   echo ""
   read -r -p "  Continue? [y/N] " confirm
