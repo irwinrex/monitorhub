@@ -2,6 +2,10 @@
 # ==============================================================================
 # scripts/install_k0s.sh
 # Debian 12 ARM64 system prep + k0s single-node install + Helm + kubectl.
+#
+# Usage:
+#   sudo bash scripts/install_k0s.sh              # Install fresh
+#   UPGRADE=true sudo bash scripts/install_k0s.sh # Upgrade existing
 # ==============================================================================
 set -euo pipefail
 IFS=$'\n\t'
@@ -12,6 +16,9 @@ source "${SCRIPT_DIR}/lib/common.sh"
 
 require_root
 
+# ── Check for upgrade mode ─────────────────────────────────────────────────────
+: "${UPGRADE:=false}"
+
 # ── 0. Check Existing Installation ────────────────────────────────────────────
 SKIP_INSTALL=false
 
@@ -19,8 +26,14 @@ SKIP_INSTALL=false
 if command -v k0s &>/dev/null && systemctl is-active --quiet k0scontroller; then
   export KUBECONFIG=/var/lib/k0s/pki/admin.conf
   if k0s kubectl get nodes --no-headers 2>/dev/null | grep -q " Ready"; then
-    success "k0s is already installed, running, and healthy. Skipping core installation."
-    SKIP_INSTALL=true
+    if [[ "${UPGRADE}" == "true" ]]; then
+      info "k0s upgrade requested - current version:"
+      k0s version
+      echo ""
+    else
+      success "k0s is already installed, running, and healthy. Skipping core installation."
+      SKIP_INSTALL=true
+    fi
   fi
 fi
 
@@ -185,6 +198,74 @@ helm repo update >/dev/null
 
 info "Creating namespaces..."
 kubectl create namespace "${MONITORING_NS}" --dry-run=client -o yaml | kubectl apply -f -
+
+# ── 4. Upgrade k0s (if UPGRADE=true) ────────────────────────────────────────────
+if [[ "${UPGRADE}" == "true" ]]; then
+  echo ""
+  header "Upgrading k0s to ${K0S_VERSION}"
+  
+  # Backup before upgrade
+  info "Backing up k0s before upgrade..."
+  BACKUP_DIR="/var/backups/k0s"
+  TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+  mkdir -p "${BACKUP_DIR}"
+  
+  BACKUP_FILE="${BACKUP_DIR}/k0s-backup-${TIMESTAMP}.tar.gz"
+  tar -czf "${BACKUP_FILE}" \
+    -C / var/lib/k0s/pki \
+    -C / var/lib/k0s/manifests \
+    -C / etc/k0s 2>/dev/null || true
+  cp /var/lib/k0s/pki/admin.conf "${BACKUP_DIR}/kubeconfig-${TIMESTAMP}" 2>/dev/null || true
+  
+  success "Backup created: ${BACKUP_FILE}"
+  
+  # Stop k0s
+  info "Stopping k0s..."
+  k0s stop
+  
+  # Download and install new k0s binary
+  info "Downloading k0s ${K0S_VERSION}..."
+  rm -f /usr/local/bin/k0s
+  
+  K0S_INSTALL_PATH=/usr/local/bin \
+    K0S_VERSION="${K0S_VERSION}" \
+    curl -sSLf https://get.k0s.sh | sh
+  
+  # Verify new version
+  NEW_VER="$(k0s version 2>/dev/null || true)"
+  if [[ "${NEW_VER}" != *"${K0S_VERSION}"* ]]; then
+    ENCODED_TAG="${K0S_VERSION//+/%2B}"
+    curl -sSLf \
+      "https://github.com/k0sproject/k0s/releases/download/${ENCODED_TAG}/k0s-${K0S_VERSION}-arm64" \
+      -o /usr/local/bin/k0s
+    chmod +x /usr/local/bin/k0s
+  fi
+  
+  info "k0s version: $(k0s version)"
+  
+  # Start k0s
+  info "Starting k0s..."
+  k0s start
+  
+  # Wait for API
+  info "Waiting for k0s API..."
+  for i in $(seq 1 60); do
+    if k0s kubectl get nodes >/dev/null 2>&1; then
+      success "API is up"
+      break
+    fi
+    [[ $i -eq 60 ]] && die "k0s API timeout."
+    printf '.'
+    sleep 2
+  done
+  echo
+  
+  # Wait for node
+  kubectl wait node --all --for=condition=Ready --timeout=180s >/dev/null
+  
+  success "k0s upgraded to ${K0S_VERSION}"
+  echo ""
+fi
 
 echo ""
 success "install_k0s.sh complete"
