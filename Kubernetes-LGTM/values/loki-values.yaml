@@ -5,7 +5,7 @@ deploymentMode: SingleBinary
 readinessProbe:
   httpGet:
     path: /ready
-    port: 3100
+    port: http-metrics
   initialDelaySeconds: 60
   periodSeconds: 10
   timeoutSeconds: 5
@@ -14,7 +14,7 @@ readinessProbe:
 livenessProbe:
   httpGet:
     path: /ready
-    port: 3100
+    port: http-metrics
   initialDelaySeconds: 120
   periodSeconds: 20
   timeoutSeconds: 5
