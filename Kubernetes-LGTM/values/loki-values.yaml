@@ -1,5 +1,8 @@
 fullnameOverride: loki
 
+test:
+  enabled: false
+
 deploymentMode: SingleBinary
 
 singleBinary:
