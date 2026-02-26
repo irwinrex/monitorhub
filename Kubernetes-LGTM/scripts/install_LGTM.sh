@@ -70,6 +70,12 @@ apply_values() {
 helm repo add grafana https://grafana.github.io/helm-charts --force-update
 helm repo update grafana >/dev/null
 
+info "Helm repos configured"
+info "  - grafana/loki:${LOKI_CHART_VERSION}"
+info "  - grafana/tempo:${TEMPO_CHART_VERSION}"
+info "  - grafana/mimir-distributed:${MIMIR_CHART_VERSION}"
+info "  - grafana/grafana:${GRAFANA_CHART_VERSION}"
+
 # Install Local Path Provisioner for PVC support
 info "Installing Local Path Provisioner..."
 if ! kubectl get sc local-path &>/dev/null; then

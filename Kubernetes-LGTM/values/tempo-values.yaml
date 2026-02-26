@@ -1,25 +1,30 @@
-# Tempo Values - Monolithic
 fullnameOverride: tempo
 
-mode: monolithic
-replicas: 1
+deploymentMode: SingleBinary
 
-persistence:
-  enabled: false
+singleBinary:
+  replicas: 1
 
-storage:
-  trace:
-    backend: s3
-    s3:
-      region: ${S3_REGION}
-      bucket: ${S3_BUCKET}/tempo
+  persistence:
+    enabled: false   # safe since S3 backend
 
-server:
-  http_listen_port: 3200
-  grpc_listen_port: 9096
-
-config:
+tempo:
   auth_enabled: false
+
+  server:
+    http_listen_port: 3200
+    grpc_listen_port: 9096
+
+  storage:
+    trace:
+      backend: s3
+      s3:
+        region: ${S3_REGION}
+        bucket: ${S3_BUCKET}
+        prefix: lgtm-prod/tempo/
+
+  metricsGenerator:
+    enabled: false
 
 resources:
   requests:
