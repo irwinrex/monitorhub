@@ -68,11 +68,12 @@ apply_values() {
 
 # ── 5. Helm Deploy ─────────────────────────────────────────────────────────────
 helm repo add grafana https://grafana.github.io/helm-charts --force-update
-helm repo update grafana >/dev/null
+helm repo add grafana-community https://grafana-community.github.io/helm-charts --force-update
+helm repo update >/dev/null
 
 info "Helm repos configured"
 info "  - grafana/loki:${LOKI_CHART_VERSION}"
-info "  - grafana/tempo:${TEMPO_CHART_VERSION}"
+info "  - grafana-community/tempo-simple:${TEMPO_CHART_VERSION}"
 info "  - grafana/mimir-distributed:${MIMIR_CHART_VERSION}"
 info "  - grafana/grafana:${GRAFANA_CHART_VERSION}"
 
@@ -99,7 +100,7 @@ helm upgrade --install loki grafana/loki \
 # Tempo
 info "Installing Tempo..."
 apply_values "${VALUES_DIR}/tempo-values.yaml" /tmp/tempo-values.yaml
-helm upgrade --install tempo grafana/tempo \
+helm upgrade --install tempo grafana-community/tempo-simple \
   --namespace "${MONITORING_NS}" \
   --version "${TEMPO_CHART_VERSION}" \
   --values /tmp/tempo-values.yaml \

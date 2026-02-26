@@ -13,7 +13,7 @@ export HAPROXY_CHART_VERSION="1.48.0"   # Updated to latest (released Feb 2026)
 export LINKERD_VERSION="stable-2.14.11" # Updated to latest OSS stable branch (2.14.11)
 
 export LOKI_CHART_VERSION="6.53.0"     # Already at latest
-export TEMPO_CHART_VERSION="1.24.4"    # Tempo monolithic
+export TEMPO_CHART_VERSION="2.3.0"    # Tempo single binary (community)
 export MIMIR_CHART_VERSION="6.0.5"     # Already at latest stable
 export GRAFANA_CHART_VERSION="10.5.15" # Updated from 9.1.0 to the latest 10.x release
 
