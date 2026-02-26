@@ -137,36 +137,6 @@ else
   info "Running in non-interactive mode (YES=true)"
 fi
 
-# ── S3 Backup Configuration ───────────────────────────────────────────────────
-echo ""
-info "=== S3 Backup Configuration ==="
-echo ""
-
-if [[ -z "${S3_BUCKET:-}" ]]; then
-  read -r -p "Enter S3 bucket name for backups: " S3_BUCKET
-fi
-
-if [[ -z "${S3_BUCKET}" ]]; then
-  die "S3_BUCKET is required for backups."
-fi
-
-read -r -p "Enter S3 prefix (default: lgtm-backup): " S3_PREFIX_INPUT
-S3_PREFIX="${S3_PREFIX_INPUT:-lgtm-backup}"
-
-read -r -p "Enter S3 region (default: us-east-1): " S3_REGION_INPUT
-S3_REGION="${S3_REGION_INPUT:-us-east-1}"
-
-read -r -p "Local retention days (default: 7): " LOCAL_RETENTION_INPUT
-LOCAL_RETENTION_DAYS="${LOCAL_RETENTION_INPUT:-7}"
-
-echo ""
-info "S3 Backup: s3://${S3_BUCKET}/${S3_PREFIX} (${S3_REGION})"
-info "Local retention: ${LOCAL_RETENTION_DAYS} days"
-echo ""
-
-# Export for backup script
-export S3_BUCKET S3_PREFIX S3_REGION LOCAL_RETENTION_DAYS
-
 TOTAL_START=$SECONDS
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -186,6 +156,38 @@ _run_phase 4 "Secrets — Grafana admin credentials" \
 
 _run_phase 5 "LGTM — Loki · Tempo · Mimir · Grafana" \
   "${SKIP_LGTM}" "${SCRIPTS_DIR}/install_LGTM.sh"
+
+# ── S3 Backup Configuration (asked after LGTM install) ────────────────────────
+if [[ "${SKIP_BACKUP}" != "true" ]]; then
+  echo ""
+  info "=== S3 Backup Configuration ==="
+  echo ""
+  
+  if [[ -z "${S3_BUCKET:-}" ]]; then
+    read -r -p "Enter S3 bucket name for backups: " S3_BUCKET
+  fi
+  
+  if [[ -z "${S3_BUCKET}" ]]; then
+    warn "No S3 bucket provided - backup phase will be skipped"
+    SKIP_BACKUP=true
+  else
+    read -r -p "Enter S3 prefix (default: lgtm-backup): " S3_PREFIX_INPUT
+    S3_PREFIX="${S3_PREFIX_INPUT:-lgtm-backup}"
+    
+    read -r -p "Enter S3 region (default: us-east-1): " S3_REGION_INPUT
+    S3_REGION="${S3_REGION_INPUT:-us-east-1}"
+    
+    read -r -p "Local retention days (default: 7): " LOCAL_RETENTION_INPUT
+    LOCAL_RETENTION_DAYS="${LOCAL_RETENTION_INPUT:-7}"
+    
+    echo ""
+    info "S3 Backup: s3://${S3_BUCKET}/${S3_PREFIX} (${S3_REGION})"
+    info "Local retention: ${LOCAL_RETENTION_DAYS} days"
+    echo ""
+    
+    export S3_BUCKET S3_PREFIX S3_REGION LOCAL_RETENTION_DAYS
+  fi
+fi
 
 _run_phase 6 "Backup — S3 backup configuration" \
   "${SKIP_BACKUP}" "${SCRIPTS_DIR}/backup_all.sh"

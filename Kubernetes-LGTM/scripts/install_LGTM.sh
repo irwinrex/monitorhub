@@ -43,33 +43,56 @@ if [[ ! -f "${BASE_VALUES}" ]]; then
   die "Values file not found: ${BASE_VALUES}"
 fi
 
+# Prompt for S3 (single bucket with prefixes)
+echo ""
+echo "=== S3 Bucket Configuration (Single Bucket with Prefixes) ==="
+echo ""
+
 if [[ -z "${S3_BUCKET:-}" ]]; then
-  echo ""
-  read -r -p "Enter S3 bucket name: " S3_BUCKET
+  read -r -p "S3 bucket name: " S3_BUCKET
 fi
 S3_BUCKET="${S3_BUCKET:-lgtm-observability}"
 
 if [[ -z "${S3_REGION:-}" ]]; then
-  read -r -p "Enter S3 region [default: us-east-1]: " S3_REGION
+  read -r -p "S3 region [default: us-east-1]: " S3_REGION
 fi
 S3_REGION="${S3_REGION:-us-east-1}"
 
-info "S3: Bucket='${S3_BUCKET}', Region='${S3_REGION}'"
+# Use single bucket with prefixes
+LOKI_CHUNKS_BUCKET="${S3_BUCKET}/loki"
+LOKI_RULER_BUCKET="${S3_BUCKET}/loki-ruler"
+TEMPO_BUCKET="${S3_BUCKET}/tempo"
+MIMIR_BLOCKS_BUCKET="${S3_BUCKET}/mimir"
+
+info "S3 Configuration:"
+echo "  Bucket:    ${S3_BUCKET}"
+echo "  Loki:      ${LOKI_CHUNKS_BUCKET}"
+echo "  Tempo:     ${TEMPO_BUCKET}"
+echo "  Mimir:     ${MIMIR_BLOCKS_BUCKET}"
+echo "  Region:    ${S3_REGION}"
 
 # ── 4. Generate Values ───────────────────────────────────────────────────────
 generate_values() {
   local service="$1"
   local outfile="/tmp/values-${service}.yaml"
   
-  # Replace placeholder with actual bucket name in values file
-  sed "s/CHANGEME/${S3_BUCKET}/g" "${BASE_VALUES}" > /tmp/lgtm-temp.yaml
+  # Create temp file with bucket replacements
+  cp "${BASE_VALUES}" /tmp/lgtm-temp.yaml
+  
+  # Replace bucket placeholders (single bucket with prefixes)
+  sed -i "s|loki-chunks|${S3_BUCKET}/loki|g" /tmp/lgtm-temp.yaml
+  sed -i "s|loki-ruler|${S3_BUCKET}/loki-ruler|g" /tmp/lgtm-temp.yaml
+  sed -i "s|loki-admin|${S3_BUCKET}/loki-admin|g" /tmp/lgtm-temp.yaml
+  sed -i "s|tempo-traces|${S3_BUCKET}/tempo|g" /tmp/lgtm-temp.yaml
+  sed -i "s|mimir-blocks|${S3_BUCKET}/mimir|g" /tmp/lgtm-temp.yaml
+  sed -i "s|mimir-alertmanager|${S3_BUCKET}/mimir-alertmanager|g" /tmp/lgtm-temp.yaml
+  sed -i "s|mimir-ruler|${S3_BUCKET}/mimir-ruler|g" /tmp/lgtm-temp.yaml
+  sed -i "s/us-east-1/${S3_REGION}/g" /tmp/lgtm-temp.yaml
   
   python3 -c "
 import yaml
 
 service = '${service}'
-bucket = '${S3_BUCKET}'
-region = '${S3_REGION}'
 
 with open('/tmp/lgtm-temp.yaml', 'r') as f:
     docs = list(yaml.safe_load_all(f))
@@ -85,7 +108,7 @@ with open('${outfile}', 'w') as f:
     yaml.dump(config, f)
 "
 
-rm -f /tmp/lgtm-temp.yaml
+  rm -f /tmp/lgtm-temp.yaml
 }
 
 # ── 5. Helm Deploy ─────────────────────────────────────────────────────────────
