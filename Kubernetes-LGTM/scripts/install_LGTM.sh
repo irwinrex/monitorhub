@@ -70,24 +70,16 @@ apply_values() {
 helm repo add grafana https://grafana.github.io/helm-charts --force-update
 helm repo update grafana >/dev/null
 
-# Create PV BEFORE Loki installation
-info "Creating PV for Loki..."
-kubectl apply -f - <<EOF
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: pv-loki-data
-spec:
-  capacity:
-    storage: 30Gi
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: local-path
-  persistentVolumeReclaimPolicy: Retain
-  hostPath:
-    path: /mnt/loki-data
-    type: DirectoryOrCreate
-EOF
+# Install Local Path Provisioner for PVC support
+info "Installing Local Path Provisioner..."
+if ! kubectl get sc local-path &>/dev/null; then
+  kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
+  kubectl -n local-path-storage rollout status deployment/local-path-provisioner --timeout=2m
+  kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+  success "Local Path Provisioner installed"
+else
+  info "Local Path Provisioner already installed"
+fi
 
 # Loki
 info "Installing Loki..."
@@ -97,17 +89,6 @@ helm upgrade --install loki grafana/loki \
   --version "${LOKI_CHART_VERSION}" \
   --values /tmp/loki-values.yaml \
   --wait --timeout 10m
-
-info "Waiting for Loki PVC to bind..."
-for i in $(seq 1 30); do
-  PVC_STATUS=$(kubectl get pvc storage-loki-0 -n "${MONITORING_NS}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Pending")
-  if [[ "$PVC_STATUS" == "Bound" ]]; then
-    success "Loki PVC bound"
-    break
-  fi
-  [[ $i -eq 30 ]] && warn "Loki PVC still pending after 30 attempts"
-  sleep 2
-done
 
 # Tempo
 info "Installing Tempo..."
