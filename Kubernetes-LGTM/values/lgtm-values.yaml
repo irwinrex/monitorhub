@@ -1,21 +1,16 @@
 # LGTM Stack Values - S3 Backend Configuration
 # Uses IAM role for S3 access (no credentials needed)
-# Pod-to-pod communication via gRPC
-# All S3 config via environment variables
+# Monolithic mode (all in one pod) - ideal for single-node
 
 ---
-# Loki
+# Loki - Monolithic
 loki:
+  mode: monolithic
+  replicas: 1
   auth_enabled: false
 
   commonConfig:
     replication_factor: 1
-    storage:
-      type: s3
-      s3:
-        region: ${S3_REGION}
-        s3ForcePathStyle: true
-        insecure: false
 
   schemaConfig:
     configs:
@@ -38,29 +33,24 @@ loki:
       s3ForcePathStyle: true
       insecure: false
 
-  server:
-    grpc_listen_port: 9096
+  # Disable caches
+  chunksCache:
+    enabled: false
+  resultsCache:
+    enabled: false
 
-  limits_config:
-    retention_period: 720h
-    ingestion_rate_mb: 16
-    ingestion_burst_size_mb: 32
-
-  singleBinary:
-    replicas: 1
-    persistence:
-      enabled: false
-    resources:
-      requests:
-        cpu: 300m
-        memory: 512Mi
-      limits:
-        cpu: 800m
-        memory: 1Gi
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
 
 ---
-# Tempo
+# Tempo - Monolithic
 tempo:
+  mode: monolithic
   replicas: 1
   persistence:
     enabled: false
@@ -100,21 +90,24 @@ tempo:
 
   resources:
     requests:
-      cpu: 200m
-      memory: 256Mi
-    limits:
       cpu: 500m
       memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
 
 ---
-# Mimir
+# Mimir - Monolithic
 mimir:
   enabled: true
+  mode: monolithic
+  replicas: 1
 
   persistence:
     enabled: false
 
   server:
+    http_listen_port: 8080
     grpc_listen_port: 9095
 
   structuredConfig:
@@ -154,10 +147,10 @@ mimir:
 
   resources:
     requests:
-      cpu: 300m
+      cpu: 500m
       memory: 512Mi
     limits:
-      cpu: 800m
+      cpu: 1000m
       memory: 1Gi
 
 ---
@@ -174,7 +167,6 @@ grafana:
   grafana.ini:
     analytics:
       reporting_enabled: false
-
     log:
       mode: console
 
@@ -186,11 +178,9 @@ grafana:
           type: prometheus
           url: http://lgtm-mimir-gateway.monitoring.svc.cluster.local/prometheus
           isDefault: true
-
         - name: Loki
           type: loki
-          url: http://lgtm-loki.monitoring.svc.cluster.local:3100
-
+          url: http://lgtm-loki-gateway.monitoring.svc.cluster.local:80
         - name: Tempo
           type: tempo
           url: http://lgtm-tempo.monitoring.svc.cluster.local:3200
