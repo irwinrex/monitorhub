@@ -1,5 +1,6 @@
 # LGTM Stack Values - S3 Backend Configuration
 # Uses IAM role for S3 access (no credentials needed)
+# Pod-to-pod communication via gRPC
 
 ---
 # Loki
@@ -29,6 +30,11 @@ loki:
       region: us-east-1
       s3ForcePathStyle: true
       insecure: false
+
+  # gRPC configuration for pod-to-pod
+  config:
+    grpc_listen_port: 9096
+    grpc_server_max_concurrent_streams: 100
 
   limits_config:
     retention_period: 720h
@@ -96,8 +102,17 @@ tempo:
 mimir:
   enabled: true
 
+  # gRPC configuration for pod-to-pod communication
+  config:
+    server:
+      grpc_listen_port: 9095
+      grpc_server_max_concurrent_streams: 100
+
   structuredConfig:
     auth_enabled: false
+
+    server:
+      grpc_listen_port: 9095
 
     common:
       storage:
