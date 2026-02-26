@@ -8,6 +8,15 @@ deploymentMode: SingleBinary
 singleBinary:
   replicas: 1
 
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 3100
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 15
+
   persistence:
     enabled: true
     size: 30Gi

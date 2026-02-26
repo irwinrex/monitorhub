@@ -63,7 +63,7 @@ VALUES_DIR="$(resolve_values_dir)"
 apply_values() {
   local template="$1"
   local output="$2"
-  envsubst < "${template}" > "${output}"
+  envsubst <"${template}" >"${output}"
 }
 
 # ── 5. Helm Deploy ─────────────────────────────────────────────────────────────
@@ -73,7 +73,7 @@ helm repo update >/dev/null
 
 info "Helm repos configured"
 info "  - grafana/loki:${LOKI_CHART_VERSION}"
-info "  - grafana-community/tempo-simple:${TEMPO_CHART_VERSION}"
+info "  - grafana-community/tempo:${TEMPO_CHART_VERSION}"
 info "  - grafana/mimir-distributed:${MIMIR_CHART_VERSION}"
 info "  - grafana/grafana:${GRAFANA_CHART_VERSION}"
 
@@ -100,7 +100,7 @@ helm upgrade --install loki grafana/loki \
 # Tempo
 info "Installing Tempo..."
 apply_values "${VALUES_DIR}/tempo-values.yaml" /tmp/tempo-values.yaml
-helm upgrade --install tempo grafana-community/tempo-simple \
+helm upgrade --install tempo grafana-community/tempo \
   --namespace "${MONITORING_NS}" \
   --version "${TEMPO_CHART_VERSION}" \
   --values /tmp/tempo-values.yaml \
