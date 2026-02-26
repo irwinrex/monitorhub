@@ -79,6 +79,35 @@ helm upgrade --install loki grafana/loki \
   --values /tmp/loki-values.yaml \
   --wait --timeout 10m
 
+info "Creating PV for Loki PVC..."
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-loki-data
+spec:
+  capacity:
+    storage: 30Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: /var/local-path-provisioner/loki-data
+    type: DirectoryOrCreate
+EOF
+
+info "Waiting for Loki PVC to bind..."
+for i in $(seq 1 30); do
+  PVC_STATUS=$(kubectl get pvc storage-loki-0 -n "${MONITORING_NS}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Pending")
+  if [[ "$PVC_STATUS" == "Bound" ]]; then
+    success "Loki PVC bound"
+    break
+  fi
+  [[ $i -eq 30 ]] && warn "Loki PVC still pending after 30 attempts"
+  sleep 2
+done
+
 # Tempo
 info "Installing Tempo..."
 apply_values "${VALUES_DIR}/tempo-values.yaml" /tmp/tempo-values.yaml
