@@ -1,4 +1,4 @@
-# Tempo Values - Monolithic mode (single binary)
+# Tempo Values - Monolithic
 fullnameOverride: tempo
 
 mode: monolithic
@@ -11,8 +11,8 @@ storage:
   trace:
     backend: s3
     s3:
-      region: S3_REGION_PLACEHOLDER
-      bucket: TEMPO_BUCKET_PLACEHOLDER
+      region: ${S3_REGION}
+      bucket: ${S3_BUCKET}/tempo
 
 server:
   http_listen_port: 3200
@@ -20,25 +20,6 @@ server:
 
 config:
   auth_enabled: false
-
-  distributor:
-    receivers:
-      jaeger:
-        protocols:
-          thrift_http: {}
-          grpc: {}
-          thrift_binary: {}
-      otlp:
-        protocols:
-          http: {}
-          grpc: {}
-
-  ingester:
-    max_block_duration: 5m
-
-  compactor:
-    compaction:
-      block_retention: 24h
 
 resources:
   requests:

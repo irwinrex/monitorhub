@@ -1,4 +1,4 @@
-# Mimir Values - Monolithic mode (single binary)
+# Mimir Values - Monolithic
 fullnameOverride: mimir
 
 enabled: true
@@ -19,26 +19,26 @@ structuredConfig:
     storage:
       backend: s3
       s3:
-        region: S3_REGION_PLACEHOLDER
-        bucket_name: MIMIR_BUCKET_PLACEHOLDER
+        region: ${S3_REGION}
+        bucket_name: ${S3_BUCKET}/mimir
 
   blocks_storage:
     backend: s3
     s3:
-      region: S3_REGION_PLACEHOLDER
-      bucket_name: MIMIR_BUCKET_PLACEHOLDER
+      region: ${S3_REGION}
+      bucket_name: ${S3_BUCKET}/mimir
 
   alertmanager_storage:
     backend: s3
     s3:
-      region: S3_REGION_PLACEHOLDER
-      bucket_name: MIMIR_BUCKET_PLACEHOLDER-alertmanager
+      region: ${S3_REGION}
+      bucket_name: ${S3_BUCKET}/mimir-alertmanager
 
   ruler_storage:
     backend: s3
     s3:
-      region: S3_REGION_PLACEHOLDER
-      bucket_name: MIMIR_BUCKET_PLACEHOLDER-ruler
+      region: ${S3_REGION}
+      bucket_name: ${S3_BUCKET}/mimir-ruler
 
   ingester:
     ring:

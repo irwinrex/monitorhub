@@ -2,7 +2,7 @@
 # ==============================================================================
 # scripts/install_LGTM.sh
 # Deploys Loki, Tempo, Mimir, Grafana via Helm.
-# Uses separate values files for each component.
+# Uses separate values files with env substitution.
 # ==============================================================================
 set -euo pipefail
 IFS=$'\n\t'
@@ -15,10 +15,10 @@ require_kubeconfig
 require_helm
 
 : "${MONITORING_NS:=monitoring}"
-: "${LOKI_CHART_VERSION:=6.32.0}"
-: "${TEMPO_CHART_VERSION:=1.22.0}"
-: "${MIMIR_CHART_VERSION:=5.7.0}"
-: "${GRAFANA_CHART_VERSION:=9.1.0}"
+: "${LOKI_CHART_VERSION:=6.53.0}"
+: "${TEMPO_CHART_VERSION:=1.61.3}"
+: "${MIMIR_CHART_VERSION:=6.0.5}"
+: "${GRAFANA_CHART_VERSION:=10.5.15}"
 
 # Skip if already deployed
 if helm list -n "${MONITORING_NS}" 2>/dev/null | grep -q "^loki "; then
@@ -36,10 +36,8 @@ if ! kubectl get secret grafana-admin -n "${MONITORING_NS}" &>/dev/null; then
 fi
 
 # ── 3. S3 Configuration ────────────────────────────────────────────────────────
-VALUES_DIR="$(resolve_values_dir)"
-
 echo ""
-echo "=== S3 Bucket Configuration (Single Bucket with Prefixes) ==="
+echo "=== S3 Bucket Configuration ==="
 echo ""
 
 if [[ -z "${S3_BUCKET:-}" ]]; then
@@ -52,34 +50,20 @@ if [[ -z "${S3_REGION:-}" ]]; then
 fi
 S3_REGION="${S3_REGION:-us-east-1}"
 
-# Use single bucket with prefixes
-export LOKI_CHUNKS_BUCKET="${S3_BUCKET}/loki"
-export LOKI_RULER_BUCKET="${S3_BUCKET}/loki-ruler"
-export LOKI_ADMIN_BUCKET="${S3_BUCKET}/loki-admin"
-export TEMPO_BUCKET="${S3_BUCKET}/tempo"
-export MIMIR_BLOCKS_BUCKET="${S3_BUCKET}/mimir"
-export MIMIR_ALERTMANAGER_BUCKET="${S3_BUCKET}/mimir-alertmanager"
-export MIMIR_RULER_BUCKET="${S3_BUCKET}/mimir-ruler"
-export S3_REGION
+# Export for envsubst
+export S3_BUCKET S3_REGION
 
 info "S3 Configuration:"
 echo "  Bucket:    ${S3_BUCKET}"
-echo "  Loki:      ${LOKI_CHUNKS_BUCKET}"
-echo "  Tempo:     ${TEMPO_BUCKET}"
-echo "  Mimir:     ${MIMIR_BLOCKS_BUCKET}"
 echo "  Region:    ${S3_REGION}"
 
-# ── 4. Generate Values from templates ────────────────────────────────────────
-generate_values() {
+VALUES_DIR="$(resolve_values_dir)"
+
+# ── 4. Helper to apply env vars to values file ───────────────────────────────
+apply_values() {
   local template="$1"
-  local outfile="$2"
-  
-  # Read template and replace placeholders with actual values
-  sed -e "s|S3_REGION_PLACEHOLDER|${S3_REGION}|g" \
-      -e "s|LOKI_BUCKET_PLACEHOLDER|${S3_BUCKET}/loki|g" \
-      -e "s|TEMPO_BUCKET_PLACEHOLDER|${S3_BUCKET}/tempo|g" \
-      -e "s|MIMIR_BUCKET_PLACEHOLDER|${S3_BUCKET}/mimir|g" \
-      "${template}" > "${outfile}"
+  local output="$2"
+  envsubst < "${template}" > "${output}"
 }
 
 # ── 5. Helm Deploy ─────────────────────────────────────────────────────────────
@@ -88,7 +72,7 @@ helm repo update grafana >/dev/null
 
 # Loki
 info "Installing Loki..."
-generate_values "${VALUES_DIR}/loki-values.yaml" /tmp/loki-values.yaml
+apply_values "${VALUES_DIR}/loki-values.yaml" /tmp/loki-values.yaml
 helm upgrade --install loki grafana/loki \
   --namespace "${MONITORING_NS}" \
   --version "${LOKI_CHART_VERSION}" \
@@ -97,7 +81,7 @@ helm upgrade --install loki grafana/loki \
 
 # Tempo
 info "Installing Tempo..."
-generate_values "${VALUES_DIR}/tempo-values.yaml" /tmp/tempo-values.yaml
+apply_values "${VALUES_DIR}/tempo-values.yaml" /tmp/tempo-values.yaml
 helm upgrade --install tempo grafana/tempo \
   --namespace "${MONITORING_NS}" \
   --version "${TEMPO_CHART_VERSION}" \
@@ -106,7 +90,7 @@ helm upgrade --install tempo grafana/tempo \
 
 # Mimir
 info "Installing Mimir..."
-generate_values "${VALUES_DIR}/mimir-values.yaml" /tmp/mimir-values.yaml
+apply_values "${VALUES_DIR}/mimir-values.yaml" /tmp/mimir-values.yaml
 helm upgrade --install mimir grafana/mimir-distributed \
   --namespace "${MONITORING_NS}" \
   --version "${MIMIR_CHART_VERSION}" \
@@ -121,8 +105,32 @@ helm upgrade --install grafana grafana/grafana \
   --values "${VALUES_DIR}/grafana-values.yaml" \
   --wait --timeout 10m
 
-# ── 6. Ingress (HTTP) ─────────────────────────────────────────────────────────
-info "Applying Ingress Rules..."
+# Add datasources
+info "Configuring datasources..."
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: ${MONITORING_NS}
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Mimir
+        type: prometheus
+        url: http://mimir.${MONITORING_NS}.svc.cluster.local:8080/prometheus
+        isDefault: true
+      - name: Loki
+        type: loki
+        url: http://loki.${MONITORING_NS}.svc.cluster.local:3100
+      - name: Tempo
+        type: tempo
+        url: http://tempo.${MONITORING_NS}.svc.cluster.local:3200
+EOF
+
+# ── 6. Ingress ─────────────────────────────────────────────────────────────
+info "Applying Ingress..."
 
 kubectl apply -f - <<EOF
 ---
@@ -149,7 +157,7 @@ EOF
 
 # ── Summary ─────────────────────────────────────────────────────────────────
 echo ""
-kubectl get pods -n "${MONITORING_NS}" -o wide | head -n 10
+kubectl get pods -n "${MONITORING_NS}" -o wide
 
 echo ""
 success "install_LGTM.sh complete"

@@ -1,8 +1,15 @@
-# Loki Values - Simple mode (single binary)
+# Loki Values - Single Binary (Monolithic)
 fullnameOverride: loki
 
-mode: simple
-replicas: 1
+singleBinary:
+  enabled: true
+  replicas: 1
+
+lokiCanary:
+  enabled: false
+
+memcached:
+  enabled: false
 
 auth_enabled: false
 
@@ -22,11 +29,11 @@ schemaConfig:
 storage:
   type: s3
   bucketNames:
-    chunks: LOKI_BUCKET_PLACEHOLDER
-    ruler: LOKI_BUCKET_PLACEHOLDER-ruler
-    admin: LOKI_BUCKET_PLACEHOLDER-admin
+    chunks: ${S3_BUCKET}/loki-chunks
+    ruler: ${S3_BUCKET}/loki-ruler
+    admin: ${S3_BUCKET}/loki-admin
   s3:
-    region: S3_REGION_PLACEHOLDER
+    region: ${S3_REGION}
     s3ForcePathStyle: true
     insecure: false
 
