@@ -127,18 +127,17 @@ helm_deploy() {
     --version "${version}" \
     --values "${values_file}" \
     --wait \
-    --timeout "${timeout}" \
-    --atomic
+    --timeout "${timeout}"
 
   success "${release} Ready"
   rm -f "${values_file}"
 }
 
-# Deploy
-helm_deploy lgtm-loki    grafana/loki               "${LOKI_CHART_VERSION}"    "loki"    5m
-helm_deploy lgtm-tempo   grafana/tempo              "${TEMPO_CHART_VERSION}"   "tempo"   5m
-helm_deploy lgtm-mimir   grafana/mimir-distributed  "${MIMIR_CHART_VERSION}"  "mimir"   10m
-helm_deploy lgtm-grafana grafana/grafana            "${GRAFANA_CHART_VERSION}"  "grafana" 5m
+# Deploy (increased timeout for Loki)
+helm_deploy lgtm-loki    grafana/loki               "${LOKI_CHART_VERSION}"    "loki"    15m
+helm_deploy lgtm-tempo   grafana/tempo              "${TEMPO_CHART_VERSION}"   "tempo"   10m
+helm_deploy lgtm-mimir   grafana/mimir-distributed  "${MIMIR_CHART_VERSION}"  "mimir"   15m
+helm_deploy lgtm-grafana grafana/grafana            "${GRAFANA_CHART_VERSION}"  "grafana" 10m
 
 # ── 6. Ingress (HTTP) ─────────────────────────────────────────────────────────
 info "Applying Ingress Rules..."
