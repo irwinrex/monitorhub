@@ -1,6 +1,10 @@
 # Loki Values - Simple (Single Binary)
 fullnameOverride: loki
 
+# Disable tests
+tests:
+  enabled: false
+
 mode: simple
 
 write:
