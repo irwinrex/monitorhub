@@ -19,26 +19,26 @@ structuredConfig:
     storage:
       backend: s3
       s3:
-        region: ${S3_REGION}
-        bucket_name: ${MIMIR_BLOCKS_BUCKET}
+        region: S3_REGION_PLACEHOLDER
+        bucket_name: MIMIR_BUCKET_PLACEHOLDER
 
   blocks_storage:
     backend: s3
     s3:
-      region: ${S3_REGION}
-      bucket_name: ${MIMIR_BLOCKS_BUCKET}
+      region: S3_REGION_PLACEHOLDER
+      bucket_name: MIMIR_BUCKET_PLACEHOLDER
 
   alertmanager_storage:
     backend: s3
     s3:
-      region: ${S3_REGION}
-      bucket_name: ${MIMIR_ALERTMANAGER_BUCKET}
+      region: S3_REGION_PLACEHOLDER
+      bucket_name: MIMIR_BUCKET_PLACEHOLDER-alertmanager
 
   ruler_storage:
     backend: s3
     s3:
-      region: ${S3_REGION}
-      bucket_name: ${MIMIR_RULER_BUCKET}
+      region: S3_REGION_PLACEHOLDER
+      bucket_name: MIMIR_BUCKET_PLACEHOLDER-ruler
 
   ingester:
     ring:

@@ -11,8 +11,8 @@ storage:
   trace:
     backend: s3
     s3:
-      region: ${S3_REGION}
-      bucket: ${TEMPO_BUCKET}
+      region: S3_REGION_PLACEHOLDER
+      bucket: TEMPO_BUCKET_PLACEHOLDER
 
 server:
   http_listen_port: 3200

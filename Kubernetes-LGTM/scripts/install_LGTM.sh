@@ -74,16 +74,11 @@ generate_values() {
   local template="$1"
   local outfile="$2"
   
-  # Read template and replace env vars
-  sed -e "s|\${S3_BUCKET}|${S3_BUCKET}|g" \
-      -e "s|\${S3_REGION}|${S3_REGION}|g" \
-      -e "s|\${LOKI_CHUNKS_BUCKET}|${LOKI_CHUNKS_BUCKET}|g" \
-      -e "s|\${LOKI_RULER_BUCKET}|${LOKI_RULER_BUCKET}|g" \
-      -e "s|\${LOKI_ADMIN_BUCKET}|${LOKI_ADMIN_BUCKET}|g" \
-      -e "s|\${TEMPO_BUCKET}|${TEMPO_BUCKET}|g" \
-      -e "s|\${MIMIR_BLOCKS_BUCKET}|${MIMIR_BLOCKS_BUCKET}|g" \
-      -e "s|\${MIMIR_ALERTMANAGER_BUCKET}|${MIMIR_ALERTMANAGER_BUCKET}|g" \
-      -e "s|\${MIMIR_RULER_BUCKET}|${MIMIR_RULER_BUCKET}|g" \
+  # Read template and replace placeholders with actual values
+  sed -e "s|S3_REGION_PLACEHOLDER|${S3_REGION}|g" \
+      -e "s|LOKI_BUCKET_PLACEHOLDER|${S3_BUCKET}/loki|g" \
+      -e "s|TEMPO_BUCKET_PLACEHOLDER|${S3_BUCKET}/tempo|g" \
+      -e "s|MIMIR_BUCKET_PLACEHOLDER|${S3_BUCKET}/mimir|g" \
       "${template}" > "${outfile}"
 }
 

@@ -22,11 +22,11 @@ schemaConfig:
 storage:
   type: s3
   bucketNames:
-    chunks: ${LOKI_CHUNKS_BUCKET}
-    ruler: ${LOKI_RULER_BUCKET}
-    admin: ${LOKI_ADMIN_BUCKET}
+    chunks: LOKI_BUCKET_PLACEHOLDER
+    ruler: LOKI_BUCKET_PLACEHOLDER-ruler
+    admin: LOKI_BUCKET_PLACEHOLDER-admin
   s3:
-    region: ${S3_REGION}
+    region: S3_REGION_PLACEHOLDER
     s3ForcePathStyle: true
     insecure: false
 
