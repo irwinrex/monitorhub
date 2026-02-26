@@ -63,7 +63,6 @@ loki:
       replay_memory_ceiling: 1GB
     chunk_idle_period: 5m
     chunk_retain_period: 1m
-    max_transfer_retries: 0
 
   compactor:
     working_directory: /var/loki/compactor
