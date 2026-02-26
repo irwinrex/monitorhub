@@ -1,0 +1,49 @@
+# Tempo Values - Monolithic mode (single binary)
+fullnameOverride: tempo
+
+mode: monolithic
+replicas: 1
+
+persistence:
+  enabled: false
+
+storage:
+  trace:
+    backend: s3
+    s3:
+      region: ${S3_REGION}
+      bucket: ${TEMPO_BUCKET}
+
+server:
+  http_listen_port: 3200
+  grpc_listen_port: 9096
+
+config:
+  auth_enabled: false
+
+  distributor:
+    receivers:
+      jaeger:
+        protocols:
+          thrift_http: {}
+          grpc: {}
+          thrift_binary: {}
+      otlp:
+        protocols:
+          http: {}
+          grpc: {}
+
+  ingester:
+    max_block_duration: 5m
+
+  compactor:
+    compaction:
+      block_retention: 24h
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi

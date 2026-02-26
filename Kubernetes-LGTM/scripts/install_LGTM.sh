@@ -2,7 +2,7 @@
 # ==============================================================================
 # scripts/install_LGTM.sh
 # Deploys Loki, Tempo, Mimir, Grafana via Helm.
-# Configured for: Private IP, No Domain, No Cert-Manager, HTTP only.
+# Uses separate values files for each component.
 # ==============================================================================
 set -euo pipefail
 IFS=$'\n\t'
@@ -21,12 +21,12 @@ require_helm
 : "${GRAFANA_CHART_VERSION:=9.1.0}"
 
 # Skip if already deployed
-if helm list -n "${MONITORING_NS}" 2>/dev/null | grep -q lgtm-grafana; then
+if helm list -n "${MONITORING_NS}" 2>/dev/null | grep -q "^loki "; then
   success "LGTM stack already deployed"
   exit 0
 fi
 
-# ── 1. Namespace & Linkerd ─────────────────────────────────────────────────────
+# ── 1. Namespace ─────────────────────────────────────────────────────────────
 info "Configuring Namespace '${MONITORING_NS}'..."
 kubectl create namespace "${MONITORING_NS}" --dry-run=client -o yaml | kubectl apply -f -
 
@@ -37,13 +37,7 @@ fi
 
 # ── 3. S3 Configuration ────────────────────────────────────────────────────────
 VALUES_DIR="$(resolve_values_dir)"
-BASE_VALUES="${VALUES_DIR}/lgtm-values.yaml"
 
-if [[ ! -f "${BASE_VALUES}" ]]; then
-  die "Values file not found: ${BASE_VALUES}"
-fi
-
-# Prompt for S3 (single bucket with prefixes)
 echo ""
 echo "=== S3 Bucket Configuration (Single Bucket with Prefixes) ==="
 echo ""
@@ -59,18 +53,13 @@ fi
 S3_REGION="${S3_REGION:-us-east-1}"
 
 # Use single bucket with prefixes
-LOKI_CHUNKS_BUCKET="${S3_BUCKET}/loki"
-LOKI_RULER_BUCKET="${S3_BUCKET}/loki-ruler"
-LOKI_ADMIN_BUCKET="${S3_BUCKET}/loki-admin"
-TEMPO_BUCKET="${S3_BUCKET}/tempo"
-MIMIR_BLOCKS_BUCKET="${S3_BUCKET}/mimir"
-MIMIR_ALERTMANAGER_BUCKET="${S3_BUCKET}/mimir-alertmanager"
-MIMIR_RULER_BUCKET="${S3_BUCKET}/mimir-ruler"
-
-# Export for helm (values file will use these env vars)
-export LOKI_CHUNKS_BUCKET LOKI_RULER_BUCKET LOKI_ADMIN_BUCKET
-export TEMPO_BUCKET
-export MIMIR_BLOCKS_BUCKET MIMIR_ALERTMANAGER_BUCKET MIMIR_RULER_BUCKET
+export LOKI_CHUNKS_BUCKET="${S3_BUCKET}/loki"
+export LOKI_RULER_BUCKET="${S3_BUCKET}/loki-ruler"
+export LOKI_ADMIN_BUCKET="${S3_BUCKET}/loki-admin"
+export TEMPO_BUCKET="${S3_BUCKET}/tempo"
+export MIMIR_BLOCKS_BUCKET="${S3_BUCKET}/mimir"
+export MIMIR_ALERTMANAGER_BUCKET="${S3_BUCKET}/mimir-alertmanager"
+export MIMIR_RULER_BUCKET="${S3_BUCKET}/mimir-ruler"
 export S3_REGION
 
 info "S3 Configuration:"
@@ -80,64 +69,62 @@ echo "  Tempo:     ${TEMPO_BUCKET}"
 echo "  Mimir:     ${MIMIR_BLOCKS_BUCKET}"
 echo "  Region:    ${S3_REGION}"
 
-# ── 4. Generate Values ───────────────────────────────────────────────────────
+# ── 4. Generate Values from templates ────────────────────────────────────────
 generate_values() {
-  local service="$1"
-  local outfile="/tmp/values-${service}.yaml"
+  local template="$1"
+  local outfile="$2"
   
-  # Create temp file with env var replacements
-  cp "${BASE_VALUES}" /tmp/lgtm-temp.yaml
-  
-  # Replace ${VAR} placeholders with actual values
-  sed -i "s|\${S3_BUCKET}|${S3_BUCKET}|g" /tmp/lgtm-temp.yaml
-  sed -i "s|\${S3_REGION}|${S3_REGION}|g" /tmp/lgtm-temp.yaml
-  sed -i "s|\${LOKI_CHUNKS_BUCKET}|${LOKI_CHUNKS_BUCKET}|g" /tmp/lgtm-temp.yaml
-  sed -i "s|\${LOKI_RULER_BUCKET}|${LOKI_RULER_BUCKET}|g" /tmp/lgtm-temp.yaml
-  sed -i "s|\${LOKI_ADMIN_BUCKET}|${LOKI_ADMIN_BUCKET}|g" /tmp/lgtm-temp.yaml
-  sed -i "s|\${TEMPO_BUCKET}|${TEMPO_BUCKET}|g" /tmp/lgtm-temp.yaml
-  sed -i "s|\${MIMIR_BLOCKS_BUCKET}|${MIMIR_BLOCKS_BUCKET}|g" /tmp/lgtm-temp.yaml
-  sed -i "s|\${MIMIR_ALERTMANAGER_BUCKET}|${MIMIR_ALERTMANAGER_BUCKET}|g" /tmp/lgtm-temp.yaml
-  sed -i "s|\${MIMIR_RULER_BUCKET}|${MIMIR_RULER_BUCKET}|g" /tmp/lgtm-temp.yaml
-  
-  # Use the full config
-  cp /tmp/lgtm-temp.yaml "${outfile}"
-  rm -f /tmp/lgtm-temp.yaml
+  # Read template and replace env vars
+  sed -e "s|\${S3_BUCKET}|${S3_BUCKET}|g" \
+      -e "s|\${S3_REGION}|${S3_REGION}|g" \
+      -e "s|\${LOKI_CHUNKS_BUCKET}|${LOKI_CHUNKS_BUCKET}|g" \
+      -e "s|\${LOKI_RULER_BUCKET}|${LOKI_RULER_BUCKET}|g" \
+      -e "s|\${LOKI_ADMIN_BUCKET}|${LOKI_ADMIN_BUCKET}|g" \
+      -e "s|\${TEMPO_BUCKET}|${TEMPO_BUCKET}|g" \
+      -e "s|\${MIMIR_BLOCKS_BUCKET}|${MIMIR_BLOCKS_BUCKET}|g" \
+      -e "s|\${MIMIR_ALERTMANAGER_BUCKET}|${MIMIR_ALERTMANAGER_BUCKET}|g" \
+      -e "s|\${MIMIR_RULER_BUCKET}|${MIMIR_RULER_BUCKET}|g" \
+      "${template}" > "${outfile}"
 }
 
 # ── 5. Helm Deploy ─────────────────────────────────────────────────────────────
 helm repo add grafana https://grafana.github.io/helm-charts --force-update
 helm repo update grafana >/dev/null
 
-helm_deploy() {
-  local release="$1"
-  local chart="$2"
-  local version="$3"
-  local service_key="$4"
-  local timeout="${5:-10m}"
+# Loki
+info "Installing Loki..."
+generate_values "${VALUES_DIR}/loki-values.yaml" /tmp/loki-values.yaml
+helm upgrade --install loki grafana/loki \
+  --namespace "${MONITORING_NS}" \
+  --version "${LOKI_CHART_VERSION}" \
+  --values /tmp/loki-values.yaml \
+  --wait --timeout 10m
 
-  generate_values "${service_key}"
-  local values_file="/tmp/values-${service_key}.yaml"
+# Tempo
+info "Installing Tempo..."
+generate_values "${VALUES_DIR}/tempo-values.yaml" /tmp/tempo-values.yaml
+helm upgrade --install tempo grafana/tempo \
+  --namespace "${MONITORING_NS}" \
+  --version "${TEMPO_CHART_VERSION}" \
+  --values /tmp/tempo-values.yaml \
+  --wait --timeout 10m
 
-  local action="install"
-  helm list -n "${MONITORING_NS}" -q | grep -q "^${release}$" && action="upgrade"
+# Mimir
+info "Installing Mimir..."
+generate_values "${VALUES_DIR}/mimir-values.yaml" /tmp/mimir-values.yaml
+helm upgrade --install mimir grafana/mimir-distributed \
+  --namespace "${MONITORING_NS}" \
+  --version "${MIMIR_CHART_VERSION}" \
+  --values /tmp/mimir-values.yaml \
+  --wait --timeout 10m
 
-  info "${action^}ing ${release}..."
-  helm ${action} "${release}" "${chart}" \
-    --namespace "${MONITORING_NS}" \
-    --version "${version}" \
-    --values "${values_file}" \
-    --wait \
-    --timeout "${timeout}"
-
-  success "${release} Ready"
-  rm -f "${values_file}"
-}
-
-# Deploy (increased timeout for Loki)
-helm_deploy lgtm-loki    grafana/loki               "${LOKI_CHART_VERSION}"    "loki"    15m
-helm_deploy lgtm-tempo   grafana/tempo              "${TEMPO_CHART_VERSION}"   "tempo"   10m
-helm_deploy lgtm-mimir   grafana/mimir-distributed  "${MIMIR_CHART_VERSION}"  "mimir"   15m
-helm_deploy lgtm-grafana grafana/grafana            "${GRAFANA_CHART_VERSION}"  "grafana" 10m
+# Grafana
+info "Installing Grafana..."
+helm upgrade --install grafana grafana/grafana \
+  --namespace "${MONITORING_NS}" \
+  --version "${GRAFANA_CHART_VERSION}" \
+  --values "${VALUES_DIR}/grafana-values.yaml" \
+  --wait --timeout 10m
 
 # ── 6. Ingress (HTTP) ─────────────────────────────────────────────────────────
 info "Applying Ingress Rules..."
@@ -160,30 +147,9 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: lgtm-grafana
+                name: grafana
                 port:
                   number: 3000
-          - path: /api/v1/push
-            pathType: Prefix
-            backend:
-              service:
-                name: lgtm-mimir-gateway
-                port:
-                  number: 80
-          - path: /loki
-            pathType: Prefix
-            backend:
-              service:
-                name: lgtm-loki
-                port:
-                  number: 3100
-          - path: /tempo
-            pathType: Prefix
-            backend:
-              service:
-                name: lgtm-tempo
-                port:
-                  number: 3200
 EOF
 
 # ── Summary ─────────────────────────────────────────────────────────────────

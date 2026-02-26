@@ -12,16 +12,12 @@
 # Skip completed phases after a partial/failed install:
 #   SKIP_K0S=true SKIP_HAPROXY=true sudo bash install_all.sh
 #
-# Non-interactive mode (skip confirmation):
-#   YES=true sudo bash install_all.sh
-#
 # Available skip flags:
 #   SKIP_K0S=true        skip scripts/install_k0s.sh
-#   SKIP_HAPROXY=true   skip scripts/install_HAProxy.sh
-#   SKIP_POSTGRES=true  skip scripts/install_Postgres.sh
-#   SKIP_SECRETS=true   skip scripts/install_secrets.sh
-#   SKIP_LGTM=true      skip scripts/install_LGTM.sh
-#   SKIP_BACKUP=true    skip scripts/backup_all.sh
+#   SKIP_HAPROXY=true    skip scripts/install_HAProxy.sh
+#   SKIP_SECRETS=true    skip scripts/install_secrets.sh
+#   SKIP_LGTM=true       skip scripts/install_LGTM.sh
+#   SKIP_BACKUP=true     skip scripts/backup_all.sh
 #
 # Project structure expected:
 #   install_all.sh          ← this file
@@ -51,7 +47,6 @@ require_root
 # ── Skip flags ────────────────────────────────────────────────────────────────────
 SKIP_K0S="${SKIP_K0S:-false}"
 SKIP_HAPROXY="${SKIP_HAPROXY:-false}"
-SKIP_POSTGRES="${SKIP_POSTGRES:-false}"
 SKIP_SECRETS="${SKIP_SECRETS:-false}"
 SKIP_LGTM="${SKIP_LGTM:-false}"
 SKIP_BACKUP="${SKIP_BACKUP:-false}"
@@ -107,10 +102,12 @@ for script in \
 done
 
 for vfile in \
-  "${VALUES_DIR}/lgtm-values.yaml" \
+  "${VALUES_DIR}/loki-values.yaml" \
+  "${VALUES_DIR}/tempo-values.yaml" \
+  "${VALUES_DIR}/mimir-values.yaml" \
+  "${VALUES_DIR}/grafana-values.yaml" \
   "${VALUES_DIR}/haproxy-values.yaml" \
-  "${VALUES_DIR}/ingress-values.yaml" \
-  "${VALUES_DIR}/postgres-values.yaml"; do
+  "${VALUES_DIR}/ingress-values.yaml"; do
   if [[ -f "$vfile" ]]; then
     info "  found: ${vfile##"${ROOT_DIR}/"}"
   else
@@ -148,10 +145,7 @@ _run_phase 1 "k0s — System prep + Kubernetes + Helm" \
 _run_phase 2 "HAProxy — Ingress Controller (HTTP 80)" \
   "${SKIP_HAPROXY}" "${SCRIPTS_DIR}/install_HAProxy.sh"
 
-_run_phase 3 "PostgreSQL — Database for HA" \
-  "${SKIP_POSTGRES}" "${SCRIPTS_DIR}/install_Postgres.sh"
-
-_run_phase 4 "Secrets — Grafana admin credentials" \
+_run_phase 3 "Secrets — Grafana admin credentials" \
   "${SKIP_SECRETS}" "${SCRIPTS_DIR}/install_secrets.sh"
 
 _run_phase 5 "LGTM — Loki · Tempo · Mimir · Grafana" \
