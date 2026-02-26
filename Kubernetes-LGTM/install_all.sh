@@ -48,6 +48,7 @@ require_root
 SKIP_K0S="${SKIP_K0S:-false}"
 SKIP_HAPROXY="${SKIP_HAPROXY:-false}"
 SKIP_SECRETS="${SKIP_SECRETS:-false}"
+SKIP_POSTGRES="${SKIP_POSTGRES:-false}"
 SKIP_LGTM="${SKIP_LGTM:-false}"
 SKIP_BACKUP="${SKIP_BACKUP:-false}"
 YES="${YES:-false}"
@@ -147,6 +148,9 @@ _run_phase 2 "HAProxy — Ingress Controller (HTTP 80)" \
 
 _run_phase 3 "Secrets — Grafana admin credentials" \
   "${SKIP_SECRETS}" "${SCRIPTS_DIR}/install_secrets.sh"
+
+_run_phase 4 "PostgreSQL — HA Database (2 Instances)" \
+  "${SKIP_POSTGRES:-false}" "${SCRIPTS_DIR}/install_Postgres.sh"
 
 _run_phase 5 "LGTM — Loki · Tempo · Mimir · Grafana" \
   "${SKIP_LGTM}" "${SCRIPTS_DIR}/install_LGTM.sh"

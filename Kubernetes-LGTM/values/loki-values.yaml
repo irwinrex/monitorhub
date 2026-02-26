@@ -1,8 +1,6 @@
-# Loki Values - Simple (Single Binary)
 fullnameOverride: loki
 
-# Disable tests
-tests:
+test:
   enabled: false
 
 mode: simple
@@ -31,8 +29,8 @@ monitoring:
 
 memcached:
   enabled: false
-memcachedExporter:
-  enabled: false
+  memcachedExporter:
+    enabled: false
 
 chunksCache:
   enabled: false
@@ -44,9 +42,7 @@ auth_enabled: false
 loki:
   commonConfig:
     replication_factor: 1
-  
   prefix: "loki"
-  
   storage:
     type: s3
     bucketNames:
@@ -61,7 +57,6 @@ loki:
       chunk_prefix: "loki/chunks/"
       ruler_prefix: "loki/ruler/"
       admin_prefix: "loki/admin/"
-  
   schemaConfig:
     configs:
       - from: "2024-01-01"
@@ -72,20 +67,17 @@ loki:
           prefix: loki_index_
           period: 24h
         object_store_prefix: "loki"
-  
   limits_config:
     retention_period: 720h
     allow_structured_metadata: true
     volume_enabled: true
-
-resources:
-  requests:
-    cpu: 500m
-    memory: 512Mi
-  limits:
-    cpu: 1000m
-    memory: 1Gi
-
-service:
-  port: 3100
-  type: ClusterIP
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  service:
+    port: 3100
+    type: ClusterIP
