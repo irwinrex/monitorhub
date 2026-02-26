@@ -1,6 +1,7 @@
 # LGTM Stack Values - S3 Backend Configuration
 # Uses IAM role for S3 access (no credentials needed)
 # Pod-to-pod communication via gRPC
+# All S3 config via environment variables
 
 ---
 # Loki
@@ -23,15 +24,14 @@ loki:
   storage:
     type: s3
     bucketNames:
-      chunks: loki-chunks
-      ruler: loki-ruler
-      admin: loki-admin
+      chunks: "${LOKI_CHUNKS_BUCKET}"
+      ruler: "${LOKI_RULER_BUCKET}"
+      admin: "${LOKI_ADMIN_BUCKET}"
     s3:
-      region: us-east-1
+      region: "${S3_REGION}"
       s3ForcePathStyle: true
       insecure: false
 
-  # gRPC configuration for pod-to-pod
   config:
     grpc_listen_port: 9096
     grpc_server_max_concurrent_streams: 100
@@ -60,8 +60,8 @@ tempo:
     trace:
       backend: s3
       s3:
-        region: us-east-1
-        bucket: tempo-traces
+        region: "${S3_REGION}"
+        bucket: "${TEMPO_BUCKET}"
 
   config:
     auth_enabled: false
@@ -102,7 +102,6 @@ tempo:
 mimir:
   enabled: true
 
-  # gRPC configuration for pod-to-pod communication
   config:
     server:
       grpc_listen_port: 9095
@@ -118,26 +117,26 @@ mimir:
       storage:
         backend: s3
         s3:
-          region: us-east-1
-          bucket_name: mimir-blocks
+          region: "${S3_REGION}"
+          bucket_name: "${MIMIR_BLOCKS_BUCKET}"
 
     blocks_storage:
       backend: s3
       s3:
-        region: us-east-1
-        bucket_name: mimir-blocks
+        region: "${S3_REGION}"
+        bucket_name: "${MIMIR_BLOCKS_BUCKET}"
 
     alertmanager_storage:
       backend: s3
       s3:
-        region: us-east-1
-        bucket_name: mimir-alertmanager
+        region: "${S3_REGION}"
+        bucket_name: "${MIMIR_ALERTMANAGER_BUCKET}"
 
     ruler_storage:
       backend: s3
       s3:
-        region: us-east-1
-        bucket_name: mimir-ruler
+        region: "${S3_REGION}"
+        bucket_name: "${MIMIR_RULER_BUCKET}"
 
     ingester:
       ring:

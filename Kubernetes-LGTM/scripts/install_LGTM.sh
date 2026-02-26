@@ -61,8 +61,17 @@ S3_REGION="${S3_REGION:-us-east-1}"
 # Use single bucket with prefixes
 LOKI_CHUNKS_BUCKET="${S3_BUCKET}/loki"
 LOKI_RULER_BUCKET="${S3_BUCKET}/loki-ruler"
+LOKI_ADMIN_BUCKET="${S3_BUCKET}/loki-admin"
 TEMPO_BUCKET="${S3_BUCKET}/tempo"
 MIMIR_BLOCKS_BUCKET="${S3_BUCKET}/mimir"
+MIMIR_ALERTMANAGER_BUCKET="${S3_BUCKET}/mimir-alertmanager"
+MIMIR_RULER_BUCKET="${S3_BUCKET}/mimir-ruler"
+
+# Export for helm (values file will use these env vars)
+export LOKI_CHUNKS_BUCKET LOKI_RULER_BUCKET LOKI_ADMIN_BUCKET
+export TEMPO_BUCKET
+export MIMIR_BLOCKS_BUCKET MIMIR_ALERTMANAGER_BUCKET MIMIR_RULER_BUCKET
+export S3_REGION
 
 info "S3 Configuration:"
 echo "  Bucket:    ${S3_BUCKET}"
@@ -79,35 +88,18 @@ generate_values() {
   # Create temp file with bucket replacements
   cp "${BASE_VALUES}" /tmp/lgtm-temp.yaml
   
-  # Replace bucket placeholders (single bucket with prefixes)
-  sed -i "s|loki-chunks|${S3_BUCKET}/loki|g" /tmp/lgtm-temp.yaml
-  sed -i "s|loki-ruler|${S3_BUCKET}/loki-ruler|g" /tmp/lgtm-temp.yaml
-  sed -i "s|loki-admin|${S3_BUCKET}/loki-admin|g" /tmp/lgtm-temp.yaml
-  sed -i "s|tempo-traces|${S3_BUCKET}/tempo|g" /tmp/lgtm-temp.yaml
-  sed -i "s|mimir-blocks|${S3_BUCKET}/mimir|g" /tmp/lgtm-temp.yaml
-  sed -i "s|mimir-alertmanager|${S3_BUCKET}/mimir-alertmanager|g" /tmp/lgtm-temp.yaml
-  sed -i "s|mimir-ruler|${S3_BUCKET}/mimir-ruler|g" /tmp/lgtm-temp.yaml
-  sed -i "s/us-east-1/${S3_REGION}/g" /tmp/lgtm-temp.yaml
+  # Replace bucket placeholders using env vars
+  sed -i "s|\${LOKI_CHUNKS_BUCKET}|${LOKI_CHUNKS_BUCKET}|g" /tmp/lgtm-temp.yaml
+  sed -i "s|\${LOKI_RULER_BUCKET}|${LOKI_RULER_BUCKET}|g" /tmp/lgtm-temp.yaml
+  sed -i "s|\${LOKI_ADMIN_BUCKET}|${LOKI_ADMIN_BUCKET}|g" /tmp/lgtm-temp.yaml
+  sed -i "s|\${TEMPO_BUCKET}|${TEMPO_BUCKET}|g" /tmp/lgtm-temp.yaml
+  sed -i "s|\${MIMIR_BLOCKS_BUCKET}|${MIMIR_BLOCKS_BUCKET}|g" /tmp/lgtm-temp.yaml
+  sed -i "s|\${MIMIR_ALERTMANAGER_BUCKET}|${MIMIR_ALERTMANAGER_BUCKET}|g" /tmp/lgtm-temp.yaml
+  sed -i "s|\${MIMIR_RULER_BUCKET}|${MIMIR_RULER_BUCKET}|g" /tmp/lgtm-temp.yaml
+  sed -i "s|\${S3_REGION}|${S3_REGION}|g" /tmp/lgtm-temp.yaml
   
-  python3 -c "
-import yaml
-
-service = '${service}'
-
-with open('/tmp/lgtm-temp.yaml', 'r') as f:
-    docs = list(yaml.safe_load_all(f))
-
-full_config = {}
-for doc in docs:
-    if doc:
-        full_config.update(doc)
-
-config = full_config.get(service, {})
-
-with open('${outfile}', 'w') as f:
-    yaml.dump(config, f)
-"
-
+  # Use the full config
+  cp /tmp/lgtm-temp.yaml "${outfile}"
   rm -f /tmp/lgtm-temp.yaml
 }
 
