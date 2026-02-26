@@ -196,6 +196,16 @@ helm repo add haproxytech https://haproxytech.github.io/helm-charts --force-upda
 helm repo add grafana https://grafana.github.io/helm-charts --force-update
 helm repo update >/dev/null
 
+info "Installing Local Path Provisioner for PVC support..."
+if ! kubectl get sc local-path &>/dev/null; then
+  kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
+  kubectl -n local-path-storage rollout status deployment/local-path-provisioner --timeout=2m
+  kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+  success "Local Path Provisioner installed"
+else
+  info "Local Path Provisioner already installed. Skipping."
+fi
+
 info "Creating namespaces..."
 kubectl create namespace "${MONITORING_NS}" --dry-run=client -o yaml | kubectl apply -f -
 

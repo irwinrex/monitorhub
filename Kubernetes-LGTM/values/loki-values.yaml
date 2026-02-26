@@ -1,62 +1,74 @@
 fullnameOverride: loki
 
-test:
-  enabled: false
-
 deploymentMode: SingleBinary
 
+singleBinary:
+  replicas: 1
+
+  persistence:
+    enabled: true
+    size: 30Gi
+    accessModes:
+      - ReadWriteOnce
+    storageClass: local-path
+
+  extraArgs:
+    - -config.expand-env=true
+
+  podDisruptionBudget:
+    enabled: true
+    maxUnavailable: 0
+
 write:
-  enabled: false
+  replicas: 0
 read:
-  enabled: false
+  replicas: 0
 backend:
+  replicas: 0
+
+gateway:
   enabled: false
 
 lokiCanary:
   enabled: false
 
-monitoring:
-  dashboards:
-    enabled: false
-  rules:
-    enabled: false
-  alerts:
-    enabled: false
-  serviceMonitor:
-    enabled: false
-  selfMonitoring:
-    enabled: false
-
 memcached:
   enabled: false
-  memcachedExporter:
-    enabled: false
-
 chunksCache:
   enabled: false
 resultsCache:
   enabled: false
 
-auth_enabled: false
-
 loki:
+  auth_enabled: false
+
   commonConfig:
     replication_factor: 1
-  prefix: "loki"
-  storage:
-    type: s3
-    bucketNames:
-      chunks: ${S3_BUCKET}
-      ruler: ${S3_BUCKET}
-      admin: ${S3_BUCKET}
-    s3:
-      region: ${S3_REGION}
-      s3ForcePathStyle: true
-      insecure: false
-    config:
-      chunk_prefix: "loki/chunks/"
-      ruler_prefix: "loki/ruler/"
-      admin_prefix: "loki/admin/"
+    ring:
+      kvstore:
+        store: inmemory
+
+  server:
+    http_listen_port: 3100
+    grpc_listen_port: 9095
+    log_level: info
+
+  ingester:
+    wal:
+      enabled: true
+      dir: /var/loki/wal
+      replay_memory_ceiling: 1GB
+    chunk_idle_period: 5m
+    chunk_retain_period: 1m
+    max_transfer_retries: 0
+
+  compactor:
+    working_directory: /var/loki/compactor
+    compaction_interval: 5m
+    retention_enabled: true
+    delete_request_store: s3
+    retention_delete_delay: 2h
+
   schemaConfig:
     configs:
       - from: "2024-01-01"
@@ -66,18 +78,50 @@ loki:
         index:
           prefix: loki_index_
           period: 24h
-        object_store_prefix: "loki"
+
+  storage:
+    type: s3
+    bucketNames:
+      chunks: ${S3_BUCKET}
+      ruler: ${S3_BUCKET}
+      admin: ${S3_BUCKET}
+    s3:
+      region: ${S3_REGION}
+      s3ForcePathStyle: false
+      insecure: false
+    config:
+      chunk_prefix: "lgtm-prod/loki/chunks/"
+      ruler_prefix: "lgtm-prod/loki/ruler/"
+      admin_prefix: "lgtm-prod/loki/admin/"
+
   limits_config:
     retention_period: 720h
+    ingestion_rate_mb: 10
+    ingestion_burst_size_mb: 20
+    max_streams_per_user: 10000
+    max_global_streams_per_user: 10000
+    max_entries_limit_per_query: 5000
+    reject_old_samples: true
+    reject_old_samples_max_age: 168h
     allow_structured_metadata: true
-    volume_enabled: true
+
+  querier:
+    max_concurrent: 4
+
+  query_scheduler:
+    max_outstanding_requests_per_tenant: 2048
+
+  frontend:
+    max_outstanding_per_tenant: 2048
+
   resources:
     requests:
       cpu: 500m
-      memory: 512Mi
-    limits:
-      cpu: 1000m
       memory: 1Gi
+    limits:
+      cpu: 2
+      memory: 2Gi
+
   service:
-    port: 3100
     type: ClusterIP
+    port: 3100
