@@ -142,7 +142,7 @@ TOTAL_START=$SECONDS
 _run_phase 1 "k0s — System prep + Kubernetes + Helm" \
   "${SKIP_K0S}" "${SCRIPTS_DIR}/install_k0s.sh"
 
-_run_phase 2 "HAProxy — Ingress Controller (HTTP 80)" \
+_run_phase 2 "HAProxy — Ingress Controller" \
   "${SKIP_HAPROXY}" "${SCRIPTS_DIR}/install_HAProxy.sh"
 
 _run_phase 3 "Secrets — Grafana admin credentials" \
