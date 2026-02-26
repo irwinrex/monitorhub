@@ -1,47 +1,78 @@
-# Loki Values - Single Binary (Monolithic)
+# Loki Values - Simple (Single Binary)
 fullnameOverride: loki
 
-singleBinary:
-  enabled: true
-  replicas: 1
+mode: simple
+
+write:
+  enabled: false
+read:
+  enabled: false
+backend:
+  enabled: false
 
 lokiCanary:
   enabled: false
 
+monitoring:
+  dashboards:
+    enabled: false
+  rules:
+    enabled: false
+  alerts:
+    enabled: false
+  serviceMonitor:
+    enabled: false
+  selfMonitoring:
+    enabled: false
+
 memcached:
+  enabled: false
+memcachedExporter:
+  enabled: false
+
+chunksCache:
+  enabled: false
+resultsCache:
   enabled: false
 
 auth_enabled: false
 
-commonConfig:
-  replication_factor: 1
-
-schemaConfig:
-  configs:
-    - from: 2024-01-01
-      store: tsdb
-      object_store: s3
-      schema: v13
-      index:
-        prefix: loki_index_
-        period: 24h
-
-storage:
-  type: s3
-  bucketNames:
-    chunks: ${S3_BUCKET}/loki-chunks
-    ruler: ${S3_BUCKET}/loki-ruler
-    admin: ${S3_BUCKET}/loki-admin
-  s3:
-    region: ${S3_REGION}
-    s3ForcePathStyle: true
-    insecure: false
-
-chunksCache:
-  enabled: false
-
-resultsCache:
-  enabled: false
+loki:
+  commonConfig:
+    replication_factor: 1
+  
+  prefix: "loki"
+  
+  storage:
+    type: s3
+    bucketNames:
+      chunks: ${S3_BUCKET}
+      ruler: ${S3_BUCKET}
+      admin: ${S3_BUCKET}
+    s3:
+      region: ${S3_REGION}
+      s3ForcePathStyle: true
+      insecure: false
+    config:
+      chunk_prefix: "loki/chunks/"
+      ruler_prefix: "loki/ruler/"
+      admin_prefix: "loki/admin/"
+  
+  schemaConfig:
+    configs:
+      - from: "2024-01-01"
+        store: tsdb
+        object_store: s3
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+        object_store_prefix: "loki"
+  
+  limits_config:
+    retention_period: 720h
+    allow_structured_metadata: true
+    volume_enabled: true
 
 resources:
   requests:
@@ -50,3 +81,7 @@ resources:
   limits:
     cpu: 1000m
     memory: 1Gi
+
+service:
+  port: 3100
+  type: ClusterIP
