@@ -3,7 +3,7 @@ fullnameOverride: loki
 test:
   enabled: false
 
-mode: SingleBinary
+deploymentMode: SingleBinary
 
 write:
   enabled: false
