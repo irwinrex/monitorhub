@@ -85,10 +85,12 @@ generate_values() {
   local service="$1"
   local outfile="/tmp/values-${service}.yaml"
   
-  # Create temp file with bucket replacements
+  # Create temp file with env var replacements
   cp "${BASE_VALUES}" /tmp/lgtm-temp.yaml
   
-  # Replace bucket placeholders using env vars
+  # Replace ${VAR} placeholders with actual values
+  sed -i "s|\${S3_BUCKET}|${S3_BUCKET}|g" /tmp/lgtm-temp.yaml
+  sed -i "s|\${S3_REGION}|${S3_REGION}|g" /tmp/lgtm-temp.yaml
   sed -i "s|\${LOKI_CHUNKS_BUCKET}|${LOKI_CHUNKS_BUCKET}|g" /tmp/lgtm-temp.yaml
   sed -i "s|\${LOKI_RULER_BUCKET}|${LOKI_RULER_BUCKET}|g" /tmp/lgtm-temp.yaml
   sed -i "s|\${LOKI_ADMIN_BUCKET}|${LOKI_ADMIN_BUCKET}|g" /tmp/lgtm-temp.yaml
@@ -96,7 +98,6 @@ generate_values() {
   sed -i "s|\${MIMIR_BLOCKS_BUCKET}|${MIMIR_BLOCKS_BUCKET}|g" /tmp/lgtm-temp.yaml
   sed -i "s|\${MIMIR_ALERTMANAGER_BUCKET}|${MIMIR_ALERTMANAGER_BUCKET}|g" /tmp/lgtm-temp.yaml
   sed -i "s|\${MIMIR_RULER_BUCKET}|${MIMIR_RULER_BUCKET}|g" /tmp/lgtm-temp.yaml
-  sed -i "s|\${S3_REGION}|${S3_REGION}|g" /tmp/lgtm-temp.yaml
   
   # Use the full config
   cp /tmp/lgtm-temp.yaml "${outfile}"
