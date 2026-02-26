@@ -6,8 +6,8 @@
 # Usage:
 #   sudo bash install_all.sh
 #
-# With custom Grafana password:
-#   GRAFANA_ADMIN_PASSWORD="strong-pass" sudo -E bash install_all.sh
+# With S3 backup configuration:
+#   S3_BUCKET=my-bucket S3_REGION=us-east-1 sudo -E bash install_all.sh
 #
 # Skip completed phases after a partial/failed install:
 #   SKIP_K0S=true SKIP_HAPROXY=true sudo bash install_all.sh
@@ -21,6 +21,7 @@
 #   SKIP_POSTGRES=true  skip scripts/install_Postgres.sh
 #   SKIP_SECRETS=true   skip scripts/install_secrets.sh
 #   SKIP_LGTM=true      skip scripts/install_LGTM.sh
+#   SKIP_BACKUP=true    skip scripts/backup_all.sh
 #
 # Project structure expected:
 #   install_all.sh          ← this file
@@ -53,6 +54,7 @@ SKIP_HAPROXY="${SKIP_HAPROXY:-false}"
 SKIP_POSTGRES="${SKIP_POSTGRES:-false}"
 SKIP_SECRETS="${SKIP_SECRETS:-false}"
 SKIP_LGTM="${SKIP_LGTM:-false}"
+SKIP_BACKUP="${SKIP_BACKUP:-false}"
 YES="${YES:-false}"
 
 # ── Phase runner helpers ──────────────────────────────────────────────────────
@@ -94,7 +96,8 @@ for script in \
   "${SCRIPTS_DIR}/install_HAProxy.sh" \
   "${SCRIPTS_DIR}/install_Postgres.sh" \
   "${SCRIPTS_DIR}/install_secrets.sh" \
-  "${SCRIPTS_DIR}/install_LGTM.sh"; do
+  "${SCRIPTS_DIR}/install_LGTM.sh" \
+  "${SCRIPTS_DIR}/backup_all.sh"; do
   if [[ -f "$script" ]]; then
     info "  found: ${script##"${ROOT_DIR}/"}"
   else
@@ -122,7 +125,7 @@ success "All required files present"
 # ── Confirm ───────────────────────────────────────────────────────────────────
 if [[ "${YES}" != "true" ]]; then
   echo ""
-  warn "This will install k0s, HAProxy, Linkerd (mTLS), and LGTM stack."
+  warn "This will install k0s, HAProxy, PostgreSQL, and LGTM stack."
   warn "Intended for a FRESH Debian 12 ARM64 instance (t4g.xlarge)."
   echo ""
   read -r -p "  Continue? [y/N] " confirm
@@ -133,6 +136,36 @@ if [[ "${YES}" != "true" ]]; then
 else
   info "Running in non-interactive mode (YES=true)"
 fi
+
+# ── S3 Backup Configuration ───────────────────────────────────────────────────
+echo ""
+info "=== S3 Backup Configuration ==="
+echo ""
+
+if [[ -z "${S3_BUCKET:-}" ]]; then
+  read -r -p "Enter S3 bucket name for backups: " S3_BUCKET
+fi
+
+if [[ -z "${S3_BUCKET}" ]]; then
+  die "S3_BUCKET is required for backups."
+fi
+
+read -r -p "Enter S3 prefix (default: lgtm-backup): " S3_PREFIX_INPUT
+S3_PREFIX="${S3_PREFIX_INPUT:-lgtm-backup}"
+
+read -r -p "Enter S3 region (default: us-east-1): " S3_REGION_INPUT
+S3_REGION="${S3_REGION_INPUT:-us-east-1}"
+
+read -r -p "Local retention days (default: 7): " LOCAL_RETENTION_INPUT
+LOCAL_RETENTION_DAYS="${LOCAL_RETENTION_INPUT:-7}"
+
+echo ""
+info "S3 Backup: s3://${S3_BUCKET}/${S3_PREFIX} (${S3_REGION})"
+info "Local retention: ${LOCAL_RETENTION_DAYS} days"
+echo ""
+
+# Export for backup script
+export S3_BUCKET S3_PREFIX S3_REGION LOCAL_RETENTION_DAYS
 
 TOTAL_START=$SECONDS
 
@@ -153,6 +186,9 @@ _run_phase 4 "Secrets — Grafana admin credentials" \
 
 _run_phase 5 "LGTM — Loki · Tempo · Mimir · Grafana" \
   "${SKIP_LGTM}" "${SCRIPTS_DIR}/install_LGTM.sh"
+
+_run_phase 6 "Backup — S3 backup configuration" \
+  "${SKIP_BACKUP}" "${SCRIPTS_DIR}/backup_all.sh"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Done
