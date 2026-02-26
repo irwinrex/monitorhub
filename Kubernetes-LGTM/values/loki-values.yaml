@@ -1,21 +1,27 @@
 fullnameOverride: loki
 
-test:
-  enabled: false
-
 deploymentMode: SingleBinary
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: 3100
+  initialDelaySeconds: 60
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 30
+
+livenessProbe:
+  httpGet:
+    path: /ready
+    port: 3100
+  initialDelaySeconds: 120
+  periodSeconds: 20
+  timeoutSeconds: 5
+  failureThreshold: 5
 
 singleBinary:
   replicas: 1
-
-  readinessProbe:
-    httpGet:
-      path: /ready
-      port: 3100
-    initialDelaySeconds: 30
-    periodSeconds: 10
-    timeoutSeconds: 5
-    failureThreshold: 15
 
   persistence:
     enabled: true
@@ -24,13 +30,11 @@ singleBinary:
       - ReadWriteOnce
     storageClass: local-path
 
-  extraArgs:
-    - -config.expand-env=true
-
   podDisruptionBudget:
     enabled: true
     maxUnavailable: 0
 
+# Disable distributed mode
 write:
   replicas: 0
 read:
@@ -51,6 +55,9 @@ chunksCache:
 resultsCache:
   enabled: false
 
+# -----------------------------
+# Loki Config
+# -----------------------------
 loki:
   auth_enabled: false
 
@@ -66,6 +73,9 @@ loki:
     log_level: info
 
   ingester:
+    lifecycler:
+      join_after: 0s
+      observe_period: 0s
     wal:
       enabled: true
       dir: /var/loki/wal
@@ -93,11 +103,11 @@ loki:
   storage:
     type: s3
     bucketNames:
-      chunks: ${S3_BUCKET}
-      ruler: ${S3_BUCKET}
-      admin: ${S3_BUCKET}
+      chunks: your-loki-bucket
+      ruler: your-loki-bucket
+      admin: your-loki-bucket
     s3:
-      region: ${S3_REGION}
+      region: us-east-1
       s3ForcePathStyle: false
       insecure: false
     config:
@@ -127,11 +137,11 @@ loki:
 
   resources:
     requests:
-      cpu: 500m
-      memory: 1Gi
-    limits:
-      cpu: 2
+      cpu: 1
       memory: 2Gi
+    limits:
+      cpu: 3
+      memory: 4Gi
 
   service:
     type: ClusterIP
