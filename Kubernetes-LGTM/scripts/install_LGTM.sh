@@ -97,19 +97,6 @@ helm upgrade --install loki grafana/loki \
   --values /tmp/loki-values.yaml \
   --wait --timeout 10m
 
-# Patch Loki probes (chart has hardcoded values)
-info "Patching Loki probe settings..."
-kubectl patch statefulset loki -n "${MONITORING_NS}" --type json -p='[
-  {"op": "replace", "path": "/spec/template/spec/containers/0/readinessProbe/initialDelaySeconds", "value": 60},
-  {"op": "replace", "path": "/spec/template/spec/containers/0/readinessProbe/periodSeconds", "value": 10},
-  {"op": "replace", "path": "/spec/template/spec/containers/0/readinessProbe/failureThreshold", "value": 30},
-  {"op": "replace", "path": "/spec/template/spec/containers/0/readinessProbe/timeoutSeconds", "value": 5},
-  {"op": "replace", "path": "/spec/template/spec/containers/0/livenessProbe/initialDelaySeconds", "value": 120},
-  {"op": "replace", "path": "/spec/template/spec/containers/0/livenessProbe/periodSeconds", "value": 20},
-  {"op": "replace", "path": "/spec/template/spec/containers/0/livenessProbe/failureThreshold", "value": 10},
-  {"op": "remove", "path": "/spec/template/spec/containers/0/startupProbe"}
-]'
-
 # Tempo
 info "Installing Tempo..."
 apply_values "${VALUES_DIR}/tempo-values.yaml" /tmp/tempo-values.yaml
