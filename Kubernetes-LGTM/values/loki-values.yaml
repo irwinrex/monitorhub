@@ -19,6 +19,21 @@ loki:
     volume_enabled: true
   ruler:
     enable_api: true
+  
+  server:
+    grpc_listen_port: 9095
+    http_listen_port: 3100
+    http_server_read_timeout: "600s"
+    http_server_write_timeout: "600s"
+  
+  # Disable all probes - let Loki start without healthcheck requirements
+  readinessProbe:
+    enabled: false
+  livenessProbe:
+    enabled: false
+  startupProbe:
+    enabled: false
+  
   storage:
     type: s3
     bucketNames:
@@ -69,5 +84,6 @@ bloomCompactor:
   replicas: 0
 bloomGateway:
   replicas: 0
+
 test:
   enabled: false
