@@ -100,7 +100,7 @@ helm upgrade --install loki grafana/loki \
 # Patch Loki probes (chart has hardcoded values)
 info "Patching Loki probe settings..."
 kubectl patch statefulset loki -n "${MONITORING_NS}" --type json -p='[
-  {"op": "add", "path": "/spec/template/spec/containers/0/startupProbe", "value": {"httpGet":{"path":"/ready","port":"http-metrics"},"initialDelaySeconds":30,"periodSeconds":10,"failureThreshold":30,"timeoutSeconds":5}},
+  {"op": "add", "path": "/spec/template/spec/containers/0/startupProbe", "value": {"httpGet":{"path":"/ready","port":3100},"initialDelaySeconds":30,"periodSeconds":10,"failureThreshold":30,"timeoutSeconds":5}},
   {"op": "replace", "path": "/spec/template/spec/containers/0/readinessProbe/initialDelaySeconds", "value": 60},
   {"op": "replace", "path": "/spec/template/spec/containers/0/readinessProbe/periodSeconds", "value": 10},
   {"op": "replace", "path": "/spec/template/spec/containers/0/readinessProbe/failureThreshold", "value": 30},
