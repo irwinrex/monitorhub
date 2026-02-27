@@ -6,8 +6,15 @@
 # Usage:
 #   sudo bash install_all.sh
 #
-# With S3 backup configuration:
+# With S3 configuration via flags:
+#   sudo bash install_all.sh --bucket-name my-bucket --bucket-region us-east-1
+#
+# Or with environment variables:
 #   S3_BUCKET=my-bucket S3_REGION=us-east-1 sudo -E bash install_all.sh
+#
+# Non-interactive mode:
+#   sudo bash install_all.sh -y
+#   sudo bash install_all.sh --yes
 #
 # Skip completed phases after a partial/failed install:
 #   SKIP_K0S=true SKIP_HAPROXY=true sudo bash install_all.sh
@@ -25,12 +32,15 @@
 #     lib/common.sh
 #     install_k0s.sh
 #     install_HAProxy.sh
-#     install_mTLS.sh
 #     install_secrets.sh
 #     install_LGTM.sh
 #   values/
-#     lgtm-values.yaml
+#     loki-values.yaml
+#     tempo-values.yaml
+#     mimir-values.yaml
+#     grafana-values.yaml
 #     haproxy-values.yaml
+#     ingress-values.yaml
 # ==============================================================================
 set -euo pipefail
 IFS=$'\n\t'
@@ -43,6 +53,55 @@ VALUES_DIR="${ROOT_DIR}/values"
 source "${SCRIPTS_DIR}/lib/common.sh"
 
 require_root
+
+# ── Parse arguments ───────────────────────────────────────────────────────────────
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -b|--bucket-name)
+      S3_BUCKET="$2"
+      shift 2
+      ;;
+    --bucket-name=*)
+      S3_BUCKET="${1#*=}"
+      shift
+      ;;
+    -r|--bucket-region)
+      S3_REGION="$2"
+      shift 2
+      ;;
+    --bucket-region=*)
+      S3_REGION="${1#*=}"
+      shift
+      ;;
+    -y|--yes)
+      YES="true"
+      shift
+      ;;
+    -h|--help)
+      echo "Usage: sudo bash install_all.sh [OPTIONS]"
+      echo ""
+      echo "Options:"
+      echo "  -b, --bucket-name NAME     S3 bucket name for backups"
+      echo "  -r, --bucket-region REGION S3 region (e.g., us-east-1)"
+      echo "  -y, --yes                  Run in non-interactive mode"
+      echo "  -h, --help                 Show this help message"
+      echo ""
+      echo "Examples:"
+      echo "  sudo bash install_all.sh"
+      echo "  sudo bash install_all.sh --bucket-name my-bucket --bucket-region us-east-1 -y"
+      echo "  S3_BUCKET=my-bucket S3_REGION=us-east-1 sudo -E bash install_all.sh -y"
+      exit 0
+      ;;
+    *)
+      warn "Unknown option: $1"
+      shift
+      ;;
+  esac
+done
+
+# Export for child scripts
+export S3_BUCKET="${S3_BUCKET:-}"
+export S3_REGION="${S3_REGION:-}"
 
 # ── Skip flags ────────────────────────────────────────────────────────────────────
 SKIP_K0S="${SKIP_K0S:-false}"
@@ -158,17 +217,23 @@ if [[ "${SKIP_BACKUP}" != "true" ]]; then
   
   if [[ -z "${S3_BUCKET:-}" ]]; then
     read -r -p "Enter S3 bucket name for backups: " S3_BUCKET
+  else
+    info "Using S3 bucket from argument: ${S3_BUCKET}"
   fi
   
   if [[ -z "${S3_BUCKET}" ]]; then
     warn "No S3 bucket provided - backup phase will be skipped"
     SKIP_BACKUP=true
   else
+    if [[ -z "${S3_REGION:-}" ]]; then
+      read -r -p "Enter S3 region (default: us-east-1): " S3_REGION_INPUT
+      S3_REGION="${S3_REGION_INPUT:-us-east-1}"
+    else
+      info "Using S3 region from argument: ${S3_REGION}"
+    fi
+    
     read -r -p "Enter S3 prefix (default: lgtm-backup): " S3_PREFIX_INPUT
     S3_PREFIX="${S3_PREFIX_INPUT:-lgtm-backup}"
-    
-    read -r -p "Enter S3 region (default: us-east-1): " S3_REGION_INPUT
-    S3_REGION="${S3_REGION_INPUT:-us-east-1}"
     
     read -r -p "Local retention days (default: 7): " LOCAL_RETENTION_INPUT
     LOCAL_RETENTION_DAYS="${LOCAL_RETENTION_INPUT:-7}"

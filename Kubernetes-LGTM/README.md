@@ -93,10 +93,20 @@ chmod +x install_all.sh scripts/*.sh
 
 ### 4 — Full install
 ```bash
+# Interactive mode
 sudo bash install_all.sh
 
-# Or with a custom Grafana password
-GRAFANA_ADMIN_PASSWORD="strong-password" sudo -E bash install_all.sh
+# Non-interactive mode (skip prompts)
+sudo bash install_all.sh -y
+
+# With S3 configuration via flags
+sudo bash install_all.sh --bucket-name lgtm-observability --bucket-region us-east-1 -y
+
+# Or with environment variables
+S3_BUCKET=lgtm-observability S3_REGION=us-east-1 sudo -E bash install_all.sh -y
+
+# With custom Grafana password
+GRAFANA_ADMIN_PASSWORD="strong-password" sudo bash install_all.sh -y
 ```
 
 ---
