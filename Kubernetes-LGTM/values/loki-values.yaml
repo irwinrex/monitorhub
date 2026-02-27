@@ -1,26 +1,25 @@
 fullnameOverride: loki
-
 deploymentMode: SingleBinary
 
 # -----------------------------
-# Probes
+# Probes — must use http-metrics port
 # -----------------------------
 readinessProbe:
   httpGet:
     path: /ready
-    port: http-loki
+    port: http-metrics
   initialDelaySeconds: 60
-  periodSeconds: 10
   timeoutSeconds: 5
+  periodSeconds: 10
   failureThreshold: 30
 
 livenessProbe:
   httpGet:
     path: /ready
-    port: http-loki
+    port: http-metrics
   initialDelaySeconds: 120
-  periodSeconds: 20
   timeoutSeconds: 5
+  periodSeconds: 20
   failureThreshold: 5
 
 # -----------------------------
@@ -40,11 +39,10 @@ singleBinary:
     enabled: true
     maxUnavailable: 0
 
-  # Service configuration nested under singleBinary for 6.x charts
   service:
     type: ClusterIP
-    port: 3100
     name: http-loki
+    port: 3100
     targetPort: 3100
     protocol: TCP
 
@@ -57,7 +55,7 @@ singleBinary:
       memory: 4Gi
 
 # -----------------------------
-# Disable Distributed Components
+# Disable unused components
 # -----------------------------
 write:
   replicas: 0
@@ -65,16 +63,12 @@ read:
   replicas: 0
 backend:
   replicas: 0
-
 gateway:
   enabled: false
-
 lokiCanary:
   enabled: false
-
 test:
   enabled: false
-
 memcached:
   enabled: false
 chunksCache:
