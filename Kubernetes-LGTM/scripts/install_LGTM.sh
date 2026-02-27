@@ -97,14 +97,6 @@ helm upgrade --install loki grafana/loki \
   --values /tmp/loki-values.yaml \
   --wait --timeout 10m
 
-# Remove probes - Loki chart doesn't support disabling them via values
-info "Removing Loki health probes..."
-kubectl patch statefulset loki -n "${MONITORING_NS}" --type json -p='[
-  {"op": "remove", "path": "/spec/template/spec/containers/0/startupProbe"},
-  {"op": "remove", "path": "/spec/template/spec/containers/0/readinessProbe"},
-  {"op": "remove", "path": "/spec/template/spec/containers/0/livenessProbe"}
-]'
-
 # Tempo
 info "Installing Tempo..."
 apply_values "${VALUES_DIR}/tempo-values.yaml" /tmp/tempo-values.yaml
