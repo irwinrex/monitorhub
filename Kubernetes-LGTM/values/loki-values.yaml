@@ -2,43 +2,10 @@ fullnameOverride: loki
 deploymentMode: SingleBinary
 
 # -----------------------------
-# Probes
-# -----------------------------
-startupProbe:
-  httpGet:
-    path: /ready
-    port: http-metrics
-  initialDelaySeconds: 30
-  periodSeconds: 10
-  failureThreshold: 30
-  timeoutSeconds: 5
-
-readinessProbe:
-  httpGet:
-    path: /ready
-    port: http-metrics
-  initialDelaySeconds: 120
-  periodSeconds: 10
-  timeoutSeconds: 5
-  failureThreshold: 10
-  successThreshold: 1
-
-livenessProbe:
-  httpGet:
-    path: /ready
-    port: http-metrics
-  initialDelaySeconds: 180
-  periodSeconds: 20
-  timeoutSeconds: 5
-  failureThreshold: 6
-  successThreshold: 1
-
-# -----------------------------
-# SingleBinary Configuration
+# Single Binary Configuration
 # -----------------------------
 singleBinary:
   replicas: 1
-
   persistence:
     enabled: true
     size: 30Gi
@@ -46,14 +13,29 @@ singleBinary:
       - ReadWriteOnce
     storageClass: local-path
 
-  podDisruptionBudget:
-    enabled: true
-    maxUnavailable: 0
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: http-loki
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    failureThreshold: 30
+  livenessProbe:
+    httpGet:
+      path: /ready
+      port: http-loki
+    initialDelaySeconds: 120
+    periodSeconds: 20
+
+  extraPorts:
+    - name: http-loki
+      containerPort: 3100
+      protocol: TCP
 
   service:
     type: ClusterIP
-    name: http-loki
     port: 3100
+    name: http-loki
     targetPort: 3100
     protocol: TCP
 
@@ -66,33 +48,10 @@ singleBinary:
       memory: 4Gi
 
 # -----------------------------
-# Disable unused components
-# -----------------------------
-write:
-  replicas: 0
-read:
-  replicas: 0
-backend:
-  replicas: 0
-gateway:
-  enabled: false
-lokiCanary:
-  enabled: false
-test:
-  enabled: false
-memcached:
-  enabled: false
-chunksCache:
-  enabled: false
-resultsCache:
-  enabled: false
-
-# -----------------------------
 # Loki Application Config
 # -----------------------------
 loki:
   auth_enabled: false
-
   commonConfig:
     replication_factor: 1
     ring:
@@ -166,3 +125,22 @@ loki:
 
   frontend:
     max_outstanding_per_tenant: 2048
+
+# -----------------------------
+# Global Overrides (Safety Net)
+# -----------------------------
+# If the chart still insists on http-metrics, we override the name globally
+sidecar:
+  healthcheckPort: 3100
+
+# Disable components
+write:
+  replicas: 0
+read:
+  replicas: 0
+backend:
+  replicas: 0
+gateway:
+  enabled: false
+test:
+  enabled: false
