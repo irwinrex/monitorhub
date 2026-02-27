@@ -7,27 +7,27 @@ deploymentMode: SingleBinary
 startupProbe:
   httpGet:
     path: /ready
-    port: http-metrics    # must match container port name from chart
-  initialDelaySeconds: 30   # wait before first startup check
+    port: http-metrics
+  initialDelaySeconds: 30
   periodSeconds: 10
-  failureThreshold: 30      # tolerate many retries while starting
+  failureThreshold: 30
   timeoutSeconds: 5
 
 readinessProbe:
   httpGet:
     path: /ready
     port: http-metrics
-  initialDelaySeconds: 0       # will wait on startupProbe first
+  initialDelaySeconds: 120
   periodSeconds: 10
   timeoutSeconds: 5
-  failureThreshold: 6
+  failureThreshold: 10
   successThreshold: 1
 
 livenessProbe:
   httpGet:
     path: /ready
     port: http-metrics
-  initialDelaySeconds: 0       # wait on startupProbe
+  initialDelaySeconds: 180
   periodSeconds: 20
   timeoutSeconds: 5
   failureThreshold: 6

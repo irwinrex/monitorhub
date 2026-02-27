@@ -66,47 +66,35 @@ ssh admin@<EC2-IP>
 cd ~/Kubernetes-LGTM
 ```
 
-### 2 — Set your domain, region, and S3 bucket
-```bash
-DOMAIN="grafana.yourdomain.com"
-REGION="us-east-1"
-S3_BUCKET="lgtm-observability"
-
-# Replace in all files that reference them
-sed -i "s/grafana.example.com/${DOMAIN}/g" \
-    values/*.yaml scripts/install_mTLS.sh
-
-sed -i "s/us-east-1/${REGION}/g" \
-    values/*.yaml
-
-sed -i "s/\${S3_BUCKET}/${S3_BUCKET}/g" \
-    values/*.yaml
-
-sed -i "s/\${S3_REGION}/${REGION}/g" \
-    values/*.yaml
-```
-
-### 3 — Make executable
+### 2 — Make executable
 ```bash
 chmod +x install_all.sh scripts/*.sh
 ```
 
-### 4 — Full install
+### 3 — Full install
 ```bash
-# Interactive mode
+# Interactive mode (will prompt for S3 bucket after Phase 4)
 sudo bash install_all.sh
 
-# Non-interactive mode (skip prompts)
+# Non-interactive mode (skip all prompts)
 sudo bash install_all.sh -y
 
 # With S3 configuration via flags
 sudo bash install_all.sh --bucket-name lgtm-observability --bucket-region us-east-1 -y
 
-# Or with environment variables
+# Shorthand
+sudo bash install_all.sh -b lgtm-observability -r us-east-1 -y
+
+# With environment variables
 S3_BUCKET=lgtm-observability S3_REGION=us-east-1 sudo -E bash install_all.sh -y
 
 # With custom Grafana password
 GRAFANA_ADMIN_PASSWORD="strong-password" sudo bash install_all.sh -y
+```
+
+### 4 — Help
+```bash
+sudo bash install_all.sh --help
 ```
 
 ---
@@ -119,7 +107,6 @@ Every script in `scripts/` is fully standalone:
 # Run each phase separately (in order)
 sudo bash scripts/install_k0s.sh
 sudo bash scripts/install_HAProxy.sh
-sudo bash scripts/install_mTLS.sh
 sudo bash scripts/install_secrets.sh
 sudo bash scripts/install_LGTM.sh
 ```
@@ -133,11 +120,11 @@ If `install_all.sh` fails partway, fix the issue and skip completed phases:
 SKIP_K0S=true SKIP_HAPROXY=true sudo bash install_all.sh
 
 # Re-deploy LGTM only (e.g. after editing values files)
-SKIP_K0S=true SKIP_HAPROXY=true SKIP_MTLS=true SKIP_SECRETS=true \
+SKIP_K0S=true SKIP_HAPROXY=true SKIP_SECRETS=true SKIP_BACKUP=true \
     sudo bash install_all.sh
 ```
 
-Available flags: `SKIP_K0S` `SKIP_HAPROXY` `SKIP_MTLS` `SKIP_SECRETS` `SKIP_LGTM`
+Available flags: `SKIP_K0S` `SKIP_HAPROXY` `SKIP_SECRETS` `SKIP_LGTM` `SKIP_BACKUP`
 
 ---
 
