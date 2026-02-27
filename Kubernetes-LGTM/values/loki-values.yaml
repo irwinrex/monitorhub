@@ -72,6 +72,9 @@ gateway:
 lokiCanary:
   enabled: false
 
+test:
+  enabled: false
+
 memcached:
   enabled: false
 chunksCache:
