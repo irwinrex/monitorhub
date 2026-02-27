@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# scripts/install_HAProxy.sh
-# Installs HAProxy Kubernetes Ingress Controller into kube-system.
+# scripts/install_HAproxy.sh
+# Installs HAproxy Kubernetes Ingress Controller into kube-system.
 # ==============================================================================
 set -euo pipefail
 IFS=$'\n\t'
@@ -40,10 +40,10 @@ if helm list -n kube-system -q | grep -q "^haproxy-ingress$"; then
   if [[ "$STATUS" == "deployed" ]]; then
     # If marked deployed, check if pods are actually running
     if kubectl get pods -n kube-system -l app.kubernetes.io/instance=haproxy-ingress 2>/dev/null | grep -q "Running"; then
-      success "HAProxy is already installed and healthy. Skipping."
+      success "HAproxy is already installed and healthy. Skipping."
       exit 0
     else
-      warn "HAProxy is deployed but pods are not running. Re-installing..."
+      warn "HAproxy is deployed but pods are not running. Re-installing..."
     fi
   elif [[ "$STATUS" == "failed" || "$STATUS" == "pending-install" || "$STATUS" == "pending-upgrade" ]]; then
     warn "Found broken Helm release (Status: $STATUS). Uninstalling to fix..."
@@ -53,12 +53,12 @@ fi
 
 # 3. Pre-flight: Check Port 80 availability
 # ------------------------------------------------------------------------------
-# If Nginx/Apache/Traefik is holding port 80, HAProxy (hostNetwork) will Crash.
+# If Nginx/Apache/Traefik is holding port 80, HAproxy (hostNetwork) will Crash.
 if ss -tulpn 2>/dev/null | grep -q ":80 "; then
   if ! ss -tulpn 2>/dev/null | grep ":80 " | grep -q "haproxy"; then
     warn "Port 80 is occupied by another process:"
     ss -tulpn | grep ":80 "
-    die "Cannot install HAProxy (hostNetwork) because Port 80 is in use. Stop the conflicting service."
+    die "Cannot install HAproxy (hostNetwork) because Port 80 is in use. Stop the conflicting service."
   fi
 fi
 
@@ -68,7 +68,7 @@ info "Updating Helm repositories..."
 helm repo add haproxytech https://haproxytech.github.io/helm-charts --force-update
 helm repo update haproxytech >/dev/null
 
-info "Deploying HAProxy Ingress..."
+info "Deploying HAproxy Ingress..."
 
 # Use set +e to capture failure and print debug info
 set +e
@@ -102,6 +102,6 @@ if [[ $EXIT_CODE -ne 0 ]]; then
   die "Installation failed. See debug info above."
 fi
 
-success "install_HAProxy.sh complete"
-info "HAProxy bound to host ports 80/443"
+success "install_HAproxy.sh complete"
+info "HAproxy bound to host ports 80/443"
 echo ""

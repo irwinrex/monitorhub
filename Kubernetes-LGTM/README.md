@@ -1,5 +1,5 @@
 # LGTM Stack — Deployment Guide
-## k0s · Single Node · t4g.xlarge · Debian 12 ARM64 · HAProxy · mTLS
+## k0s · Single Node · t4g.xlarge · Debian 12 ARM64 · HAproxy · mTLS
 
 ---
 
@@ -13,14 +13,14 @@
 │   ├── lib/
 │   │   └── common.sh           ← Shared: versions, colours, helpers (sourced, not run)
 │   ├── install_k0s.sh          ← Phase 1: system prep + k0s + Helm
-│   ├── install_HAProxy.sh      ← Phase 2: HAProxy Ingress Controller
+│   ├── install_HAproxy.sh      ← Phase 2: HAproxy Ingress Controller
 │   ├── install_mTLS.sh         ← Phase 3: cert-manager + PKI + 6 certs
 │   ├── install_secrets.sh      ← Phase 4: Grafana admin secret
 │   ├── install_LGTM.sh         ← Phase 5: Loki + Tempo + Mimir + Grafana
 │   └── backup_all.sh           ← Backup LGTM data to S3
 │
 └── values/
-    ├── haproxy-values.yaml     ← HAProxy Ingress configuration
+    ├── haproxy-values.yaml     ← HAproxy Ingress configuration
     ├── ingress-values.yaml     ← IngressClass configuration
     ├── loki-values.yaml        ← Loki configuration: S3, resources
     ├── tempo-values.yaml       ← Tempo configuration: S3, resources
@@ -106,7 +106,7 @@ Every script in `scripts/` is fully standalone:
 ```bash
 # Run each phase separately (in order)
 sudo bash scripts/install_k0s.sh
-sudo bash scripts/install_HAProxy.sh
+sudo bash scripts/install_HAproxy.sh
 sudo bash scripts/install_secrets.sh
 sudo bash scripts/install_LGTM.sh
 ```
@@ -134,7 +134,7 @@ Available flags: `SKIP_K0S` `SKIP_HAPROXY` `SKIP_SECRETS` `SKIP_LGTM` `SKIP_BACK
 Browser / Client
       │  HTTPS ( AWS ALB )  
       ▼
-HAProxy Ingress  (hostNetwork :80)
+HAproxy Ingress  (hostNetwork :80)
       │  HTTP 
       ▼
 Grafana pod      (gRPC 9100/ALWAYS_AUTHENTICATE)
@@ -192,7 +192,7 @@ All versions are in `scripts/lib/common.sh`. Bump deliberately.
 |---|---|
 | k0s | v1.34.3+k0s.0 |
 | Helm | v3.17.1 |
-| HAProxy Ingress chart | 1.48.0 |
+| HAproxy Ingress chart | 1.48.0 |
 | Linkerd | stable-2.14.11 |
 | cert-manager | v1.17.1 |
 | Loki chart | 6.53.0 |
@@ -227,6 +227,6 @@ kubectl describe certificaterequest -n monitoring
 # Grafana datasource TLS errors
 kubectl logs -n monitoring -l app.kubernetes.io/name=grafana | grep -i tls
 
-# HAProxy not routing
+# HAproxy not routing
 kubectl logs -n kube-system -l app.kubernetes.io/name=kubernetes-ingress
 ```

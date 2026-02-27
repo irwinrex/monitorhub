@@ -108,7 +108,7 @@ controller:
       operator: "Exists"
       effect: "NoSchedule"
 
-  # nodeSelector removed - HAProxy will run on any available node
+  # nodeSelector removed - HAproxy will run on any available node
 
   podAntiAffinity:
     preferredDuringSchedulingIgnoredDuringExecution:

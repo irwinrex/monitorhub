@@ -21,7 +21,7 @@
 #
 # Available skip flags:
 #   SKIP_K0S=true        skip scripts/install_k0s.sh
-#   SKIP_HAPROXY=true    skip scripts/install_HAProxy.sh
+#   SKIP_HAPROXY=true    skip scripts/install_HAproxy.sh
 #   SKIP_SECRETS=true    skip scripts/install_secrets.sh
 #   SKIP_LGTM=true       skip scripts/install_LGTM.sh
 #   SKIP_BACKUP=true     skip scripts/backup_all.sh
@@ -31,7 +31,7 @@
 #   scripts/
 #     lib/common.sh
 #     install_k0s.sh
-#     install_HAProxy.sh
+#     install_HAproxy.sh
 #     install_secrets.sh
 #     install_LGTM.sh
 #   values/
@@ -137,7 +137,7 @@ _run_phase() {
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}║  LGTM Full Stack Install                                 ║${NC}"
-echo -e "${BOLD}║  k0s · HAProxy · Loki/Tempo/Mimir/Grafana             ║${NC}"
+echo -e "${BOLD}║  k0s · HAproxy · Loki/Tempo/Mimir/Grafana             ║${NC}"
 echo -e "${BOLD}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -147,7 +147,7 @@ MISSING=false
 for script in \
   "${SCRIPTS_DIR}/lib/common.sh" \
   "${SCRIPTS_DIR}/install_k0s.sh" \
-  "${SCRIPTS_DIR}/install_HAProxy.sh" \
+  "${SCRIPTS_DIR}/install_HAproxy.sh" \
   "${SCRIPTS_DIR}/install_secrets.sh" \
   "${SCRIPTS_DIR}/install_LGTM.sh" \
   "${SCRIPTS_DIR}/backup_all.sh"; do
@@ -180,7 +180,7 @@ success "All required files present"
 # ── Confirm ───────────────────────────────────────────────────────────────────
 if [[ "${YES}" != "true" ]]; then
   echo ""
-  warn "This will install k0s, HAProxy, and LGTM stack."
+  warn "This will install k0s, HAproxy, and LGTM stack."
   warn "Intended for a FRESH Debian 12 ARM64 instance (t4g.xlarge)."
   echo ""
   read -r -p "  Continue? [y/N] " confirm
@@ -200,8 +200,8 @@ TOTAL_START=$SECONDS
 _run_phase 1 "k0s — System prep + Kubernetes + Helm" \
   "${SKIP_K0S}" "${SCRIPTS_DIR}/install_k0s.sh"
 
-_run_phase 2 "HAProxy — Ingress Controller" \
-  "${SKIP_HAPROXY}" "${SCRIPTS_DIR}/install_HAProxy.sh"
+_run_phase 2 "HAproxy — Ingress Controller" \
+  "${SKIP_HAPROXY}" "${SCRIPTS_DIR}/install_HAproxy.sh"
 
 _run_phase 3 "Secrets — Grafana admin credentials" \
   "${SKIP_SECRETS}" "${SCRIPTS_DIR}/install_secrets.sh"
