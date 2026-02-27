@@ -80,16 +80,16 @@ while [[ $# -gt 0 ]]; do
     -h|--help)
       echo "Usage: sudo bash install_all.sh [OPTIONS]"
       echo ""
-      echo "Options:"
-      echo "  -b, --bucket-name NAME     S3 bucket name for backups"
-      echo "  -r, --bucket-region REGION S3 region (e.g., us-east-1)"
-      echo "  -y, --yes                  Run in non-interactive mode"
-      echo "  -h, --help                 Show this help message"
-      echo ""
-      echo "Examples:"
-      echo "  sudo bash install_all.sh"
-      echo "  sudo bash install_all.sh --bucket-name my-bucket --bucket-region us-east-1 -y"
-      echo "  S3_BUCKET=my-bucket S3_REGION=us-east-1 sudo -E bash install_all.sh -y"
+    echo "Options:"
+    echo "  -b, --bucket-name NAME     S3 bucket name for backups"
+    echo "  -r, --bucket-region REGION S3 region (e.g., us-east-1)"
+    echo "  -y, --yes                  Run in non-interactive mode"
+    echo "  -h, --help                 Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  sudo bash install_all.sh"
+    echo "  sudo bash install_all.sh --bucket-name my-bucket --bucket-region us-east-1 -y"
+    echo "  S3_BUCKET=my-bucket S3_REGION=us-east-1 sudo -E bash install_all.sh -y"
       exit 0
       ;;
     *)
@@ -232,18 +232,15 @@ if [[ "${SKIP_BACKUP}" != "true" ]]; then
       info "Using S3 region from argument: ${S3_REGION}"
     fi
     
-    read -r -p "Enter S3 prefix (default: lgtm-backup): " S3_PREFIX_INPUT
-    S3_PREFIX="${S3_PREFIX_INPUT:-lgtm-backup}"
-    
     read -r -p "Local retention days (default: 7): " LOCAL_RETENTION_INPUT
     LOCAL_RETENTION_DAYS="${LOCAL_RETENTION_INPUT:-7}"
     
     echo ""
-    info "S3 Backup: s3://${S3_BUCKET}/${S3_PREFIX} (${S3_REGION})"
+    info "S3 Backup: s3://${S3_BUCKET} (${S3_REGION})"
     info "Local retention: ${LOCAL_RETENTION_DAYS} days"
     echo ""
     
-    export S3_BUCKET S3_PREFIX S3_REGION LOCAL_RETENTION_DAYS
+    export S3_BUCKET S3_REGION LOCAL_RETENTION_DAYS
   fi
 fi
 

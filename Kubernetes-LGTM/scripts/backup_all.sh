@@ -34,20 +34,24 @@ if [[ -z "${S3_BUCKET:-}" ]]; then
     die "S3_BUCKET is required. Backup aborted."
   fi
 
-  read -p "Enter S3 prefix (default: lgtm-backup): " S3_PREFIX_INPUT
-  : "${S3_PREFIX:=${S3_PREFIX_INPUT:-lgtm-backup}}"
-
   read -p "Enter S3 region (default: us-east-1): " S3_REGION_INPUT
   : "${S3_REGION:=${S3_REGION_INPUT:-us-east-1}}"
 
   read -p "Local retention days (default: 7): " LOCAL_RETENTION_INPUT
-  : "${LOCAL_RETENTION_DAYS:=${LOCAL_RETENTION_INPUT:-7}}"
+  : "${LOCAL_RETENTION_DAYS:=${LOCAL_RETENTION_INPUT:-7}}" 
 else
   # Use environment variables, set defaults if not provided
-  : "${S3_PREFIX:=lgtm-backup}"
   : "${S3_REGION:=us-east-1}"
   : "${LOCAL_RETENTION_DAYS:=7}"
 fi
+
+# Component-specific S3 prefixes (can be overridden via environment variables)
+: "${S3_PREFIX_LOKI:=loki}"
+: "${S3_PREFIX_TEMPO:=tempo}"
+: "${S3_PREFIX_MIMIR:=mimir}"
+: "${S3_PREFIX_GRAFANA:=grafana}"
+: "${S3_PREFIX_K0S:=k0s}"
+: "${S3_PREFIX_POSTGRES:=postgres}"
 
 # S3 retention (for display only - you handle expiration manually)
 : "${S3_RETENTION_DAYS:=90}"
@@ -125,7 +129,7 @@ backup_k0s() {
   tar -czf "${BACKUP_DIR}/k0s_${BACKUP_TIMESTAMP}.tar.gz" -C "${BACKUP_PATH}" k0s
   
   # Upload to S3
-  backup_to_s3 "${BACKUP_DIR}/k0s_${BACKUP_TIMESTAMP}.tar.gz" "${S3_PREFIX}/k0s/k0s_${BACKUP_TIMESTAMP}.tar.gz"
+  backup_to_s3 "${BACKUP_DIR}/k0s_${BACKUP_TIMESTAMP}.tar.gz" "${S3_PREFIX_K0S}/k0s_${BACKUP_TIMESTAMP}.tar.gz"
   
   success "k0s backup complete"
 }
@@ -163,7 +167,7 @@ backup_postgres() {
   tar -czf "${BACKUP_DIR}/postgres_${BACKUP_TIMESTAMP}.tar.gz" -C "${BACKUP_PATH}" postgres
   
   # Upload to S3
-  backup_to_s3 "${BACKUP_DIR}/postgres_${BACKUP_TIMESTAMP}.tar.gz" "${S3_PREFIX}/postgres/postgres_${BACKUP_TIMESTAMP}.tar.gz"
+  backup_to_s3 "${BACKUP_DIR}/postgres_${BACKUP_TIMESTAMP}.tar.gz" "${S3_PREFIX_POSTGRES}/postgres_${BACKUP_TIMESTAMP}.tar.gz"
   
   success "PostgreSQL backup complete"
 }
@@ -232,11 +236,22 @@ backup_lgtm() {
   # Backup Helm releases
   helm repo list 2>/dev/null > "${lgtm_backup_dir}/helm-repos.txt" || true
   
-  # Compress
-  tar -czf "${BACKUP_DIR}/lgtm_${BACKUP_TIMESTAMP}.tar.gz" -C "${BACKUP_PATH}" lgtm
+  # Compress and upload each component separately with its own prefix
+  # ── Loki ──
+  tar -czf "${BACKUP_DIR}/loki_${BACKUP_TIMESTAMP}.tar.gz" -C "${lgtm_backup_dir}" loki
+  backup_to_s3 "${BACKUP_DIR}/loki_${BACKUP_TIMESTAMP}.tar.gz" "${S3_PREFIX_LOKI}/loki_${BACKUP_TIMESTAMP}.tar.gz"
   
-  # Upload to S3
-  backup_to_s3 "${BACKUP_DIR}/lgtm_${BACKUP_TIMESTAMP}.tar.gz" "${S3_PREFIX}/lgtm/lgtm_${BACKUP_TIMESTAMP}.tar.gz"
+  # ── Tempo ──
+  tar -czf "${BACKUP_DIR}/tempo_${BACKUP_TIMESTAMP}.tar.gz" -C "${lgtm_backup_dir}" tempo
+  backup_to_s3 "${BACKUP_DIR}/tempo_${BACKUP_TIMESTAMP}.tar.gz" "${S3_PREFIX_TEMPO}/tempo_${BACKUP_TIMESTAMP}.tar.gz"
+  
+  # ── Mimir ──
+  tar -czf "${BACKUP_DIR}/mimir_${BACKUP_TIMESTAMP}.tar.gz" -C "${lgtm_backup_dir}" mimir
+  backup_to_s3 "${BACKUP_DIR}/mimir_${BACKUP_TIMESTAMP}.tar.gz" "${S3_PREFIX_MIMIR}/mimir_${BACKUP_TIMESTAMP}.tar.gz"
+  
+  # ── Grafana ──
+  tar -czf "${BACKUP_DIR}/grafana_${BACKUP_TIMESTAMP}.tar.gz" -C "${lgtm_backup_dir}" grafana
+  backup_to_s3 "${BACKUP_DIR}/grafana_${BACKUP_TIMESTAMP}.tar.gz" "${S3_PREFIX_GRAFANA}/grafana_${BACKUP_TIMESTAMP}.tar.gz"
   
   success "LGTM backup complete"
 }
@@ -253,7 +268,10 @@ cleanup_old_backups() {
     # Remove current backup files
     rm -f "${BACKUP_DIR}"/k0s_*.tar.gz 2>/dev/null || true
     rm -f "${BACKUP_DIR}"/postgres_*.tar.gz 2>/dev/null || true
-    rm -f "${BACKUP_DIR}"/lgtm_*.tar.gz 2>/dev/null || true
+    rm -f "${BACKUP_DIR}"/loki_*.tar.gz 2>/dev/null || true
+    rm -f "${BACKUP_DIR}"/tempo_*.tar.gz 2>/dev/null || true
+    rm -f "${BACKUP_DIR}"/mimir_*.tar.gz 2>/dev/null || true
+    rm -f "${BACKUP_DIR}"/grafana_*.tar.gz 2>/dev/null || true
     rm -rf "${BACKUP_PATH}" 2>/dev/null || true
   else
     # Clean up backup directories older than retention period
@@ -271,8 +289,16 @@ cleanup_old_backups() {
 # ─────────────────────────────────────────────────────────────────────────────
 info "=== S3 Retention Note ==="
 echo ""
-echo "S3 bucket: s3://${S3_BUCKET}/${S3_PREFIX}"
+echo "S3 bucket: s3://${S3_BUCKET}"
 echo "S3 retention: ${S3_RETENTION_DAYS} days (you manage expiration manually)"
+echo ""
+echo "Backup prefixes:"
+echo "  - k0s:      s3://${S3_BUCKET}/${S3_PREFIX_K0S}/"
+echo "  - postgres: s3://${S3_BUCKET}/${S3_PREFIX_POSTGRES}/"
+echo "  - loki:     s3://${S3_BUCKET}/${S3_PREFIX_LOKI}/"
+echo "  - tempo:    s3://${S3_BUCKET}/${S3_PREFIX_TEMPO}/"
+echo "  - mimir:    s3://${S3_BUCKET}/${S3_PREFIX_MIMIR}/"
+echo "  - grafana:  s3://${S3_BUCKET}/${S3_PREFIX_GRAFANA}/"
 echo ""
 echo "IMPORTANT: Configure S3 Lifecycle Policy for ${S3_BUCKET}:"
 echo "  - Transition to Glacier/Deep Archive after ${S3_RETENTION_DAYS} days"
@@ -304,5 +330,11 @@ echo ""
 success "=== All backups completed at $(date) ==="
 echo ""
 info "Local backup location: ${BACKUP_DIR}"
-info "S3 location: s3://${S3_BUCKET}/${S3_PREFIX}"
+echo "S3 locations:"
+echo "  - k0s:      s3://${S3_BUCKET}/${S3_PREFIX_K0S}/"
+echo "  - postgres: s3://${S3_BUCKET}/${S3_PREFIX_POSTGRES}/"
+echo "  - loki:     s3://${S3_BUCKET}/${S3_PREFIX_LOKI}/"
+echo "  - tempo:    s3://${S3_BUCKET}/${S3_PREFIX_TEMPO}/"
+echo "  - mimir:    s3://${S3_BUCKET}/${S3_PREFIX_MIMIR}/"
+echo "  - grafana:  s3://${S3_BUCKET}/${S3_PREFIX_GRAFANA}/"
 echo ""
