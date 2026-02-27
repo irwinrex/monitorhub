@@ -2,30 +2,49 @@ fullnameOverride: tempo
 
 deploymentMode: SingleBinary
 
+# -----------------------------
+# Single Binary Configuration
+# -----------------------------
 singleBinary:
   replicas: 1
-
+  
   persistence:
-    enabled: false   # safe since S3 backend
+    enabled: false  # Using S3 backend
 
+  # Port naming for the Service
+  service:
+    type: ClusterIP
+    port: 3200
+    name: http-tempo
+    targetPort: 3200
+    protocol: TCP
+
+# -----------------------------
+# Tempo Application Config
+# -----------------------------
 tempo:
   auth_enabled: false
 
   server:
     http_listen_port: 3200
     grpc_listen_port: 9096
+    log_level: info
 
   storage:
     trace:
       backend: s3
       s3:
-        region: ${S3_REGION}
         bucket: ${S3_BUCKET}
-        prefix: lgtm-prod/tempo/
+        region: ${S3_REGION}
+        prefix: lgtm/tempo/
 
+  # Disabling metrics generator to save resources
   metricsGenerator:
     enabled: false
 
+# -----------------------------
+# Resource Management
+# -----------------------------
 resources:
   requests:
     cpu: 500m
@@ -33,3 +52,19 @@ resources:
   limits:
     cpu: 1000m
     memory: 1Gi
+
+# -----------------------------
+# Health Probes (Optional but Recommended)
+# -----------------------------
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: http-tempo
+  initialDelaySeconds: 30
+  periodSeconds: 10
+
+livenessProbe:
+  httpGet:
+    path: /ready
+    port: http-tempo
+  initialDelaySeconds: 60

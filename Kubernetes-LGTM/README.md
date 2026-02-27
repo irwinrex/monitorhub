@@ -16,11 +16,16 @@
 │   ├── install_HAProxy.sh      ← Phase 2: HAProxy Ingress Controller
 │   ├── install_mTLS.sh         ← Phase 3: cert-manager + PKI + 6 certs
 │   ├── install_secrets.sh      ← Phase 4: Grafana admin secret
-│   └── install_LGTM.sh         ← Phase 5: Loki + Tempo + Mimir + Grafana
+│   ├── install_LGTM.sh         ← Phase 5: Loki + Tempo + Mimir + Grafana
+│   └── backup_all.sh           ← Backup LGTM data to S3
 │
 └── values/
-    ├── lgtm-values.yaml        ← Base Helm values: S3, resources, ingress
-    └── mtls-patch.yaml         ← mTLS overlay: cert mounts, TLS listeners
+    ├── haproxy-values.yaml     ← HAProxy Ingress configuration
+    ├── ingress-values.yaml     ← IngressClass configuration
+    ├── loki-values.yaml        ← Loki configuration: S3, resources
+    ├── tempo-values.yaml       ← Tempo configuration: S3, resources
+    ├── mimir-values.yaml       ← Mimir configuration: S3, resources
+    └── grafana-values.yaml     ← Grafana configuration: datasources, ingress
 ```
 
 Each script in `scripts/` can be run standalone or via `install_all.sh`.
@@ -56,27 +61,34 @@ All version pins live in `scripts/lib/common.sh`.
 
 ### 1 — Upload
 ```bash
-scp -r ./lgtm-stack admin@<EC2-IP>:~/
+scp -r ./Kubernetes-LGTM admin@<EC2-IP>:~/
 ssh admin@<EC2-IP>
-cd ~/lgtm-stack
+cd ~/Kubernetes-LGTM
 ```
 
-### 2 — Set your domain and region
+### 2 — Set your domain, region, and S3 bucket
 ```bash
 DOMAIN="grafana.yourdomain.com"
 REGION="us-east-1"
+S3_BUCKET="lgtm-observability"
 
 # Replace in all files that reference them
 sed -i "s/grafana.example.com/${DOMAIN}/g" \
-    values/lgtm-values.yaml values/mtls-patch.yaml scripts/install_mTLS.sh
+    values/*.yaml scripts/install_mTLS.sh
 
 sed -i "s/us-east-1/${REGION}/g" \
-    values/lgtm-values.yaml values/mtls-patch.yaml
+    values/*.yaml
+
+sed -i "s/\${S3_BUCKET}/${S3_BUCKET}/g" \
+    values/*.yaml
+
+sed -i "s/\${S3_REGION}/${REGION}/g" \
+    values/*.yaml
 ```
 
 ### 3 — Make executable
 ```bash
-chmod +x install_all.sh scripts/install_*.sh
+chmod +x install_all.sh scripts/*.sh
 ```
 
 ### 4 — Full install
@@ -123,24 +135,30 @@ Available flags: `SKIP_K0S` `SKIP_HAPROXY` `SKIP_MTLS` `SKIP_SECRETS` `SKIP_LGTM
 
 ```
 Browser / Client
-      │  HTTPS  →  grafana-ingress-tls-secret (server cert)
+      │  HTTPS ( AWS ALB )  
       ▼
-HAProxy Ingress  (hostNetwork :80/:443)
-      │  HTTPS + backend cert verification
+HAProxy Ingress  (hostNetwork :80)
+      │  HTTP 
       ▼
-Grafana pod      (presents grafana-client-tls-secret)
-      │  mTLS — verified against lgtm-root-ca-secret
-      ├──▶  Loki   :3100  RequireAndVerifyClientCert
-      ├──▶  Tempo  :3200  RequireAndVerifyClientCert
-      └──▶  Mimir Gateway :443  RequireAndVerifyClientCert
-                   │  internal gRPC mTLS
-                   ├──▶  Ingester     (mimir-ingester-tls-secret)
-                   ├──▶  Store-GW     (mimir-gateway-tls-secret)
-                   └──▶  Querier      (mimir-gateway-tls-secret)
+Grafana pod      (gRPC 9100/ALWAYS_AUTHENTICATE)
+      │
+      ├──▶  Loki   :9095  gRPC  RequireAndVerifyClientCert
+      │                   (write/read logs)
+      │
+      ├──▶  Tempo  :9096 gRPC  RequireAndVerifyClientCert
+      │                   (query traces)
+      │
+      └──▶  Mimir  :9095 gRPC  RequireAndVerifyClientCert
+                        (query/metric storage)
 
 OTLP receivers (Tempo):
   :4317 gRPC  — full mTLS  (apps must present a cert signed by lgtm-root-ca)
   :4318 HTTP  — TLS only   (no client cert, easier for SDK migration)
+
+External Clients (Promtail, Agents):
+  ─────────────────────────────────────
+  Write logs/traces/metrics to LGTM
+  All connections use mTLS verified against lgtm-root-ca-secret
 ```
 
 ---
@@ -175,14 +193,24 @@ All versions are in `scripts/lib/common.sh`. Bump deliberately.
 
 | Component | Version |
 |---|---|
-| k0s | v1.32.2+k0s.0 |
+| k0s | v1.34.3+k0s.0 |
 | Helm | v3.17.1 |
-| HAProxy Ingress chart | 1.42.2 |
+| HAProxy Ingress chart | 1.48.0 |
+| Linkerd | stable-2.14.11 |
 | cert-manager | v1.17.1 |
-| Loki chart | 6.29.0 |
-| Tempo chart | 1.21.1 |
-| Mimir chart | 5.6.0 |
-| Grafana chart | 8.9.1 |
+| Loki chart | 6.53.0 |
+| Tempo chart | 1.24.4 |
+| Mimir chart | 6.0.5 |
+| Grafana chart | 10.5.15 |
+
+---
+
+## Backup
+
+Backup LGTM data to S3:
+```bash
+sudo bash scripts/backup_all.sh
+```
 
 ---
 
