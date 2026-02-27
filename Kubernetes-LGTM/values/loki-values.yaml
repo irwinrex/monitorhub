@@ -13,34 +13,6 @@ singleBinary:
       - ReadWriteOnce
     storageClass: local-path
 
-  # Force named ports onto the container spec so probe name resolution works.
-  # Without this, 'port: http-metrics' in probes cannot be resolved by Kubernetes
-  # because the chart template does not declare containerPorts on the Loki container.
-  extraContainerConfig:
-    ports:
-      - name: http-metrics
-        containerPort: 3100
-        protocol: TCP
-      - name: grpc
-        containerPort: 9095
-        protocol: TCP
-    readinessProbe:
-      httpGet:
-        path: /ready
-        port: http-metrics
-      initialDelaySeconds: 180
-      periodSeconds: 10
-      failureThreshold: 30
-      timeoutSeconds: 5
-    livenessProbe:
-      httpGet:
-        path: /ready
-        port: http-metrics
-      initialDelaySeconds: 180
-      periodSeconds: 20
-      failureThreshold: 10
-      timeoutSeconds: 5
-
   service:
     type: ClusterIP
     port: 3100
@@ -60,7 +32,6 @@ singleBinary:
 # -----------------------------
 loki:
   auth_enabled: false
-
   commonConfig:
     replication_factor: 1
     ring:
@@ -71,6 +42,33 @@ loki:
     http_listen_port: 3100
     grpc_listen_port: 9095
     log_level: info
+
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 3100
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    failureThreshold: 30
+    timeoutSeconds: 5
+
+  livenessProbe:
+    httpGet:
+      path: /ready
+      port: 3100
+    initialDelaySeconds: 120
+    periodSeconds: 20
+    failureThreshold: 10
+    timeoutSeconds: 5
+
+  startupProbe:
+    httpGet:
+      path: /ready
+      port: 3100
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    failureThreshold: 30
+    timeoutSeconds: 5
 
   ingester:
     lifecycler:
@@ -152,6 +150,3 @@ gateway:
 
 test:
   enabled: false
-
-sidecar:
-  healthcheckPort: 3100
