@@ -34,6 +34,8 @@ loki:
     volume_enabled: true
   ruler:
     enable_api: true
+  memberlist:
+    join_members: []
   server:
     grpc_listen_port: 9095
     http_listen_port: 3100
@@ -52,20 +54,20 @@ loki:
     httpGet:
       path: /ready
       port: http-metrics
-    initialDelaySeconds: 60
+    initialDelaySeconds: 120
     timeoutSeconds: 1
     periodSeconds: 10
     successThreshold: 1
-    failureThreshold: 3
+    failureThreshold: 5
 
   livenessProbe:
     httpGet:
       path: /ready
       port: http-metrics
-    initialDelaySeconds: 60
+    initialDelaySeconds: 120
     timeoutSeconds: 1
     periodSeconds: 10
-    failureThreshold: 3
+    failureThreshold: 5
 
   resources:
     requests:
