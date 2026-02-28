@@ -40,9 +40,9 @@ loki:
   storage:
     type: s3
     bucketNames:
-      chunks: ${S3_BUCKET}/loki
-      ruler: ${S3_BUCKET}/loki
-      admin: ${S3_BUCKET}/loki
+      chunks: ${S3_BUCKET}
+      ruler: ${S3_BUCKET}
+      admin: ${S3_BUCKET}
     s3:
       region: ${S3_REGION}
       s3ForcePathStyle: false
