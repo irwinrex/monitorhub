@@ -40,9 +40,9 @@ loki:
   storage:
     type: s3
     bucketNames:
-      chunks: ${S3_BUCKET}
-      ruler: ${S3_BUCKET}
-      admin: ${S3_BUCKET}
+      chunks: ${S3_BUCKET}/loki
+      ruler: ${S3_BUCKET}/loki
+      admin: ${S3_BUCKET}/loki
     s3:
       region: ${S3_REGION}
       s3ForcePathStyle: false
@@ -52,7 +52,7 @@ loki:
     httpGet:
       path: /ready
       port: http-metrics
-    initialDelaySeconds: 30
+    initialDelaySeconds: 60
     timeoutSeconds: 1
     periodSeconds: 10
     successThreshold: 1
