@@ -15,7 +15,7 @@ require_kubeconfig
 require_helm
 
 : "${MONITORING_NS:=monitoring}"
-: "${LOKI_CHART_VERSION:=6.53.0}"
+: "${LOKI_CHART_VERSION:=2.10.3}"
 : "${TEMPO_CHART_VERSION:=1.26.5}"
 : "${MIMIR_CHART_VERSION:=6.0.5}"
 : "${GRAFANA_CHART_VERSION:=10.5.15}"
@@ -25,8 +25,6 @@ LOKI_REPO="grafana"
 TEMPO_REPO="grafana-community"
 MIMIR_REPO="grafana"
 GRAFANA_REPO="grafana"
-TEMPO_REPO="grafana"
-MIMIR_REPO="grafana"
 GRAFANA_REPO="grafana"
 
 # Skip if already deployed
@@ -100,7 +98,7 @@ fi
 # Loki
 info "Installing Loki..."
 apply_values "${VALUES_DIR}/loki-values.yaml" /tmp/loki-values.yaml
-helm upgrade --install loki "${LOKI_REPO}/loki" \
+helm upgrade --install loki-stack "${LOKI_REPO}/loki-stack" \
   --namespace "${MONITORING_NS}" \
   --version "${LOKI_CHART_VERSION}" \
   --values /tmp/loki-values.yaml \
