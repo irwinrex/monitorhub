@@ -20,8 +20,8 @@ require_helm
 : "${MIMIR_CHART_VERSION:=6.0.5}"
 : "${GRAFANA_CHART_VERSION:=10.5.15}"
 
-# Chart repository URLs (Loki from community since March 2026)
-LOKI_REPO="grafana-community"
+# Chart repository URLs
+LOKI_REPO="grafana"
 TEMPO_REPO="grafana"
 MIMIR_REPO="grafana"
 GRAFANA_REPO="grafana"
