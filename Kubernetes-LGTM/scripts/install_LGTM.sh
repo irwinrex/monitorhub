@@ -20,6 +20,12 @@ require_helm
 : "${MIMIR_CHART_VERSION:=6.0.5}"
 : "${GRAFANA_CHART_VERSION:=10.5.15}"
 
+# Chart repository URLs (Loki from community since March 2026)
+LOKI_REPO="grafana-community"
+TEMPO_REPO="grafana"
+MIMIR_REPO="grafana"
+GRAFANA_REPO="grafana"
+
 # Skip if already deployed
 if helm list -n "${MONITORING_NS}" 2>/dev/null | grep -q "^loki "; then
   success "LGTM stack already deployed"
@@ -72,10 +78,10 @@ helm repo add grafana-community https://grafana-community.github.io/helm-charts 
 helm repo update >/dev/null
 
 info "Helm repos configured"
-info "  - grafana/loki:${LOKI_CHART_VERSION}"
-info "  - grafana-community/tempo:${TEMPO_CHART_VERSION}"
-info "  - grafana/mimir-distributed:${MIMIR_CHART_VERSION}"
-info "  - grafana/grafana:${GRAFANA_CHART_VERSION}"
+info "  - ${LOKI_REPO}/loki:${LOKI_CHART_VERSION}"
+info "  - ${TEMPO_REPO}/tempo:${TEMPO_CHART_VERSION}"
+info "  - ${MIMIR_REPO}/mimir-distributed:${MIMIR_CHART_VERSION}"
+info "  - ${GRAFANA_REPO}/grafana:${GRAFANA_CHART_VERSION}"
 
 # Install Local Path Provisioner for PVC support
 info "Installing Local Path Provisioner..."
@@ -91,7 +97,7 @@ fi
 # Loki
 info "Installing Loki..."
 apply_values "${VALUES_DIR}/loki-values.yaml" /tmp/loki-values.yaml
-helm upgrade --install loki grafana/loki \
+helm upgrade --install loki "${LOKI_REPO}/loki" \
   --namespace "${MONITORING_NS}" \
   --version "${LOKI_CHART_VERSION}" \
   --values /tmp/loki-values.yaml \
@@ -100,7 +106,7 @@ helm upgrade --install loki grafana/loki \
 # Tempo
 info "Installing Tempo..."
 apply_values "${VALUES_DIR}/tempo-values.yaml" /tmp/tempo-values.yaml
-helm upgrade --install tempo grafana-community/tempo \
+helm upgrade --install tempo "${TEMPO_REPO}/tempo" \
   --namespace "${MONITORING_NS}" \
   --version "${TEMPO_CHART_VERSION}" \
   --values /tmp/tempo-values.yaml \
@@ -109,7 +115,7 @@ helm upgrade --install tempo grafana-community/tempo \
 # Mimir
 info "Installing Mimir..."
 apply_values "${VALUES_DIR}/mimir-values.yaml" /tmp/mimir-values.yaml
-helm upgrade --install mimir grafana/mimir-distributed \
+helm upgrade --install mimir "${MIMIR_REPO}/mimir-distributed" \
   --namespace "${MONITORING_NS}" \
   --version "${MIMIR_CHART_VERSION}" \
   --values /tmp/mimir-values.yaml \
@@ -117,7 +123,7 @@ helm upgrade --install mimir grafana/mimir-distributed \
 
 # Grafana
 info "Installing Grafana..."
-helm upgrade --install grafana grafana/grafana \
+helm upgrade --install grafana "${GRAFANA_REPO}/grafana" \
   --namespace "${MONITORING_NS}" \
   --version "${GRAFANA_CHART_VERSION}" \
   --values "${VALUES_DIR}/grafana-values.yaml" \

@@ -34,9 +34,8 @@ tempo:
     trace:
       backend: s3
       s3:
-        bucket: ${S3_BUCKET}
+        bucket: ${S3_BUCKET}/tempo
         region: ${S3_REGION}
-        prefix: lgtm/tempo/
 
   # Disabling metrics generator to save resources
   metricsGenerator:
@@ -48,13 +47,13 @@ tempo:
 resources:
   requests:
     cpu: 250m
-    memory: 256Mi
+    memory: 512Mi
   limits:
     cpu: 500m
-    memory: 512Mi
+    memory: 1Gi
 
 # -----------------------------
-# Health Probes (Optional but Recommended)
+# Health Probes
 # -----------------------------
 readinessProbe:
   httpGet:
@@ -68,3 +67,4 @@ livenessProbe:
     path: /ready
     port: http-tempo
   initialDelaySeconds: 60
+  periodSeconds: 10

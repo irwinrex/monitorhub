@@ -12,6 +12,9 @@ grafana.ini:
     reporting_enabled: false
   log:
     mode: console
+  users:
+    auto_assign_org: true
+    auto_assign_org_role: Viewer
 
 datasources:
   datasources.yaml:
@@ -19,19 +22,19 @@ datasources:
     datasources:
       - name: Mimir
         type: prometheus
-        url: grpc://mimir.monitoring.svc.cluster.local:9095
+        url: http://mimir.monitoring.svc.cluster.local:8080
         isDefault: true
       - name: Loki
         type: loki
-        url: grpc://loki.monitoring.svc.cluster.local:9095
+        url: http://loki.monitoring.svc.cluster.local:3100
       - name: Tempo
         type: tempo
-        url: grpc://tempo.monitoring.svc.cluster.local:9096
+        url: http://tempo.monitoring.svc.cluster.local:3200
 
 resources:
   requests:
     cpu: 100m
-    memory: 128Mi
+    memory: 256Mi
   limits:
     cpu: 250m
-    memory: 256Mi
+    memory: 512Mi
