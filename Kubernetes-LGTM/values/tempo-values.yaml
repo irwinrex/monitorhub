@@ -59,12 +59,14 @@ readinessProbe:
   httpGet:
     path: /ready
     port: http-tempo
-  initialDelaySeconds: 30
+  initialDelaySeconds: 60
   periodSeconds: 10
+  failureThreshold: 5
 
 livenessProbe:
   httpGet:
     path: /ready
     port: http-tempo
-  initialDelaySeconds: 60
+  initialDelaySeconds: 90
   periodSeconds: 10
+  failureThreshold: 5
