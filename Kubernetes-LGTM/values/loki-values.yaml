@@ -21,8 +21,6 @@ loki:
     ring:
       kvstore:
         store: inmemory
-  memberlistConfig:
-    join_members: []
   schemaConfig:
     configs:
       - from: "2024-04-01"
@@ -39,6 +37,8 @@ loki:
     volume_enabled: true
   ruler:
     enable_api: true
+  memberlist:
+    join_members: []
   server:
     grpc_listen_port: 9095
     http_listen_port: 3100
@@ -53,11 +53,20 @@ loki:
       s3ForcePathStyle: false
       insecure: false
 
+  startupProbe:
+    httpGet:
+      path: /ready
+      port: http-metrics
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 60
+
   readinessProbe:
     httpGet:
       path: /ready
-      port: 3100
-    initialDelaySeconds: 180
+      port: http-metrics
+    initialDelaySeconds: 60
     timeoutSeconds: 1
     periodSeconds: 10
     successThreshold: 1
@@ -66,8 +75,8 @@ loki:
   livenessProbe:
     httpGet:
       path: /ready
-      port: 3100
-    initialDelaySeconds: 180
+      port: http-metrics
+    initialDelaySeconds: 60
     timeoutSeconds: 1
     periodSeconds: 10
     failureThreshold: 5
