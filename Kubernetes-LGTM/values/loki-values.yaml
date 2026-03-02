@@ -56,8 +56,8 @@ loki:
   readinessProbe:
     httpGet:
       path: /ready
-      port: http-metrics
-    initialDelaySeconds: 120
+      port: 3100
+    initialDelaySeconds: 180
     timeoutSeconds: 1
     periodSeconds: 10
     successThreshold: 1
@@ -66,8 +66,8 @@ loki:
   livenessProbe:
     httpGet:
       path: /ready
-      port: http-metrics
-    initialDelaySeconds: 120
+      port: 3100
+    initialDelaySeconds: 180
     timeoutSeconds: 1
     periodSeconds: 10
     failureThreshold: 5
