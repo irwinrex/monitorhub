@@ -18,8 +18,10 @@ tempo:
       s3:
         bucket: ${S3_BUCKET_TEMPO}
         region: ${S3_REGION}
+        endpoint: s3.dualstack.${S3_REGION}.amazonaws.com   # required — Tempo uses MinIO client, not AWS SDK
+        insecure: false
       wal:
-        path: /var/tempo/wal         # explicit WAL — required for S3 backend single binary
+        path: /var/tempo/wal
   metricsGenerator:
     enabled: false
 
@@ -35,7 +37,7 @@ readinessProbe:
   httpGet:
     path: /ready
     port: 3200
-  initialDelaySeconds: 60    # S3 client init needs headroom
+  initialDelaySeconds: 60
   periodSeconds: 10
   failureThreshold: 5
 
@@ -43,6 +45,6 @@ livenessProbe:
   httpGet:
     path: /ready
     port: 3200
-  initialDelaySeconds: 120   # don't kill pod during first S3 write
+  initialDelaySeconds: 120
   periodSeconds: 10
   failureThreshold: 5
