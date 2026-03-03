@@ -17,11 +17,8 @@ require_helm
 : "${MONITORING_NS:=monitoring}"
 
 # Chart repository aliases
-# NOTE: Loki is migrating to grafana-community on 2026-03-16.
-#       Tempo already migrated on 2026-01-30.
-#       Both are pre-pointed at grafana-community here to avoid breakage.
 LOKI_REPO="grafana"
-TEMPO_REPO="grafana-community"
+TEMPO_REPO="grafana"
 MIMIR_REPO="grafana"
 GRAFANA_REPO="grafana"
 ALERTMANAGER_REPO="grafana"
