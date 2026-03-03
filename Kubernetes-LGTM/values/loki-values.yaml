@@ -63,6 +63,10 @@ chunksCache:
 resultsCache:
   enabled: false
 
+# Disable helm tests
+test:
+  enabled: false
+
 # Keep all other components at 0
 backend:
   replicas: 0
