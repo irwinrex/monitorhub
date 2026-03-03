@@ -1,0 +1,55 @@
+# Alertmanager configuration
+alertmanager:
+  enabled: true
+  clusterDomain: cluster.local
+  
+  # Use persistent storage
+  persistentVolume:
+    enabled: true
+    size: 1Gi
+    storageClass: local-path
+  
+  # Resource limits
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  
+  # Replica count (1 for single node)
+  replicaCount: 1
+  
+  # Security context
+  securityContext:
+    runAsUser: 10001
+    runAsNonRoot: true
+    fsGroup: 10001
+
+# Config - basic configuration
+config:
+  global:
+    resolve_timeout: 5m
+  route:
+    group_by: ['alertname']
+    group_wait: 10s
+    group_interval: 10s
+    repeat_interval: 12h
+    receiver: 'default'
+    routes:
+      - match:
+          namespace: monitoring
+        receiver: 'default'
+  receivers:
+    - name: 'default'
+      webhook_configs:
+        - send_resolved: true
+
+# Disable ingress for internal use
+ingress:
+  enabled: false
+
+# Disable prometheus-to-alertmanager
+prometheus:
+  enabled: false

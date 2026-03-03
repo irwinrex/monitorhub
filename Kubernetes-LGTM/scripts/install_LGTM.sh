@@ -19,15 +19,12 @@ require_helm
 : "${TEMPO_CHART_VERSION:=1.26.5}"
 : "${MIMIR_CHART_VERSION:=6.0.5}"
 : "${GRAFANA_CHART_VERSION:=10.5.15}"
+: "${ALERTMANAGER_CHART_VERSION:=1.8.0}"
 
 # Chart repository URLs
 LOKI_REPO="grafana"
 TEMPO_REPO="grafana-community"
 MIMIR_REPO="grafana"
-GRAFANA_REPO="grafana"
-TEMPO_REPO="grafana-community"
-MIMIR_REPO="grafana"
-GRAFANA_REPO="grafana"
 GRAFANA_REPO="grafana"
 
 # Skip if already deployed
@@ -132,6 +129,14 @@ helm upgrade --install grafana "${GRAFANA_REPO}/grafana" \
   --version "${GRAFANA_CHART_VERSION}" \
   --values "${VALUES_DIR}/grafana-values.yaml" \
   --wait --timeout 10m
+
+# Alertmanager
+info "Installing Alertmanager..."
+helm upgrade --install alertmanager "${GRAFANA_REPO}/alertmanager" \
+  --namespace "${MONITORING_NS}" \
+  --version "${ALERTMANAGER_CHART_VERSION}" \
+  --values "${VALUES_DIR}/alertmanager-values.yaml" \
+  --wait --timeout 5m
 
 # Add datasources
 info "Configuring datasources..."

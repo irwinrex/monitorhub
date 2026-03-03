@@ -75,7 +75,7 @@ singleBinary:
         - name: LABEL
           value: loki_rule
         - name: FOLDER
-          value: /rules
+          value: /rules-sidecar
         - name: RESOURCE
           value: both
         - name: WATCH_SERVER_TIMEOUT
@@ -86,7 +86,7 @@ singleBinary:
           value: INFO
       volumeMounts:
         - name: rules-volume
-          mountPath: /rules
+          mountPath: /rules-sidecar
       readinessProbe:
         exec:
           command:
