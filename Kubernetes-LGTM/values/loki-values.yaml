@@ -43,15 +43,15 @@ loki:
     ring:
       enabled: false
     storage:
-      type: s3
-      s3:
-        bucketName: ${S3_BUCKET}/loki/rules
-        s3ForcePathStyle: true
+      type: local                   # <-- use local so the sidecar-written rules are picked up
+      local:
+        directory: /loki-rules      # <-- new non-conflicting path
     evaluation:
       evaluation_interval: 1m
     poll_interval: 1m
 
 deploymentMode: SingleBinary
+
 singleBinary:
   replicas: 1
   resources:
@@ -66,6 +66,7 @@ singleBinary:
       value: 3750MiB
     - name: MEMBERLIST_ENABLED
       value: "false"
+
   extraContainers:
     - name: rules-sidecar
       image: kiwigrid/k8s-sidecar:1.30.9
@@ -75,7 +76,7 @@ singleBinary:
         - name: LABEL
           value: loki_rule
         - name: FOLDER
-          value: /rules-sidecar
+          value: /loki-rules          # <-- matches extraVolumeMounts below
         - name: RESOURCE
           value: both
         - name: WATCH_SERVER_TIMEOUT
@@ -86,7 +87,7 @@ singleBinary:
           value: INFO
       volumeMounts:
         - name: rules-volume
-          mountPath: /rules-sidecar
+          mountPath: /loki-rules      # <-- sidecar writes here
       readinessProbe:
         exec:
           command:
@@ -103,12 +104,14 @@ singleBinary:
             - "ps aux | grep -v grep | grep -q sidecar"
         initialDelaySeconds: 30
         periodSeconds: 30
+
   extraVolumes:
     - name: rules-volume
       emptyDir: {}
+
   extraVolumeMounts:
     - name: rules-volume
-      mountPath: /rules
+      mountPath: /loki-rules          # <-- main loki container reads rules from here
       readOnly: false
 
 # Disable unnecessary components
@@ -120,12 +123,8 @@ chunksCache:
   enabled: false
 resultsCache:
   enabled: false
-
-# Disable helm tests
 test:
   enabled: false
-
-# Keep all other components at 0
 backend:
   replicas: 0
 read:
