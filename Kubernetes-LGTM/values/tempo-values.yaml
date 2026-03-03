@@ -16,11 +16,11 @@ tempo:
     trace:
       backend: s3
       s3:
-        bucket: ${S3_BUCKET}        # plain bucket name only — no path suffix
-        prefix: tempo               # use prefix to namespace within shared bucket
+        bucket: ${S3_BUCKET}/tempo
         region: ${S3_REGION}
-      wal:
-        path: /var/tempo/wal        # explicit WAL path — required for single binary S3 backend
+        endpoint: s3.${S3_REGION}.amazonaws.com
+        s3ForcePathStyle: true
+        insecure: false
   metricsGenerator:
     enabled: false
 
@@ -36,14 +36,12 @@ readinessProbe:
   httpGet:
     path: /ready
     port: 3200
-  initialDelaySeconds: 60
+  initialDelaySeconds: 30
   periodSeconds: 10
-  failureThreshold: 5
 
 livenessProbe:
   httpGet:
     path: /ready
     port: 3200
-  initialDelaySeconds: 90
+  initialDelaySeconds: 60
   periodSeconds: 10
-  failureThreshold: 5
