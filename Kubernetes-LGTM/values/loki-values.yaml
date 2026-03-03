@@ -36,6 +36,20 @@ loki:
       insecure: false
   memberlist:
     enabled: false
+  ruler:
+    enabled: true
+    enable_api: true
+    enable_alertmanager_v2: true
+    ring:
+      enabled: false
+    storage:
+      type: s3
+      s3:
+        bucketName: ${S3_BUCKET}/loki/rules
+        s3ForcePathStyle: true
+    evaluation:
+      evaluation_interval: 1m
+    poll_interval: 1m
 
 deploymentMode: SingleBinary
 singleBinary:
@@ -52,6 +66,50 @@ singleBinary:
       value: 3750MiB
     - name: MEMBERLIST_ENABLED
       value: "false"
+  extraContainers:
+    - name: rules-sidecar
+      image: kiwigrid/k8s-sidecar:1.30.9
+      env:
+        - name: METHOD
+          value: WATCH
+        - name: LABEL
+          value: loki_rule
+        - name: FOLDER
+          value: /rules
+        - name: RESOURCE
+          value: both
+        - name: WATCH_SERVER_TIMEOUT
+          value: "60"
+        - name: WATCH_CLIENT_TIMEOUT
+          value: "60"
+        - name: LOG_LEVEL
+          value: INFO
+      volumeMounts:
+        - name: rules-volume
+          mountPath: /rules
+      readinessProbe:
+        exec:
+          command:
+            - sh
+            - -c
+            - "if [ -f /tmp/ready ]; then exit 0; else exit 1; fi"
+        initialDelaySeconds: 5
+        periodSeconds: 10
+      livenessProbe:
+        exec:
+          command:
+            - sh
+            - -c
+            - "ps aux | grep -v grep | grep -q sidecar"
+        initialDelaySeconds: 30
+        periodSeconds: 30
+  extraVolumes:
+    - name: rules-volume
+      emptyDir: {}
+  extraVolumeMounts:
+    - name: rules-volume
+      mountPath: /rules
+      readOnly: false
 
 # Disable unnecessary components
 lokiCanary:
