@@ -1,49 +1,29 @@
 fullnameOverride: tempo
-
 deploymentMode: SingleBinary
 
-# -----------------------------
-# Single Binary Configuration
-# -----------------------------
 singleBinary:
   replicas: 1
-  
   persistence:
-    enabled: false  # Using S3 backend
+    enabled: false
 
-  # Port naming for the Service
-  service:
-    type: ClusterIP
-    port: 3200
-    name: http-tempo
-    targetPort: 3200
-    protocol: TCP
-
-# -----------------------------
-# Tempo Application Config
-# -----------------------------
 tempo:
   auth_enabled: false
-
   server:
     http_listen_port: 3200
     grpc_listen_port: 9096
     log_level: info
-
   storage:
     trace:
       backend: s3
       s3:
-        bucket: ${S3_BUCKET}/tempo
+        bucket: ${S3_BUCKET}        # plain bucket name only — no path suffix
+        prefix: tempo               # use prefix to namespace within shared bucket
         region: ${S3_REGION}
-
-  # Disabling metrics generator to save resources
+      wal:
+        path: /var/tempo/wal        # explicit WAL path — required for single binary S3 backend
   metricsGenerator:
     enabled: false
 
-# -----------------------------
-# Resource Management
-# -----------------------------
 resources:
   requests:
     cpu: 250m
@@ -52,13 +32,10 @@ resources:
     cpu: 500m
     memory: 1Gi
 
-# -----------------------------
-# Health Probes
-# -----------------------------
 readinessProbe:
   httpGet:
     path: /ready
-    port: http-tempo
+    port: 3200
   initialDelaySeconds: 60
   periodSeconds: 10
   failureThreshold: 5
@@ -66,7 +43,7 @@ readinessProbe:
 livenessProbe:
   httpGet:
     path: /ready
-    port: http-tempo
+    port: 3200
   initialDelaySeconds: 90
   periodSeconds: 10
   failureThreshold: 5
