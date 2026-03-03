@@ -18,6 +18,8 @@ tempo:
       s3:
         bucket: ${S3_BUCKET_TEMPO}
         region: ${S3_REGION}
+      wal:
+        path: /var/tempo/wal         # explicit WAL — required for S3 backend single binary
   metricsGenerator:
     enabled: false
 
@@ -33,12 +35,14 @@ readinessProbe:
   httpGet:
     path: /ready
     port: 3200
-  initialDelaySeconds: 30
+  initialDelaySeconds: 60    # S3 client init needs headroom
   periodSeconds: 10
+  failureThreshold: 5
 
 livenessProbe:
   httpGet:
     path: /ready
     port: 3200
-  initialDelaySeconds: 60
+  initialDelaySeconds: 120   # don't kill pod during first S3 write
   periodSeconds: 10
+  failureThreshold: 5
