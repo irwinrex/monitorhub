@@ -16,6 +16,8 @@ loki:
   ingester:
     chunk_encoding: snappy
     lifecycler:
+      join_after: 0s
+      min_ready_duration: 0s
       ring:
         kvstore:
           store: inmemory
@@ -43,9 +45,9 @@ loki:
     ring:
       enabled: false
     storage:
-      type: local                   # <-- use local so the sidecar-written rules are picked up
+      type: local
       local:
-        directory: /loki-rules      # <-- new non-conflicting path
+        directory: /rules     # chart-native loki-sc-rules sidecar writes here
     evaluation:
       evaluation_interval: 1m
     poll_interval: 1m
@@ -67,52 +69,23 @@ singleBinary:
     - name: MEMBERLIST_ENABLED
       value: "false"
 
-  extraContainers:
-    - name: rules-sidecar
-      image: kiwigrid/k8s-sidecar:1.30.9
-      env:
-        - name: METHOD
-          value: WATCH
-        - name: LABEL
-          value: loki_rule
-        - name: FOLDER
-          value: /loki-rules          # <-- matches extraVolumeMounts below
-        - name: RESOURCE
-          value: both
-        - name: WATCH_SERVER_TIMEOUT
-          value: "60"
-        - name: WATCH_CLIENT_TIMEOUT
-          value: "60"
-        - name: LOG_LEVEL
-          value: INFO
-      volumeMounts:
-        - name: rules-volume
-          mountPath: /loki-rules      # <-- sidecar writes here
-      readinessProbe:
-        exec:
-          command:
-            - sh
-            - -c
-            - "if [ -f /tmp/ready ]; then exit 0; else exit 1; fi"
-        initialDelaySeconds: 5
-        periodSeconds: 10
-      livenessProbe:
-        exec:
-          command:
-            - sh
-            - -c
-            - "ps aux | grep -v grep | grep -q sidecar"
-        initialDelaySeconds: 30
-        periodSeconds: 30
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: http-metrics
+    initialDelaySeconds: 90
+    periodSeconds: 15
+    timeoutSeconds: 5
+    failureThreshold: 5
 
-  extraVolumes:
-    - name: rules-volume
-      emptyDir: {}
-
-  extraVolumeMounts:
-    - name: rules-volume
-      mountPath: /loki-rules          # <-- main loki container reads rules from here
-      readOnly: false
+  livenessProbe:
+    httpGet:
+      path: /ready
+      port: http-metrics
+    initialDelaySeconds: 300
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 5
 
 # Disable unnecessary components
 lokiCanary:
