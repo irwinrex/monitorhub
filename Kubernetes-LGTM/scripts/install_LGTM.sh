@@ -95,11 +95,21 @@ if [[ -z "${S3_REGION:-}" ]]; then
 fi
 S3_REGION="${S3_REGION:-us-east-1}"
 
-export S3_BUCKET S3_REGION
+# Generate component-specific bucket names
+S3_BUCKET_LOKI="${S3_BUCKET}-loki"
+S3_BUCKET_TEMPO="${S3_BUCKET}-tempo"
+S3_BUCKET_MIMIR="${S3_BUCKET}-mimir"
+S3_BUCKET_GRAFANA="${S3_BUCKET}-grafana"
+
+export S3_BUCKET S3_REGION S3_BUCKET_LOKI S3_BUCKET_TEMPO S3_BUCKET_MIMIR S3_BUCKET_GRAFANA
 
 info "S3 Configuration:"
-echo "  Bucket:    ${S3_BUCKET}"
-echo "  Region:    ${S3_REGION}"
+echo "  Base Bucket:  ${S3_BUCKET}"
+echo "  Loki Bucket:  ${S3_BUCKET_LOKI}"
+echo "  Tempo Bucket: ${S3_BUCKET_TEMPO}"
+echo "  Mimir Bucket: ${S3_BUCKET_MIMIR}"
+echo "  Grafana Bucket: ${S3_BUCKET_GRAFANA}"
+echo "  Region:       ${S3_REGION}"
 
 VALUES_DIR="$(resolve_values_dir)"
 

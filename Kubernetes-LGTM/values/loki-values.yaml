@@ -29,9 +29,9 @@ loki:
   storage:
     type: s3
     bucketNames:
-      chunks: ${S3_BUCKET}
-      ruler: ${S3_BUCKET}
-      admin: ${S3_BUCKET}
+      chunks: ${S3_BUCKET_LOKI}
+      ruler: ${S3_BUCKET_LOKI}
+      admin: ${S3_BUCKET_LOKI}
     s3:
       region: ${S3_REGION}
       s3ForcePathStyle: true

@@ -39,9 +39,15 @@ All version pins live in `scripts/lib/common.sh`.
 |---|---|
 | Instance | t4g.xlarge · 4 vCPU / 16 GB · Debian 12 ARM64 · fresh install |
 | IAM role | EC2 instance role with S3 access (policy below) |
-| S3 bucket | `lgtm-observability` in your region |
+| S3 bucket | Base name you provide (e.g., `lgtm-observability`) |
 | Security group | Ports 22, 80, 443 open inbound |
 | DNS | A record: `grafana.yourdomain.com` → EC2 public IP |
+
+**S3 Bucket Naming:**
+When you provide a base bucket name (e.g., `lgtm-observability`), the installer creates separate buckets for each component:
+- `lgtm-observability-loki` - Loki logs
+- `lgtm-observability-tempo` - Tempo traces
+- `lgtm-observability-mimir` - Mimir metrics
 
 **IAM Policy (attach to EC2 instance role):**
 ```json
@@ -49,8 +55,8 @@ All version pins live in `scripts/lib/common.sh`.
   "Effect": "Allow",
   "Action": ["s3:GetObject","s3:PutObject","s3:DeleteObject","s3:ListBucket"],
   "Resource": [
-    "arn:aws:s3:::lgtm-observability",
-    "arn:aws:s3:::lgtm-observability/*"
+    "arn:aws:s3:::lgtm-observability*",
+    "arn:aws:s3:::lgtm-observability*/*"
   ]
 }
 ```

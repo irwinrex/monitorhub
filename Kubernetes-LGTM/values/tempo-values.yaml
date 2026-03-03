@@ -16,7 +16,7 @@ tempo:
     trace:
       backend: s3
       s3:
-        bucket: ${S3_BUCKET}/tempo
+        bucket: ${S3_BUCKET_TEMPO}
         region: ${S3_REGION}
   metricsGenerator:
     enabled: false
