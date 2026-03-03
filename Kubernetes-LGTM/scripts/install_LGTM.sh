@@ -20,7 +20,7 @@ require_helm
 # NOTE: Loki is migrating to grafana-community on 2026-03-16.
 #       Tempo already migrated on 2026-01-30.
 #       Both are pre-pointed at grafana-community here to avoid breakage.
-LOKI_REPO="grafana-community"
+LOKI_REPO="grafana"
 TEMPO_REPO="grafana-community"
 MIMIR_REPO="grafana"
 GRAFANA_REPO="grafana"
