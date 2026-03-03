@@ -1,6 +1,9 @@
 loki:
   commonConfig:
     replication_factor: 1
+    ring:
+      kvstore:
+        store: inmemory
   schemaConfig:
     configs:
       - from: "2024-04-01"
@@ -12,6 +15,11 @@ loki:
           period: 24h
   ingester:
     chunk_encoding: snappy
+    lifecycler:
+      ring:
+        kvstore:
+          store: inmemory
+        replication_factor: 1
   tracing:
     enabled: true
   querier:
@@ -26,6 +34,8 @@ loki:
       region: ${S3_REGION}
       s3ForcePathStyle: true
       insecure: false
+  memberlist:
+    enabled: false
 
 deploymentMode: SingleBinary
 singleBinary:
@@ -40,12 +50,20 @@ singleBinary:
   extraEnv:
     - name: GOMEMLIMIT
       value: 3750MiB
+    - name: MEMBERLIST_ENABLED
+      value: "false"
 
-# Disable chunksCache for lightweight
+# Disable unnecessary components
+lokiCanary:
+  enabled: false
+gateway:
+  enabled: false
 chunksCache:
   enabled: false
+resultsCache:
+  enabled: false
 
-# Disable other deployment modes
+# Keep all other components at 0
 backend:
   replicas: 0
 read:
