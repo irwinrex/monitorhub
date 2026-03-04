@@ -189,10 +189,11 @@ fi
 # Grafana
 if ! check_version_drift "grafana" "${MONITORING_NS}" "${GRAFANA_CHART_VERSION}"; then
   info "Installing/Upgrading Grafana ${GRAFANA_CHART_VERSION}..."
+  apply_values "${VALUES_DIR}/grafana-values.yaml" /tmp/grafana-values.yaml
   helm upgrade --install grafana "${GRAFANA_REPO}/grafana" \
     --namespace "${MONITORING_NS}" \
     --version "${GRAFANA_CHART_VERSION}" \
-    --values "${VALUES_DIR}/grafana-values.yaml" \
+    --values /tmp/grafana-values.yaml \
     --wait --timeout 10m
   success "Grafana ${GRAFANA_CHART_VERSION} deployed"
 else
@@ -201,26 +202,26 @@ fi
 
 # ── 7. Datasources ────────────────────────────────────────────────────────────
 info "Configuring datasources..."
-kubectl apply -f - <<EOF
+MONITORING_NS="${MONITORING_NS}" envsubst '${MONITORING_NS}' | kubectl apply -f - <<EOF
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: grafana-datasources
-  namespace: ${MONITORING_NS}
+  namespace: \${MONITORING_NS}
 data:
   datasources.yaml: |
     apiVersion: 1
     datasources:
       - name: Mimir
         type: prometheus
-        url: http://mimir.${MONITORING_NS}.svc.cluster.local:8080/prometheus
+        url: http://mimir-gateway.\${MONITORING_NS}.svc.cluster.local:80/prometheus
         isDefault: true
       - name: Loki
         type: loki
-        url: http://loki.${MONITORING_NS}.svc.cluster.local:3100
+        url: http://loki.\${MONITORING_NS}.svc.cluster.local:3100
       - name: Tempo
         type: tempo
-        url: http://tempo.${MONITORING_NS}.svc.cluster.local:3200
+        url: http://tempo.\${MONITORING_NS}.svc.cluster.local:3200
 EOF
 
 # ── 8. Ingress ────────────────────────────────────────────────────────────────

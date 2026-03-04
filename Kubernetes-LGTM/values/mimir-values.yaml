@@ -7,11 +7,9 @@ mimir:
   structuredConfig:
     auth_enabled: false
 
-    # Disable ingest storage (Kafka)
     ingest_storage:
       enabled: false
 
-    # S3 storage config
     common:
       storage:
         backend: s3
@@ -40,6 +38,9 @@ mimir:
     ingester:
       ring:
         replication_factor: 1
+
+    query_scheduler:
+      service_discovery_mode: dns
 
     querier:
       max_concurrent: 2
