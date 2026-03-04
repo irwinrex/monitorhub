@@ -32,29 +32,37 @@ mimir:
       kafka:
         address: ""
 
+    # Usage stats - reporting to Grafana (requires S3 endpoint)
+    usage_stats:
+      enabled: false
+
     # S3 for all storage backends — envsubst fills ${S3_REGION} / ${S3_BUCKET_MIMIR}
     common:
       storage:
         backend: s3
         s3:
+          endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
           region: ${S3_REGION}
           bucket_name: ${S3_BUCKET_MIMIR}
 
     blocks_storage:
       backend: s3
       s3:
+        endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
         region: ${S3_REGION}
         bucket_name: ${S3_BUCKET_MIMIR}
 
     alertmanager_storage:
       backend: s3
       s3:
+        endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
         region: ${S3_REGION}
         bucket_name: ${S3_BUCKET_MIMIR}
 
     ruler_storage:
       backend: s3
       s3:
+        endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
         region: ${S3_REGION}
         bucket_name: ${S3_BUCKET_MIMIR}
 
