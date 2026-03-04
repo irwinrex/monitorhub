@@ -5,54 +5,62 @@
 # =============================================================================
 
 ---
+# Grafana - NO basic auth (Grafana handles its own login)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: lgtm-ingress
+  name: grafana-ingress
   namespace: monitoring
   annotations:
-    # HAProxy timeout settings
     haproxy.org/timeout-server: "60s"
+    haproxy.org/proxy-body-size: "50m"
 spec:
-  # Use HAProxy ingress class
   ingressClassName: haproxy
-  
-  # Routing rules
   rules:
     - http:
         paths:
-          # Default route - goes to Grafana dashboard
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: lgtm-grafana
+                name: grafana
                 port:
                   number: 3000
-          
-          # Mimir metrics push endpoint
-          - path: /api/v1/push
+---
+# API endpoints (Mimir, Loki, Tempo) - WITH basic auth
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: lgtm-api-ingress
+  namespace: monitoring
+  annotations:
+    haproxy.org/timeout-server: "60s"
+    haproxy.org/proxy-body-size: "50m"
+    ingress.kubernetes.io/auth-type: basic-auth
+    ingress.kubernetes.io/auth-secret: grafana-basic-auth
+spec:
+  ingressClassName: haproxy
+  rules:
+    - http:
+        paths:
+          - path: /mimir
             pathType: Prefix
             backend:
               service:
-                name: lgtm-mimir-gateway
+                name: mimir-gateway
                 port:
                   number: 80
-          
-          # Loki log endpoint
           - path: /loki
             pathType: Prefix
             backend:
               service:
-                name: lgtm-loki
+                name: loki
                 port:
                   number: 3100
-          
-          # Tempo trace endpoint
           - path: /tempo
             pathType: Prefix
             backend:
               service:
-                name: lgtm-tempo
+                name: tempo
                 port:
                   number: 3200

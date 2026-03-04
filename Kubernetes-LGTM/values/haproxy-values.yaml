@@ -73,7 +73,7 @@ controller:
     mimir-backend:
       enabled: true
       endpoints:
-        - http://lgtm-mimir-gateway.monitoring.svc.cluster.local:80
+        - http://mimir-gateway.monitoring.svc.cluster.local:80
       port: 80
       backendServerProtocol: HTTP
       pathRewrite: "/mimir(.*) /$1"
@@ -81,7 +81,7 @@ controller:
     loki-backend:
       enabled: true
       endpoints:
-        - http://lgtm-loki.monitoring.svc.cluster.local:3100
+        - http://loki.monitoring.svc.cluster.local:3100
       port: 3100
       backendServerProtocol: HTTP
       pathRewrite: "/loki(.*) /$1"
@@ -89,7 +89,7 @@ controller:
     tempo-backend:
       enabled: true
       endpoints:
-        - http://lgtm-tempo.monitoring.svc.cluster.local:3200
+        - http://tempo.monitoring.svc.cluster.local:3200
       port: 3200
       backendServerProtocol: HTTP
       pathRewrite: "/tempo(.*) /$1"
