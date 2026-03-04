@@ -206,7 +206,8 @@ fi
 
 # ── 7. Datasources ────────────────────────────────────────────────────────────
 info "Configuring datasources..."
-MONITORING_NS="${MONITORING_NS}" envsubst '${MONITORING_NS}' | kubectl apply -f - <<EOF
+export MONITORING_NS
+envsubst '${MONITORING_NS}' | kubectl apply -f - <<EOF
 apiVersion: v1
 kind: ConfigMap
 metadata:
