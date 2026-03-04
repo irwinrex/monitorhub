@@ -89,10 +89,10 @@ sudo bash install_all.sh
 sudo bash install_all.sh -y
 
 # With S3 configuration via flags
-sudo bash install_all.sh --bucket-name lgtm-observability --bucket-region us-east-1 -y
-
-# Shorthand
 sudo bash install_all.sh -b lgtm-observability -r us-east-1 -y
+
+# Alternative flag syntax
+sudo bash install_all.sh --bucket-name-prefix lgtm-observability --bucket-region us-east-1 -y
 
 # With environment variables
 S3_BUCKET=lgtm-observability S3_REGION=us-east-1 sudo -E bash install_all.sh -y

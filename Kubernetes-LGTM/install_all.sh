@@ -57,19 +57,19 @@ require_root
 # ── Parse arguments ───────────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -b|--bucket-name)
+    -b|--bucket-name|--bucket-name-prefix)
       S3_BUCKET="$2"
       shift 2
       ;;
-    --bucket-name=*)
+    --bucket-name=*|--bucket-name-prefix=*)
       S3_BUCKET="${1#*=}"
       shift
       ;;
-    -r|--bucket-region)
+    -r|--region|--bucket-region)
       S3_REGION="$2"
       shift 2
       ;;
-    --bucket-region=*)
+    --region=*|--bucket-region=*)
       S3_REGION="${1#*=}"
       shift
       ;;
@@ -81,14 +81,15 @@ while [[ $# -gt 0 ]]; do
       echo "Usage: sudo bash install_all.sh [OPTIONS]"
       echo ""
     echo "Options:"
-    echo "  -b, --bucket-name NAME     S3 bucket name for backups"
-    echo "  -r, --bucket-region REGION S3 region (e.g., us-east-1)"
-    echo "  -y, --yes                  Run in non-interactive mode"
-    echo "  -h, --help                 Show this help message"
+    echo "  -b, --bucket-name, --bucket-name-prefix  S3 bucket name"
+    echo "  -r, --region, --bucket-region           S3 region (e.g., us-east-1)"
+    echo "  -y, --yes                               Run in non-interactive mode"
+    echo "  -h, --help                              Show this help message"
     echo ""
     echo "Examples:"
     echo "  sudo bash install_all.sh"
-    echo "  sudo bash install_all.sh --bucket-name my-bucket --bucket-region us-east-1 -y"
+    echo "  sudo bash install_all.sh -b my-bucket -r us-east-1 -y"
+    echo "  sudo bash install_all.sh --bucket-name-prefix my-bucket --bucket-region us-west-2 -y"
     echo "  S3_BUCKET=my-bucket S3_REGION=us-east-1 sudo -E bash install_all.sh -y"
       exit 0
       ;;
