@@ -39,7 +39,10 @@ check_version_drift() {
     grep -o '[0-9][^"]*' || true)
 
   if [[ "${deployed_chart}" == *"${desired_version}"* ]]; then
-    return 0
+    # Also check if pods are running
+    if kubectl get pods -n "${namespace}" -l "app.kubernetes.io/instance=${release}" 2>/dev/null | grep -q "Running"; then
+      return 0
+    fi
   fi
   return 1
 }
