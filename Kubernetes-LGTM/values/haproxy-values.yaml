@@ -42,30 +42,25 @@ controller:
     default-server: "inter 3s rise 2 fall 3"  # Health check settings
     maxconn: "4000"                # Max connections per frontend
 
-  # Extra HAProxy configuration - rate limiting and security headers
+  # Extra HAProxy configuration - rate limiting stick table
+  # Note: Security headers are now applied via Ingress annotations in ingress-values.yaml
+  # to avoid HAProxy parsing errors with raw directives in extraConfig
   extraConfig: |
-    # Rate limiting stick table
+    # Rate limiting stick table - used by rate-limit annotations
     stick-table type ip size 100k expire 30s store conn_rate(30s),http_req_rate(30s)
-    
-    # Security headers
-    http-response set-header X-Frame-Options "SAMEORIGIN"
-    http-response set-header X-Content-Type-Options "nosniff"
-    http-response set-header X-XSS-Protection "1; mode=block"
-    http-response set-header Referrer-Policy "strict-origin-when-cross-origin"
-    http-response set-header Strict-Transport-Security "max-age=31536000; includeSubDomains"
-    http-response set-header Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https: wss:;"
 
-  # Backend rate limiting annotations
+  # Backend rate limiting annotations - applied to all backends
   extraBackendConfig:
     annotations:
-      haproxy.org/rate-limit: "100"           # Max 100 connections per IP
-      haproxy.org/rate-limit-requests: "50"    # Max 50 requests per second
+      haproxy.org/rate-limit: "100"
+      haproxy.org/rate-limit-requests: "50"
 
-  # Extra service annotations
+  # Extra service annotations - MUST include rate-limit-requests or HAProxy errors
   extraService:
     enabled: true
     annotations:
       haproxy.org/rate-limit: "100"
+      haproxy.org/rate-limit-requests: "50"
 
   # Path-based routing backends (HTTP - mTLS handled by Linkerd)
   extraBackends:

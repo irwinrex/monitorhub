@@ -220,6 +220,15 @@ metadata:
   annotations:
     haproxy.org/timeout-server: "60s"
     haproxy.org/proxy-body-size: "50m"
+    haproxy.org/rate-limit: "100"
+    haproxy.org/rate-limit-requests: "50"
+    haproxy.org/response-set-header: |
+      X-Frame-Options "SAMEORIGIN"
+      X-Content-Type-Options "nosniff"
+      X-XSS-Protection "1; mode=block"
+      Referrer-Policy "strict-origin-when-cross-origin"
+      Strict-Transport-Security "max-age=31536000; includeSubDomains"
+      Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https: wss:;"
 spec:
   ingressClassName: haproxy
   rules:
@@ -231,7 +240,7 @@ spec:
               service:
                 name: grafana
                 port:
-                  number: 3000
+                  number: 80
 ---
 # API endpoints (Mimir, Loki, Tempo) - WITH basic auth
 apiVersion: networking.k8s.io/v1
@@ -242,6 +251,15 @@ metadata:
   annotations:
     haproxy.org/timeout-server: "60s"
     haproxy.org/proxy-body-size: "50m"
+    haproxy.org/rate-limit: "100"
+    haproxy.org/rate-limit-requests: "50"
+    haproxy.org/response-set-header: |
+      X-Frame-Options "SAMEORIGIN"
+      X-Content-Type-Options "nosniff"
+      X-XSS-Protection "1; mode=block"
+      Referrer-Policy "strict-origin-when-cross-origin"
+      Strict-Transport-Security "max-age=31536000; includeSubDomains"
+      Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https: wss:;"
     ingress.kubernetes.io/auth-type: basic-auth
     ingress.kubernetes.io/auth-secret: grafana-basic-auth
 spec:
