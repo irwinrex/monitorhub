@@ -4,42 +4,50 @@ minio:
   enabled: false
 
 mimir:
-  common:
-    storage:
+  structuredConfig:
+    auth_enabled: false
+
+    # Disable ingest storage (Kafka)
+    ingest_storage:
+      enabled: false
+
+    # S3 storage config
+    common:
+      storage:
+        backend: s3
+        s3:
+          region: ${S3_REGION}
+          bucket_name: ${S3_BUCKET_MIMIR}
+
+    blocks_storage:
       backend: s3
       s3:
         region: ${S3_REGION}
         bucket_name: ${S3_BUCKET_MIMIR}
 
-  blocks_storage:
-    backend: s3
-    s3:
-      region: ${S3_REGION}
-      bucket_name: ${S3_BUCKET_MIMIR}
+    alertmanager_storage:
+      backend: s3
+      s3:
+        region: ${S3_REGION}
+        bucket_name: ${S3_BUCKET_MIMIR}
 
-  alertmanager_storage:
-    backend: s3
-    s3:
-      region: ${S3_REGION}
-      bucket_name: ${S3_BUCKET_MIMIR}
+    ruler_storage:
+      backend: s3
+      s3:
+        region: ${S3_REGION}
+        bucket_name: ${S3_BUCKET_MIMIR}
 
-  ruler_storage:
-    backend: s3
-    s3:
-      region: ${S3_REGION}
-      bucket_name: ${S3_BUCKET_MIMIR}
+    ingester:
+      ring:
+        replication_factor: 1
 
-  ingester:
-    ring:
-      replication_factor: 1
+    querier:
+      max_concurrent: 2
 
-  querier:
-    max_concurrent: 2
-
-  limits:
-    ingestion_rate: 10000
-    ingestion_burst_size: 20000
-    max_global_series_per_user: 100000
+    limits:
+      ingestion_rate: 10000
+      ingestion_burst_size: 20000
+      max_global_series_per_user: 100000
 
 kafka:
   enabled: false
