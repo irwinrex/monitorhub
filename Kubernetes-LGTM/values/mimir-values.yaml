@@ -1,75 +1,196 @@
-# Mimir Values - Minimal/Single Binary
+# mimir-values.yaml
 fullnameOverride: mimir
 
-# Use standalone mode for minimal deployment
-mode: standalone
-replicas: 1
-
-# Disable persistence (use S3)
-persistence:
-  enabled: false
-
-# MinIO is not needed with external S3
 minio:
   enabled: false
 
-server:
-  http_listen_port: 8080
-  grpc_listen_port: 9095
+# ── Classic architecture preset (no Kafka/ingest storage) ─────────────────────
+# Per official 5.x→6.0 migration guide — this is the supported way to opt out
+# of ingest storage in chart 6.x
+mimir:
+  structuredConfig:
+    auth_enabled: false
 
-# Structured config for S3
-structuredConfig:
-  auth_enabled: false
+    # Classic push path — disables ingest storage / Kafka dependency
+    ingest_storage:
+      enabled: false
+    ingester:
+      push_grpc_method_enabled: true
 
-  common:
-    storage:
+    # S3 — common storage applied to all backends
+    common:
+      storage:
+        backend: s3
+        s3:
+          region: ${S3_REGION}
+          bucket_name: ${S3_BUCKET_MIMIR}
+          endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
+
+    # Override per-storage explicitly — avoids inheriting wrong bucket paths
+    blocks_storage:
       backend: s3
       s3:
         region: ${S3_REGION}
         bucket_name: ${S3_BUCKET_MIMIR}
+        endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
 
-  blocks_storage:
-    backend: s3
-    s3:
-      region: ${S3_REGION}
-      bucket_name: ${S3_BUCKET_MIMIR}/blocks
+    alertmanager_storage:
+      backend: s3
+      s3:
+        region: ${S3_REGION}
+        bucket_name: ${S3_BUCKET_MIMIR}
+        endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
 
-  alertmanager_storage:
-    backend: s3
-    s3:
-      region: ${S3_REGION}
-      bucket_name: ${S3_BUCKET_MIMIR}/alertmanager
+    ruler_storage:
+      backend: s3
+      s3:
+        region: ${S3_REGION}
+        bucket_name: ${S3_BUCKET_MIMIR}
+        endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
 
-  ruler_storage:
-    backend: s3
-    s3:
-      region: ${S3_REGION}
-      bucket_name: ${S3_BUCKET_MIMIR}/ruler
+    # Replication factor 1 — single node, no HA
+    ingester:
+      ring:
+        replication_factor: 1
+    store_gateway:
+      sharding_ring:
+        replication_factor: 1
 
-  ingester:
-    ring:
-      replication_factor: 1
+# ── Disable Kafka (chart-level) ───────────────────────────────────────────────
+kafka:
+  enabled: false
 
-  compactor:
-    retention_enabled: true
+# ── Disable rollout operator webhooks (not needed for single-node) ────────────
+rollout_operator:
+  enabled: false
 
-# Set all components to minimal
+# ── Disable zone-aware replication everywhere ─────────────────────────────────
+ingester:
+  zoneAwareReplication:
+    enabled: false
+  replicas: 1
+  persistentVolume:
+    enabled: false
+
+storeGateway:
+  zoneAwareReplication:
+    enabled: false
+  replicas: 1
+  persistentVolume:
+    enabled: false
+
+# ── Single replica for all stateless components ───────────────────────────────
+distributor:
+  replicas: 1
+
+querier:
+  replicas: 1
+
+queryFrontend:
+  replicas: 1
+
+queryScheduler:
+  replicas: 1
+
+compactor:
+  replicas: 1
+  persistentVolume:
+    enabled: false
+
+ruler:
+  replicas: 1
+
 alertmanager:
-  replicas: 0
+  replicas: 1
+  persistentVolume:
+    enabled: false
+  statefulSet:
+    enabled: true
 
-store_gateway:
-  replicas: 0
+overridesExporter:
+  replicas: 1
 
-overrides_exporter:
-  replicas: 0
+# ── Gateway ───────────────────────────────────────────────────────────────────
+gateway:
+  replicas: 1
+  enabledNonEnterprise: true
 
-query_scheduler:
-  replicas: 0
+# ── Disable all caches and meta-monitoring ────────────────────────────────────
+metaMonitoring:
+  serviceMonitor:
+    enabled: false
+  grafanaAgent:
+    enabled: false
 
-resources:
-  requests:
-    cpu: 500m
-    memory: 1Gi
-  limits:
-    cpu: 1000m
-    memory: 2Gi
+chunks-cache:
+  enabled: false
+
+index-cache:
+  enabled: false
+
+metadata-cache:
+  enabled: false
+
+results-cache:
+  enabled: false
+
+# ── Resource limits ───────────────────────────────────────────────────────────
+# Applied globally — individual components inherit unless overridden
+global:
+  extraEnv:
+    - name: GOMAXPROCS
+      value: "1"
+
+ingester:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+distributor:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+querier:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+queryFrontend:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+compactor:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+storeGateway:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
