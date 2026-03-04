@@ -99,9 +99,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Export for child scripts
-export S3_BUCKET="${S3_BUCKET:-}"
-export S3_REGION="${S3_REGION:-}"
+# Export for child scripts (only if already set)
+export S3_BUCKET
+export S3_REGION
 
 # ── Skip flags ────────────────────────────────────────────────────────────────────
 SKIP_K0S="${SKIP_K0S:-false}"
@@ -215,7 +215,7 @@ if [[ "${SKIP_BACKUP}" != "true" ]]; then
   info "=== S3 Backup Configuration ==="
   echo ""
   
-  if [[ -z "${S3_BUCKET:-}" ]]; then
+  if [[ -z "${S3_BUCKET}" ]]; then
     read -r -p "Enter S3 bucket name for backups: " S3_BUCKET
   else
     info "Using S3 bucket from argument: ${S3_BUCKET}"
@@ -225,7 +225,7 @@ if [[ "${SKIP_BACKUP}" != "true" ]]; then
     warn "No S3 bucket provided - backup phase will be skipped"
     SKIP_BACKUP=true
   else
-    if [[ -z "${S3_REGION:-}" ]]; then
+    if [[ -z "${S3_REGION}" ]]; then
       read -r -p "Enter S3 region (default: us-east-1): " S3_REGION_INPUT
       S3_REGION="${S3_REGION_INPUT:-us-east-1}"
     else
