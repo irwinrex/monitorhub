@@ -1,40 +1,59 @@
-# Grafana Values
+# =============================================================================
+# Grafana Configuration - Metrics Visualization Dashboard
+# Grafana connects to Mimir (metrics), Loki (logs), and Tempo (traces)
+# =============================================================================
+
+# Number of Grafana replicas
 replicas: 1
 
+# Admin user configuration
 admin:
+  # Use existing secret for admin credentials (created by install_secrets.sh)
   existingSecret: grafana-admin
 
+# Persistent storage - disabled for simplicity (data stays in memory)
 persistence:
   enabled: false
 
+# Grafana main configuration
 grafana.ini:
+  # Analytics - disable reporting
   analytics:
     reporting_enabled: false
+  
+  # Logging - log to console
   log:
     mode: console
+  
+  # User settings - auto-assign to organization
   users:
     auto_assign_org: true
-    auto_assign_org_role: Viewer
+    auto_assign_org_role: Viewer  # New users are Viewers by default
 
+# Built-in datasources configuration
 datasources:
   datasources.yaml:
     apiVersion: 1
     datasources:
+      # Mimir - Prometheus-compatible metrics backend
       - name: Mimir
         type: prometheus
         url: http://mimir.monitoring.svc.cluster.local:8080
-        isDefault: true
+        isDefault: true  # Default metrics source
+      # Loki - Log aggregation
       - name: Loki
         type: loki
         url: http://loki.monitoring.svc.cluster.local:3100
+      # Tempo - Distributed tracing
       - name: Tempo
         type: tempo
         url: http://tempo.monitoring.svc.cluster.local:3200
 
+# Resource limits - how much CPU and memory to use
 resources:
   requests:
-    cpu: 100m
-    memory: 256Mi
+    cpu: 100m    # Request 100 millicpus
+    memory: 256Mi  # Request 256 MB RAM
   limits:
-    cpu: 250m
-    memory: 512Mi
+    cpu: 250m    # Max 250 millicpus
+    memory: 512Mi  # Max 512 MB RAM

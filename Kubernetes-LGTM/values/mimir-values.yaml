@@ -23,10 +23,14 @@ rollout_operator:
 # =============================================================================
 # Mimir structured config — injected directly into /etc/mimir/mimir.yaml
 # DO NOT add auth_enabled here — not a valid field in chart 6.0.5
-# DO NOT add ingest_storage here — chart templates it from kafka.enabled above
 # =============================================================================
 mimir:
   structuredConfig:
+
+    ingest_storage:
+      enabled: false
+      kafka:
+        address: ""
 
     # S3 for all storage backends — envsubst fills ${S3_REGION} / ${S3_BUCKET_MIMIR}
     common:
@@ -74,7 +78,6 @@ mimir:
 
 # =============================================================================
 # Component replicas and resources
-# KEY FIX: chart 6.0.5 uses snake_case for store_gateway and overrides_exporter
 # =============================================================================
 
 # ── Ingester ──────────────────────────────────────────────────────────────────

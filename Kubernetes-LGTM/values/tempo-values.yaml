@@ -1,50 +1,69 @@
+# =============================================================================
+# Tempo Configuration - Distributed Tracing System
+# Tempo stores and queries traces (request paths through your services)
+# Connected to S3 for persistent trace storage
+# =============================================================================
+
+# Override the default release name
 fullnameOverride: tempo
+
+# Single Binary mode - all components in one pod
 deploymentMode: SingleBinary
 
 singleBinary:
-  replicas: 1
+  replicas: 1  # One replica for single node
+  
+  # No persistent storage needed - traces go to S3
   persistence:
     enabled: false
 
+# Tempo server configuration
 tempo:
-  auth_enabled: false
+  auth_enabled: false  # No authentication for simplicity
   server:
-    http_listen_port: 3200
-    grpc_listen_port: 9096
-    log_level: info
+    http_listen_port: 3200   # HTTP port for queries
+    grpc_listen_port: 9096   # gRPC port for ingestion
+    log_level: info          # Log level
+  
+  # Storage configuration for traces
   storage:
     trace:
-      backend: s3
+      backend: s3             # Store traces in S3
       s3:
-        bucket: ${S3_BUCKET_TEMPO}
-        region: ${S3_REGION}
-        endpoint: s3.dualstack.${S3_REGION}.amazonaws.com   # required — Tempo uses MinIO client, not AWS SDK
-        insecure: false
+        bucket: ${S3_BUCKET_TEMPO}   # S3 bucket name
+        region: ${S3_REGION}          # AWS region
+        # S3 endpoint - uses AWS dualstack for accessibility
+        endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
+        insecure: false       # Use HTTPS
       wal:
-        path: /var/tempo/wal
+        path: /var/tempo/wal  # Write-ahead log location
+  
+  # Metrics generator - creates metrics from traces (disabled)
   metricsGenerator:
     enabled: false
 
+# Resource limits - how much CPU and memory to use
 resources:
   requests:
-    cpu: 250m
-    memory: 512Mi
+    cpu: 250m    # Request 250 millicpus
+    memory: 512Mi  # Request 512 MB RAM
   limits:
-    cpu: 500m
-    memory: 1Gi
+    cpu: 500m    # Max 500 millicpus
+    memory: 1Gi    # Max 1 GB RAM
 
+# Health check settings
 readinessProbe:
   httpGet:
     path: /ready
     port: 3200
-  initialDelaySeconds: 60
-  periodSeconds: 10
-  failureThreshold: 5
+  initialDelaySeconds: 60   # Wait 60s before first check
+  periodSeconds: 10         # Check every 10 seconds
+  failureThreshold: 5        # Fail after 5 failed checks
 
 livenessProbe:
   httpGet:
     path: /ready
     port: 3200
-  initialDelaySeconds: 120
-  periodSeconds: 10
-  failureThreshold: 5
+  initialDelaySeconds: 120  # Wait 2 minutes before checking
+  periodSeconds: 10        # Check every 10 seconds
+  failureThreshold: 5        # Fail after 5 failed checks

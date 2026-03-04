@@ -1,55 +1,65 @@
-# Alertmanager configuration
+# =============================================================================
+# Alertmanager Configuration
+# Alertmanager handles alerts from Mimir and routes them to receivers
+# Currently using basic webhook configuration
+# =============================================================================
+
 alertmanager:
-  enabled: true
-  clusterDomain: cluster.local
+  enabled: true  # Enable Alertmanager
+  clusterDomain: cluster.local  # Kubernetes cluster domain
   
-  # Use persistent storage
+  # Persistent storage for alert data
   persistentVolume:
     enabled: true
-    size: 1Gi
-    storageClass: local-path
+    size: 1Gi      # 1 GB storage
+    storageClass: local-path  # Use local storage
   
   # Resource limits
   resources:
     requests:
-      cpu: 100m
-      memory: 128Mi
+      cpu: 100m    # Request 100 millicpus
+      memory: 128Mi  # Request 128 MB RAM
     limits:
-      cpu: 250m
-      memory: 256Mi
+      cpu: 250m    # Max 250 millicpus
+      memory: 256Mi  # Max 256 MB RAM
   
-  # Replica count (1 for single node)
+  # Number of replicas (1 for single node)
   replicaCount: 1
   
-  # Security context
+  # Security settings
   securityContext:
-    runAsUser: 10001
+    runAsUser: 10001       # Run as non-root user
     runAsNonRoot: true
-    fsGroup: 10001
+    fsGroup: 10001         # Group for file access
 
-# Config - basic configuration
+# Alertmanager configuration
 config:
+  # Global settings
   global:
-    resolve_timeout: 5m
+    resolve_timeout: 5m  # Time to wait before resolving alert
+  
+  # Routing configuration - how to route alerts
   route:
-    group_by: ['alertname']
-    group_wait: 10s
-    group_interval: 10s
-    repeat_interval: 12h
-    receiver: 'default'
+    group_by: ['alertname']           # Group by alert name
+    group_wait: 10s                   # Wait 10s before sending first alert
+    group_interval: 10s                # Send new alerts every 10s
+    repeat_interval: 12h              # Repeat alert every 12 hours
+    receiver: 'default'                # Default receiver
     routes:
       - match:
-          namespace: monitoring
+          namespace: monitoring        # Match alerts from monitoring namespace
         receiver: 'default'
+  
+  # Receiver configurations
   receivers:
     - name: 'default'
       webhook_configs:
-        - send_resolved: true
+        - send_resolved: true  # Send notification when alert resolves
 
-# Disable ingress for internal use
+# Disable ingress - only internal access needed
 ingress:
   enabled: false
 
-# Disable prometheus-to-alertmanager
+# Disable Prometheus - not needed, Mimir handles metrics
 prometheus:
   enabled: false

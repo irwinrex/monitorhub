@@ -1,4 +1,9 @@
-# Ingress values for HAproxy - HTTP only (path-based routing)
+# =============================================================================
+# Kubernetes Ingress Configuration
+# Routes external traffic to Grafana, Loki, Mimir, and Tempo services
+# Uses HAProxy as the ingress controller
+# =============================================================================
+
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -6,12 +11,17 @@ metadata:
   name: lgtm-ingress
   namespace: monitoring
   annotations:
+    # HAProxy timeout settings
     haproxy.org/timeout-server: "60s"
 spec:
+  # Use HAProxy ingress class
   ingressClassName: haproxy
+  
+  # Routing rules
   rules:
     - http:
         paths:
+          # Default route - goes to Grafana dashboard
           - path: /
             pathType: Prefix
             backend:
@@ -19,6 +29,8 @@ spec:
                 name: lgtm-grafana
                 port:
                   number: 3000
+          
+          # Mimir metrics push endpoint
           - path: /api/v1/push
             pathType: Prefix
             backend:
@@ -26,6 +38,8 @@ spec:
                 name: lgtm-mimir-gateway
                 port:
                   number: 80
+          
+          # Loki log endpoint
           - path: /loki
             pathType: Prefix
             backend:
@@ -33,6 +47,8 @@ spec:
                 name: lgtm-loki
                 port:
                   number: 3100
+          
+          # Tempo trace endpoint
           - path: /tempo
             pathType: Prefix
             backend:

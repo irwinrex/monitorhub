@@ -1,43 +1,64 @@
+# =============================================================================
+# Loki Configuration - Log Aggregation System
+# Loki stores and queries logs from all your applications
+# Connected to S3 for persistent storage
+# =============================================================================
+
 loki:
+  # Basic configuration for single-node setup
   commonConfig:
-    replication_factor: 1
+    replication_factor: 1  # Single node = 1 replica
     ring:
       kvstore:
-        store: inmemory
+        store: inmemory  # Stores ring data in memory (fine for single node)
+  
+  # Database schema configuration
   schemaConfig:
     configs:
-      - from: "2024-04-01"
-        store: tsdb
-        object_store: s3
-        schema: v13
+      - from: "2024-04-01"  # Schema version date
+        store: tsdb         # Time-series database for efficient log storage
+        object_store: s3   # Store logs in S3
+        schema: v13        # Schema version
         index:
-          prefix: loki_index_
-          period: 24h
+          prefix: loki_index_  # Index file prefix
+          period: 24h          # New index every 24 hours
+  
+  # Ingester handles incoming log data
   ingester:
-    chunk_encoding: snappy
+    chunk_encoding: snappy  # Compress log chunks
     lifecycler:
-      join_after: 0s
+      join_after: 0s        # Join immediately
       min_ready_duration: 0s
       ring:
         kvstore:
           store: inmemory
         replication_factor: 1
+  
+  # Enable distributed tracing
   tracing:
     enabled: true
+  
+  # Querier handles log queries
   querier:
-    max_concurrent: 2
+    max_concurrent: 2  # Max 2 concurrent queries
+  
+  # S3 storage configuration
   storage:
     type: s3
     bucketNames:
-      chunks: ${S3_BUCKET_LOKI}
-      ruler: ${S3_BUCKET_LOKI}
-      admin: ${S3_BUCKET_LOKI}
+      chunks: ${S3_BUCKET_LOKI}   # Store log chunks here
+      ruler: ${S3_BUCKET_LOKI}    # Store ruler rules here
+      admin: ${S3_BUCKET_LOKI}   # Admin data
     s3:
-      region: ${S3_REGION}
-      s3ForcePathStyle: true
-      insecure: false
+      region: ${S3_REGION}       # AWS region
+      s3ForcePathStyle: true     # Use path-style URLs
+      insecure: false            # Use HTTPS
+  
+  # Disable memberlist (not needed for single node)
   memberlist:
     enabled: false
+  
+  # Ruler evaluates alert rules
   ruler:
     enabled: true
     enable_api: true
@@ -48,57 +69,75 @@ loki:
     storage:
       type: local
       local:
-        directory: /rules     # chart-native loki-sc-rules sidecar writes here
+        directory: /rules
     evaluation:
-      evaluation_interval: 1m
-    poll_interval: 1m
+      evaluation_interval: 1m  # Check rules every minute
+    poll_interval: 1m         # Poll for changes every minute
 
+# Single Binary mode - all components in one pod
 deploymentMode: SingleBinary
 
 singleBinary:
-  replicas: 1
+  replicas: 1  # One replica for single node
+  
+  # Resource limits - how much CPU and memory to use
   resources:
     limits:
-      cpu: 2
-      memory: 4Gi
+      cpu: 2           # Max 2 CPU cores
+      memory: 4Gi      # Max 4 GB RAM
     requests:
-      cpu: 1
-      memory: 2Gi
+      cpu: 1           # Request 1 CPU core
+      memory: 2Gi      # Request 2 GB RAM
+  
+  # Environment variables for Go performance
   extraEnv:
     - name: GOMEMLIMIT
-      value: 3750MiB
+      value: 3750MiB  # Limit Go memory to reduce GC pressure
     - name: MEMBERLIST_ENABLED
-      value: "false"
+      value: "false"  # Disable memberlist
 
+  # Health check settings
   readinessProbe:
     httpGet:
       path: /ready
       port: http-metrics
-    initialDelaySeconds: 90
-    periodSeconds: 15
-    timeoutSeconds: 5
-    failureThreshold: 5
+    initialDelaySeconds: 90   # Wait 90s before first check
+    periodSeconds: 15         # Check every 15 seconds
+    timeoutSeconds: 5           # Timeout after 5 seconds
+    failureThreshold: 5        # Fail after 5 failed checks
 
   livenessProbe:
     httpGet:
       path: /ready
       port: http-metrics
-    initialDelaySeconds: 300
-    periodSeconds: 30
-    timeoutSeconds: 5
-    failureThreshold: 5
+    initialDelaySeconds: 300   # Wait 5 minutes before checking
+    periodSeconds: 30          # Check every 30 seconds
+    timeoutSeconds: 5           # Timeout after 5 seconds
+    failureThreshold: 5         # Fail after 5 failed checks
 
-# Disable unnecessary components
+# =============================================================================
+# Disabled Components - Not needed for single-node setup
+# =============================================================================
+
+# Loki canary - checks if Loki is running correctly (disabled for simplicity)
 lokiCanary:
   enabled: false
+
+# Gateway - not needed, we use ingress
 gateway:
   enabled: false
+
+# Caches - disabled to save memory
 chunksCache:
   enabled: false
 resultsCache:
   enabled: false
+
+# Test pod - disabled for production
 test:
   enabled: false
+
+# These are for distributed mode - all set to 0 for single-binary
 backend:
   replicas: 0
 read:
