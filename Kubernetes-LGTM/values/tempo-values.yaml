@@ -38,7 +38,6 @@ tempo:
       s3:
         bucket: ${S3_BUCKET_TEMPO}   # S3 bucket name
         region: ${S3_REGION}          # AWS region
-        # S3 endpoint - uses AWS dualstack for accessibility
         endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
         insecure: false       # Use HTTPS
       wal:

@@ -20,10 +20,10 @@ export LINKERD_VERSION="stable-2.14.11" # https://github.com/linkerd/linkerd2/re
 #   Tempo  → grafana-community (migrated 2026-01-30)
 #   Loki   → grafana-community (migrating 2026-03-16)
 #   Both repos are registered in install_LGTM.sh.
-export LOKI_CHART_VERSION="6.53.0"        # grafana-community/loki
-export TEMPO_CHART_VERSION="1.24.4"       # grafana-community/tempo (single binary)
-export MIMIR_CHART_VERSION="6.0.5"        # grafana/mimir-distributed
-export GRAFANA_CHART_VERSION="10.5.15"    # grafana/grafana
+export LOKI_CHART_VERSION="6.53.0"     # grafana-community/loki
+export TEMPO_CHART_VERSION="1.24.4"    # grafana-community/tempo (single binary)
+export MIMIR_CHART_VERSION="6.0.5"     # grafana/mimir-distributed
+export GRAFANA_CHART_VERSION="10.5.15" # grafana/grafana
 # Alertmanager is built into Mimir - no separate chart needed
 
 # ── Namespaces ────────────────────────────────────────────────────────────────
@@ -34,7 +34,7 @@ export MONITORING_NS="monitoring"
 # Usage: configure_s3_buckets "lgtm-observability" "us-east-1"
 configure_s3_buckets() {
   local base_bucket="$1"
-  local region="${2:-us-east-1}"
+  local region="${2:-us-west-2}"
 
   export S3_BUCKET="${base_bucket}"
   export S3_REGION="${region}"
