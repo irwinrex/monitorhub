@@ -31,15 +31,17 @@ check_version_drift() {
   local namespace="$2"
   local desired_version="$3"
 
+  # Use proper JSON parsing to avoid substring matches (e.g. 6.0.5 matching 6.0.50)
   local deployed_chart
   deployed_chart=$(helm list -n "${namespace}" \
     --filter "^${release}$" \
-    --output json 2>/dev/null |
-    grep -o '"chart":"[^"]*"' |
-    grep -o '[0-9][^"]*' || true)
+    --output json 2>/dev/null | \
+    python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['chart'] if d else '')" 2>/dev/null || true)
 
-  if [[ "${deployed_chart}" == *"${desired_version}"* ]]; then
-    # Also check if pods are running
+  # Extract version suffix after last '-' (e.g. "loki-6.53.0" → "6.53.0")
+  local deployed_version="${deployed_chart##*-}"
+
+  if [[ "${deployed_version}" == "${desired_version}" ]]; then
     if kubectl get pods -n "${namespace}" -l "app.kubernetes.io/instance=${release}" 2>/dev/null | grep -q "Running"; then
       return 0
     fi
@@ -67,10 +69,18 @@ safe_statefulset_upgrade() {
 }
 
 # apply_values <template> <output>
+# Runs envsubst — validates substitution worked, aborts if any ${VAR} remain unresolved
 apply_values() {
   local template="$1"
   local output="$2"
   envsubst <"${template}" >"${output}"
+
+  # Validate — silent envsubst failures produce broken values that Helm accepts
+  # without error but cause runtime crashes
+  if grep -qE '\$\{[A-Z_]+\}' "${output}"; then
+    die "envsubst failed — unresolved variables in ${output}:
+$(grep -E '\$\{[A-Z_]+\}' "${output}")"
+  fi
 }
 
 # ── 1. Namespace ──────────────────────────────────────────────────────────────
@@ -98,11 +108,12 @@ fi
 S3_REGION="${S3_REGION:-us-east-1}"
 
 # Generate component-specific bucket names
+# All derived from ${S3_BUCKET} base — NOT from each other
 S3_BUCKET_LOKI="${S3_BUCKET}-loki-data"
 S3_BUCKET_TEMPO="${S3_BUCKET}-tempo-data"
 S3_BUCKET_MIMIR="${S3_BUCKET}-mimir-data"
 S3_BUCKET_MIMIR_ALERTMANAGER="${S3_BUCKET}-mimir-alertmanager-data"
-S3_BUCKET_MIMIR_RULER="${S3_BUCKET_MIMIR}-mimir-ruler-data"
+S3_BUCKET_MIMIR_RULER="${S3_BUCKET}-mimir-ruler-data"
 S3_BUCKET_GRAFANA="${S3_BUCKET}-grafana-data"
 
 export S3_BUCKET S3_REGION S3_BUCKET_LOKI S3_BUCKET_TEMPO S3_BUCKET_MIMIR S3_BUCKET_MIMIR_ALERTMANAGER S3_BUCKET_MIMIR_RULER S3_BUCKET_GRAFANA
@@ -204,32 +215,7 @@ else
   success "Grafana ${GRAFANA_CHART_VERSION} already deployed — skipping"
 fi
 
-# ── 7. Datasources ────────────────────────────────────────────────────────────
-info "Configuring datasources..."
-export MONITORING_NS
-envsubst '${MONITORING_NS}' | kubectl apply -f - <<EOF
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: grafana-datasources
-  namespace: \${MONITORING_NS}
-data:
-  datasources.yaml: |
-    apiVersion: 1
-    datasources:
-      - name: Mimir
-        type: prometheus
-        url: http://mimir-gateway.\${MONITORING_NS}.svc.cluster.local:80/prometheus
-        isDefault: true
-      - name: Loki
-        type: loki
-        url: http://loki.\${MONITORING_NS}.svc.cluster.local:3100
-      - name: Tempo
-        type: tempo
-        url: http://tempo.\${MONITORING_NS}.svc.cluster.local:3200
-EOF
-
-# ── 8. Ingress ────────────────────────────────────────────────────────────────
+# ── 7. Ingress ────────────────────────────────────────────────────────────────
 info "Applying Ingress..."
 kubectl apply -f - <<EOF
 ---
