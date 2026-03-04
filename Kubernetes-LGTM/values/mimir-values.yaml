@@ -37,6 +37,7 @@ mimir:
         endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
         region: ${S3_REGION}
         bucket_name: ${S3_BUCKET_MIMIR}
+        prefix: blocks/
 
     alertmanager_storage:
       backend: s3
@@ -44,6 +45,7 @@ mimir:
         endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
         region: ${S3_REGION}
         bucket_name: ${S3_BUCKET_MIMIR}
+        prefix: alertmanager/
 
     ruler_storage:
       backend: s3
@@ -51,6 +53,7 @@ mimir:
         endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
         region: ${S3_REGION}
         bucket_name: ${S3_BUCKET_MIMIR}
+        prefix: ruler/
 
     ingester:
       ring:
