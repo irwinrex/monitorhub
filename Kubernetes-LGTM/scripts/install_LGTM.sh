@@ -103,30 +103,15 @@ fi
 S3_BUCKET="${S3_BUCKET:-lgtm-observability}"
 
 if [[ -z "${S3_REGION:-}" ]]; then
-  read -r -p "S3 region [default: us-east-1]: " S3_REGION
+  read -r -p "S3 region [default: us-east-1]: " S3_REGION_INPUT
 fi
-S3_REGION="${S3_REGION:-us-east-1}"
+S3_REGION="${S3_REGION_INPUT:-us-east-1}"
 
-# Generate component-specific bucket names
-# All derived from ${S3_BUCKET} base — NOT from each other
-S3_BUCKET_LOKI="${S3_BUCKET}-loki-data"
-S3_BUCKET_TEMPO="${S3_BUCKET}-tempo-data"
-S3_BUCKET_MIMIR="${S3_BUCKET}-mimir-data"
-S3_BUCKET_MIMIR_ALERTMANAGER="${S3_BUCKET}-mimir-alertmanager-data"
-S3_BUCKET_MIMIR_RULER="${S3_BUCKET}-mimir-ruler-data"
-S3_BUCKET_GRAFANA="${S3_BUCKET}-grafana-data"
-
-export S3_BUCKET S3_REGION S3_BUCKET_LOKI S3_BUCKET_TEMPO S3_BUCKET_MIMIR S3_BUCKET_MIMIR_ALERTMANAGER S3_BUCKET_MIMIR_RULER S3_BUCKET_GRAFANA
+# Configure bucket names from shared function
+configure_s3_buckets "${S3_BUCKET}" "${S3_REGION}"
 
 info "S3 Configuration:"
-echo "  Base Bucket:        ${S3_BUCKET}"
-echo "  Loki Bucket:        ${S3_BUCKET_LOKI}"
-echo "  Tempo Bucket:       ${S3_BUCKET_TEMPO}"
-echo "  Mimir Bucket:       ${S3_BUCKET_MIMIR}"
-echo "  Mimir Alertmanager: ${S3_BUCKET_MIMIR_ALERTMANAGER}"
-echo "  Mimir Ruler:        ${S3_BUCKET_MIMIR_RULER}"
-echo "  Grafana Bucket:     ${S3_BUCKET_GRAFANA}"
-echo "  Region:             ${S3_REGION}"
+print_s3_config
 
 VALUES_DIR="$(resolve_values_dir)"
 

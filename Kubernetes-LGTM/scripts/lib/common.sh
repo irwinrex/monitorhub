@@ -29,6 +29,36 @@ export GRAFANA_CHART_VERSION="10.5.15"    # grafana/grafana
 # ── Namespaces ────────────────────────────────────────────────────────────────
 export MONITORING_NS="monitoring"
 
+# ── S3 Bucket Configuration ───────────────────────────────────────────────────
+# Call this in scripts that need S3 buckets
+# Usage: configure_s3_buckets "lgtm-observability" "us-east-1"
+configure_s3_buckets() {
+  local base_bucket="$1"
+  local region="${2:-us-east-1}"
+
+  export S3_BUCKET="${base_bucket}"
+  export S3_REGION="${region}"
+
+  # All derived from ${S3_BUCKET} base — NOT from each other
+  export S3_BUCKET_LOKI="${S3_BUCKET}-loki-data"
+  export S3_BUCKET_TEMPO="${S3_BUCKET}-tempo-data"
+  export S3_BUCKET_MIMIR="${S3_BUCKET}-mimir-data"
+  export S3_BUCKET_MIMIR_ALERTMANAGER="${S3_BUCKET}-mimir-alertmanager-data"
+  export S3_BUCKET_MIMIR_RULER="${S3_BUCKET}-mimir-ruler-data"
+  export S3_BUCKET_GRAFANA="${S3_BUCKET}-grafana-data"
+}
+
+print_s3_config() {
+  echo "  Base Bucket:        ${S3_BUCKET}"
+  echo "  Loki Bucket:        ${S3_BUCKET_LOKI}"
+  echo "  Tempo Bucket:       ${S3_BUCKET_TEMPO}"
+  echo "  Mimir Bucket:       ${S3_BUCKET_MIMIR}"
+  echo "  Mimir Alertmanager: ${S3_BUCKET_MIMIR_ALERTMANAGER}"
+  echo "  Mimir Ruler:        ${S3_BUCKET_MIMIR_RULER}"
+  echo "  Grafana Bucket:     ${S3_BUCKET_GRAFANA}"
+  echo "  Region:             ${S3_REGION}"
+}
+
 # ── Colours ───────────────────────────────────────────────────────────────────
 RED='\033[0;31m'
 GREEN='\033[0;32m'
