@@ -1,85 +1,79 @@
-# mimir-values.yaml
+# Mimir Values - Minimal Single Node
 fullnameOverride: mimir
 
+# Disable MinIO
 minio:
   enabled: false
 
-# ── Classic architecture preset (no Kafka/ingest storage) ─────────────────────
-# Per official 5.x→6.0 migration guide — this is the supported way to opt out
-# of ingest storage in chart 6.x
+# Minimal Mimir config
 mimir:
   structuredConfig:
     auth_enabled: false
 
-    # Classic push path — disables ingest storage / Kafka dependency
-    ingest_storage:
-      enabled: false
-    ingester:
-      push_grpc_method_enabled: true
-
-    # S3 — common storage applied to all backends
+    # Use S3 for all storage
     common:
       storage:
         backend: s3
         s3:
           region: ${S3_REGION}
           bucket_name: ${S3_BUCKET_MIMIR}
-          endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
 
-    # Override per-storage explicitly — avoids inheriting wrong bucket paths
     blocks_storage:
       backend: s3
       s3:
         region: ${S3_REGION}
         bucket_name: ${S3_BUCKET_MIMIR}
-        endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
 
     alertmanager_storage:
       backend: s3
       s3:
         region: ${S3_REGION}
         bucket_name: ${S3_BUCKET_MIMIR}
-        endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
 
     ruler_storage:
       backend: s3
       s3:
         region: ${S3_REGION}
         bucket_name: ${S3_BUCKET_MIMIR}
-        endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
 
-    # Replication factor 1 — single node, no HA
+    # Minimal ingester config
     ingester:
       ring:
         replication_factor: 1
-    store_gateway:
-      sharding_ring:
-        replication_factor: 1
 
-# ── Disable Kafka (chart-level) ───────────────────────────────────────────────
+# ── Disable all optional components ─────────────────────────────────────────────
 kafka:
   enabled: false
 
-# ── Disable rollout operator webhooks (not needed for single-node) ────────────
 rollout_operator:
   enabled: false
 
-# ── Disable zone-aware replication everywhere ─────────────────────────────────
+# ── Stateful components - 1 replica each, no PVC ───────────────────────────────
 ingester:
+  replicas: 1
   zoneAwareReplication:
     enabled: false
-  replicas: 1
   persistentVolume:
     enabled: false
 
 storeGateway:
+  replicas: 1
   zoneAwareReplication:
     enabled: false
+  persistentVolume:
+    enabled: false
+
+alertmanager:
   replicas: 1
   persistentVolume:
     enabled: false
 
-# ── Single replica for all stateless components ───────────────────────────────
+compactor:
+  replicas: 1
+  persistentVolume:
+  enabled: false
+
+# ── Stateless components ──────────────────────────────────────────────────────
 distributor:
   replicas: 1
 
@@ -90,38 +84,19 @@ queryFrontend:
   replicas: 1
 
 queryScheduler:
-  replicas: 1
-
-compactor:
-  replicas: 1
-  persistentVolume:
-    enabled: false
+  replicas: 0
 
 ruler:
-  replicas: 1
-
-alertmanager:
-  replicas: 1
-  persistentVolume:
-    enabled: false
-  statefulSet:
-    enabled: true
+  replicas: 0
 
 overridesExporter:
-  replicas: 1
+  replicas: 0
 
 # ── Gateway ───────────────────────────────────────────────────────────────────
 gateway:
   replicas: 1
-  enabledNonEnterprise: true
 
-# ── Disable all caches and meta-monitoring ────────────────────────────────────
-metaMonitoring:
-  serviceMonitor:
-    enabled: false
-  grafanaAgent:
-    enabled: false
-
+# ── Disable caches ──────────────────────────────────────────────────────────
 chunks-cache:
   enabled: false
 
@@ -134,63 +109,23 @@ metadata-cache:
 results-cache:
   enabled: false
 
-# ── Resource limits ───────────────────────────────────────────────────────────
-# Applied globally — individual components inherit unless overridden
+# ── Disable meta-monitoring ───────────────────────────────────────────────────
+metaMonitoring:
+  serviceMonitor:
+    enabled: false
+  grafanaAgent:
+    enabled: false
+
+# ── Minimal resources ────────────────────────────────────────────────────────
 global:
   extraEnv:
     - name: GOMAXPROCS
-      value: "1"
+      value: "2"
 
-ingester:
-  resources:
-    requests:
-      cpu: 100m
-      memory: 512Mi
-    limits:
-      cpu: 500m
-      memory: 1Gi
-
-distributor:
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-
-querier:
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-
-queryFrontend:
-  resources:
-    requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      cpu: 250m
-      memory: 256Mi
-
-compactor:
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-
-storeGateway:
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi

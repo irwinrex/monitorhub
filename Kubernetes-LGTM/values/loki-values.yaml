@@ -42,6 +42,7 @@ loki:
     enabled: true
     enable_api: true
     enable_alertmanager_v2: true
+    alertmanager_url: http://mimir.monitoring.svc.cluster.local:8080/alertmanager
     ring:
       enabled: false
     storage:

@@ -21,7 +21,6 @@ LOKI_REPO="grafana"
 TEMPO_REPO="grafana"
 MIMIR_REPO="grafana"
 GRAFANA_REPO="grafana"
-ALERTMANAGER_REPO="grafana"
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -124,7 +123,6 @@ info "  - ${LOKI_REPO}/loki:${LOKI_CHART_VERSION}"
 info "  - ${TEMPO_REPO}/tempo:${TEMPO_CHART_VERSION}"
 info "  - ${MIMIR_REPO}/mimir-distributed:${MIMIR_CHART_VERSION}"
 info "  - ${GRAFANA_REPO}/grafana:${GRAFANA_CHART_VERSION}"
-info "  - ${ALERTMANAGER_REPO}/alertmanager:${ALERTMANAGER_CHART_VERSION}"
 
 # ── 5. Local Path Provisioner ─────────────────────────────────────────────────
 info "Installing Local Path Provisioner..."
@@ -196,19 +194,6 @@ if ! check_version_drift "grafana" "${MONITORING_NS}" "${GRAFANA_CHART_VERSION}"
   success "Grafana ${GRAFANA_CHART_VERSION} deployed"
 else
   success "Grafana ${GRAFANA_CHART_VERSION} already deployed — skipping"
-fi
-
-# Alertmanager
-if ! check_version_drift "alertmanager" "${MONITORING_NS}" "${ALERTMANAGER_CHART_VERSION}"; then
-  info "Installing/Upgrading Alertmanager ${ALERTMANAGER_CHART_VERSION}..."
-  helm upgrade --install alertmanager "${ALERTMANAGER_REPO}/alertmanager" \
-    --namespace "${MONITORING_NS}" \
-    --version "${ALERTMANAGER_CHART_VERSION}" \
-    --values "${VALUES_DIR}/alertmanager-values.yaml" \
-    --wait --timeout 5m
-  success "Alertmanager ${ALERTMANAGER_CHART_VERSION} deployed"
-else
-  success "Alertmanager ${ALERTMANAGER_CHART_VERSION} already deployed — skipping"
 fi
 
 # ── 7. Datasources ────────────────────────────────────────────────────────────

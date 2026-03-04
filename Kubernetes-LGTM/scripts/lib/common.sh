@@ -24,7 +24,7 @@ export LOKI_CHART_VERSION="6.53.0"        # grafana-community/loki
 export TEMPO_CHART_VERSION="1.24.4"       # grafana-community/tempo (single binary)
 export MIMIR_CHART_VERSION="6.0.5"        # grafana/mimir-distributed (latest stable; weekly builds excluded)
 export GRAFANA_CHART_VERSION="10.5.15"    # grafana/grafana
-export ALERTMANAGER_CHART_VERSION="1.8.0" # grafana/alertmanager
+# Alertmanager is built into Mimir - no separate chart needed
 
 # ── Namespaces ────────────────────────────────────────────────────────────────
 export MONITORING_NS="monitoring"
