@@ -208,87 +208,13 @@ else
 fi
 
 # ── 7. Ingress ────────────────────────────────────────────────────────────────
-info "Applying Ingress..."
-kubectl apply -f - <<EOF
----
-# Grafana - NO basic auth (Grafana handles its own login)
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: grafana-ingress
-  namespace: ${MONITORING_NS}
-  annotations:
-    haproxy.org/timeout-server: "60s"
-    haproxy.org/proxy-body-size: "50m"
-    haproxy.org/rate-limit: "100"
-    haproxy.org/rate-limit-requests: "50"
-    haproxy.org/response-set-header: |
-      X-Frame-Options "SAMEORIGIN"
-      X-Content-Type-Options "nosniff"
-      X-XSS-Protection "1; mode=block"
-      Referrer-Policy "strict-origin-when-cross-origin"
-      Strict-Transport-Security "max-age=31536000; includeSubDomains"
-      Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https: wss:;"
-spec:
-  ingressClassName: haproxy
-  rules:
-    - http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: grafana
-                port:
-                  number: 80
----
-# API endpoints (Mimir, Loki, Tempo) - WITH basic auth
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: lgtm-api-ingress
-  namespace: ${MONITORING_NS}
-  annotations:
-    haproxy.org/timeout-server: "60s"
-    haproxy.org/proxy-body-size: "50m"
-    haproxy.org/rate-limit: "100"
-    haproxy.org/rate-limit-requests: "50"
-    haproxy.org/response-set-header: |
-      X-Frame-Options "SAMEORIGIN"
-      X-Content-Type-Options "nosniff"
-      X-XSS-Protection "1; mode=block"
-      Referrer-Policy "strict-origin-when-cross-origin"
-      Strict-Transport-Security "max-age=31536000; includeSubDomains"
-      Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https: wss:;"
-    ingress.kubernetes.io/auth-type: basic-auth
-    ingress.kubernetes.io/auth-secret: grafana-basic-auth
-spec:
-  ingressClassName: haproxy
-  rules:
-    - http:
-        paths:
-          - path: /mimir
-            pathType: Prefix
-            backend:
-              service:
-                name: mimir-gateway
-                port:
-                  number: 80
-          - path: /loki
-            pathType: Prefix
-            backend:
-              service:
-                name: loki
-                port:
-                  number: 3100
-          - path: /tempo
-            pathType: Prefix
-            backend:
-              service:
-                name: tempo
-                port:
-                  number: 3200
-EOF
+# Note: Ingress is now handled by HAProxy's extraBackends in haproxy-values.yaml
+# HAProxy is deployed AFTER LGTM in install_all.sh
+info "LGTM deployment complete - Ingress will be configured by HAProxy"
+info "Access Grafana:   http://<ip>/ (no auth)"
+info "Access Mimir:     http://<ip>/mimir (basic auth required)"
+info "Access Loki:      http://<ip>/loki (basic auth required)"
+info "Access Tempo:     http://<ip>/tempo (basic auth required)"
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo ""
