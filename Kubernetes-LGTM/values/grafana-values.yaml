@@ -1,59 +1,90 @@
 # =============================================================================
-# Grafana Configuration - Metrics Visualization Dashboard
-# Grafana connects to Mimir (metrics), Loki (logs), and Tempo (traces)
+# grafana-values.yaml — grafana/grafana chart
+# Connects to Mimir (metrics), Loki (logs), Tempo (traces), Alertmanager (alerts)
 # =============================================================================
 
-# Number of Grafana replicas
 replicas: 1
 
-# Admin user configuration
 admin:
-  # Use existing secret for admin credentials (created by install_secrets.sh)
   existingSecret: grafana-admin
 
-# Persistent storage - disabled for simplicity (data stays in memory)
 persistence:
-  enabled: false
+  enabled: true
+  storageClassName: local-path   # already installed by install_k0s.sh Phase 1
+  size: 1Gi
+  accessModes:
+    - ReadWriteOnce
 
-# Grafana main configuration
 grafana.ini:
-  # Analytics - disable reporting
   analytics:
     reporting_enabled: false
-  
-  # Logging - log to console
   log:
     mode: console
-  
-  # User settings - auto-assign to organization
   users:
     auto_assign_org: true
-    auto_assign_org_role: Viewer  # New users are Viewers by default
+    auto_assign_org_role: Viewer
 
-# Built-in datasources configuration
+# =============================================================================
+# Datasources
+# =============================================================================
 datasources:
   datasources.yaml:
     apiVersion: 1
     datasources:
-      # Mimir - Prometheus-compatible metrics backend
+      # Mimir — Prometheus-compatible metrics
       - name: Mimir
         type: prometheus
-        url: http://mimir.monitoring.svc.cluster.local:8080
-        isDefault: true  # Default metrics source
-      # Loki - Log aggregation
+        uid: mimir
+        url: http://mimir-gateway.monitoring.svc.cluster.local:80/prometheus
+        isDefault: true
+        jsonData:
+          timeInterval: 60s       # scrape interval — match your Prometheus config
+          httpMethod: POST        # POST is more efficient for large label queries
+      # Loki — log aggregation
       - name: Loki
         type: loki
+        uid: loki
         url: http://loki.monitoring.svc.cluster.local:3100
-      # Tempo - Distributed tracing
+        jsonData:
+          maxLines: 1000          # cap log lines returned per query for low-resource node
+      # Tempo — distributed tracing
       - name: Tempo
         type: tempo
+        uid: tempo
         url: http://tempo.monitoring.svc.cluster.local:3200
+        jsonData:
+          # Link Tempo traces to Loki logs via traceID
+          tracesToLogsV2:
+            datasourceUid: loki
+            filterByTraceID: true
+            filterBySpanID: false
+          # Link Tempo traces to Mimir metrics via exemplars
+          tracesToMetrics:
+            datasourceUid: mimir
+          # Enable service graph from Tempo metrics
+          serviceMap:
+            datasourceUid: mimir
+          # Enable node graph panel in trace view
+          nodeGraph:
+            enabled: true
+      # Alertmanager — alert routing and silences UI
+      # Points to Mimir's built-in alertmanager (compatible with Prometheus AM API)
+      - name: Alertmanager
+        type: alertmanager
+        uid: alertmanager
+        url: http://mimir-gateway.monitoring.svc.cluster.local:80/alertmanager
+        jsonData:
+          # Use Mimir-flavoured alertmanager API (not vanilla Prometheus)
+          implementation: mimir
+          handleGrafanaManagedAlerts: false   # Mimir manages alerts, not Grafana
 
-# Resource limits - how much CPU and memory to use
+# =============================================================================
+# Resources
+# =============================================================================
 resources:
   requests:
-    cpu: 100m    # Request 100 millicpus
-    memory: 256Mi  # Request 256 MB RAM
+    cpu: 100m
+    memory: 256Mi
   limits:
-    cpu: 250m    # Max 250 millicpus
-    memory: 512Mi  # Max 512 MB RAM
+    cpu: 250m
+    memory: 512Mi

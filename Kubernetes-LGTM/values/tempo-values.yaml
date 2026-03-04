@@ -25,6 +25,12 @@ tempo:
     grpc_listen_port: 9096   # gRPC port for ingestion
     log_level: info          # Log level
   
+  # Alertmanager configuration - use Mimir's built-in Alertmanager
+  alertmanager:
+    hosts:
+      - "http://mimir-gateway.monitoring.svc.cluster.local:80/prometheus/alertmanager"
+    refresh_interval: 30s
+  
   # Storage configuration for traces
   storage:
     trace:
