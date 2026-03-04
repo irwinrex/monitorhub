@@ -1,17 +1,23 @@
-# Mimir Values - Monolithic
+# Mimir Values - Minimal/Single Binary
 fullnameOverride: mimir
 
-enabled: true
-mode: monolithic
+# Use standalone mode for minimal deployment
+mode: standalone
 replicas: 1
 
+# Disable persistence (use S3)
 persistence:
+  enabled: false
+
+# MinIO is not needed with external S3
+minio:
   enabled: false
 
 server:
   http_listen_port: 8080
   grpc_listen_port: 9095
 
+# Structured config for S3
 structuredConfig:
   auth_enabled: false
 
@@ -46,6 +52,19 @@ structuredConfig:
 
   compactor:
     retention_enabled: true
+
+# Set all components to minimal
+alertmanager:
+  replicas: 0
+
+store_gateway:
+  replicas: 0
+
+overrides_exporter:
+  replicas: 0
+
+query_scheduler:
+  replicas: 0
 
 resources:
   requests:
