@@ -4,62 +4,49 @@ minio:
   enabled: false
 
 mimir:
-  structuredConfig:
-    auth_enabled: false
-
-    common:
-      storage:
-        backend: s3
-        s3:
-          region: ${S3_REGION}
-          bucket_name: ${S3_BUCKET_MIMIR}
-
-    blocks_storage:
-      backend: s3
-      s3:
-        region: ${S3_REGION}
-        bucket_name: ${S3_BUCKET_MIMIR}
-        chunks_cache:
-          backend: ""
-    alertmanager_storage:
-      backend: s3
-      s3:
-        region: ${S3_REGION}
-        bucket_name: ${S3_BUCKET_MIMIR}
-    ruler_storage:
+  common:
+    storage:
       backend: s3
       s3:
         region: ${S3_REGION}
         bucket_name: ${S3_BUCKET_MIMIR}
 
-    ingester:
-      ring:
-        replication_factor: 1
-      walFlushCheckPeriod: 30s
-      walReplayConcurrency: 1
+  blocks_storage:
+    backend: s3
+    s3:
+      region: ${S3_REGION}
+      bucket_name: ${S3_BUCKET_MIMIR}
 
-    # Reduce compactor memory footprint
-    compactor:
-      sharding_ring:
-        wait_stability_min_duration: 0s
+  alertmanager_storage:
+    backend: s3
+    s3:
+      region: ${S3_REGION}
+      bucket_name: ${S3_BUCKET_MIMIR}
 
-    # Tune query path for low concurrency
-    querier:
-      max_concurrent: 2
+  ruler_storage:
+    backend: s3
+    s3:
+      region: ${S3_REGION}
+      bucket_name: ${S3_BUCKET_MIMIR}
 
-    # Lower limits to reduce goroutine/memory overhead
-    limits:
-      ingestion_rate: 10000
-      ingestion_burst_size: 20000
-      max_global_series_per_user: 100000
+  ingester:
+    ring:
+      replication_factor: 1
 
-# ── Disable optional components ──────────────────────────────────────────────
+  querier:
+    max_concurrent: 2
+
+  limits:
+    ingestion_rate: 10000
+    ingestion_burst_size: 20000
+    max_global_series_per_user: 100000
+
 kafka:
   enabled: false
+
 rollout_operator:
   enabled: false
 
-# ── Stateful components ───────────────────────────────────────────────────────
 ingester:
   replicas: 1
   zoneAwareReplication:
@@ -112,7 +99,6 @@ compactor:
       cpu: 250m
       memory: 512Mi
 
-# ── Stateless components ──────────────────────────────────────────────────────
 distributor:
   replicas: 1
   resources:
@@ -144,14 +130,7 @@ queryFrontend:
       memory: 128Mi
 
 queryScheduler:
-  replicas: 1
-  resources:
-    requests:
-      cpu: 20m
-      memory: 64Mi
-    limits:
-      cpu: 100m
-      memory: 128Mi
+  replicas: 0
 
 ruler:
   replicas: 0
@@ -159,7 +138,6 @@ ruler:
 overridesExporter:
   replicas: 0
 
-# ── Gateway ───────────────────────────────────────────────────────────────────
 gateway:
   replicas: 1
   resources:
@@ -170,24 +148,24 @@ gateway:
       cpu: 100m
       memory: 64Mi
 
-# ── Disable all caches ────────────────────────────────────────────────────────
 chunks-cache:
   enabled: false
+
 index-cache:
   enabled: false
+
 metadata-cache:
   enabled: false
+
 results-cache:
   enabled: false
 
-# ── Disable meta-monitoring ───────────────────────────────────────────────────
 metaMonitoring:
   serviceMonitor:
     enabled: false
   grafanaAgent:
     enabled: false
 
-# ── Global env ────────────────────────────────────────────────────────────────
 global:
   extraEnv:
     - name: GOMAXPROCS
