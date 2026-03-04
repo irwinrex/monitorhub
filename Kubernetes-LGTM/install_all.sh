@@ -25,22 +25,6 @@
 #   SKIP_SECRETS=true    skip scripts/install_secrets.sh
 #   SKIP_LGTM=true       skip scripts/install_LGTM.sh
 #   SKIP_BACKUP=true     skip scripts/backup_all.sh
-#
-# Project structure expected:
-#   install_all.sh          ← this file
-#   scripts/
-#     lib/common.sh
-#     install_k0s.sh
-#     install_HAproxy.sh
-#     install_secrets.sh
-#     install_LGTM.sh
-#   values/
-#     loki-values.yaml
-#     tempo-values.yaml
-#     mimir-values.yaml
-#     grafana-values.yaml
-#     haproxy-values.yaml
-#     ingress-values.yaml
 # ==============================================================================
 set -euo pipefail
 IFS=$'\n\t'
@@ -54,65 +38,68 @@ source "${SCRIPTS_DIR}/lib/common.sh"
 
 require_root
 
-# ── Parse arguments ───────────────────────────────────────────────────────────────
+# ── Parse arguments ───────────────────────────────────────────────────────────
+# FIX: capture into local vars first — do not export until fully resolved
+_S3_BUCKET=""
+_S3_REGION=""
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -b|--bucket-name|--bucket-name-prefix)
-      S3_BUCKET="$2"
-      shift 2
-      ;;
-    --bucket-name=*|--bucket-name-prefix=*)
-      S3_BUCKET="${1#*=}"
-      shift
-      ;;
-    -r|--region|--bucket-region)
-      S3_REGION="$2"
-      shift 2
-      ;;
-    --region=*|--bucket-region=*)
-      S3_REGION="${1#*=}"
-      shift
-      ;;
-    -y|--yes)
-      YES="true"
-      shift
-      ;;
-    -h|--help)
-      echo "Usage: sudo bash install_all.sh [OPTIONS]"
-      echo ""
+  -b | --bucket-name | --bucket-name-prefix)
+    _S3_BUCKET="$2"
+    shift 2
+    ;;
+  --bucket-name=* | --bucket-name-prefix=*)
+    _S3_BUCKET="${1#*=}"
+    shift
+    ;;
+  -r | --region | --bucket-region)
+    _S3_REGION="$2"
+    shift 2
+    ;;
+  --region=* | --bucket-region=*)
+    _S3_REGION="${1#*=}"
+    shift
+    ;;
+  -y | --yes)
+    YES="true"
+    shift
+    ;;
+  -h | --help)
+    echo "Usage: sudo bash install_all.sh [OPTIONS]"
+    echo ""
     echo "Options:"
-    echo "  -b, --bucket-name, --bucket-name-prefix  S3 bucket name"
-    echo "  -r, --region, --bucket-region           S3 region (e.g., us-east-1)"
-    echo "  -y, --yes                               Run in non-interactive mode"
-    echo "  -h, --help                              Show this help message"
+    echo "  -b, --bucket-name    S3 base bucket name"
+    echo "  -r, --region         S3 region (e.g., us-east-1)"
+    echo "  -y, --yes            Non-interactive mode"
+    echo "  -h, --help           Show this help"
     echo ""
     echo "Examples:"
-    echo "  sudo bash install_all.sh"
     echo "  sudo bash install_all.sh -b my-bucket -r us-east-1 -y"
-    echo "  sudo bash install_all.sh --bucket-name-prefix my-bucket --bucket-region us-west-2 -y"
     echo "  S3_BUCKET=my-bucket S3_REGION=us-east-1 sudo -E bash install_all.sh -y"
-      exit 0
-      ;;
-    *)
-      warn "Unknown option: $1"
-      shift
-      ;;
+    exit 0
+    ;;
+  *)
+    warn "Unknown option: $1"
+    shift
+    ;;
   esac
 done
 
-# Export for child scripts (only if already set)
-export S3_BUCKET
-export S3_REGION
+# ── Resolve S3 config — flags > env vars > interactive prompt ─────────────────
+S3_BUCKET="${_S3_BUCKET:-${S3_BUCKET:-}}"
+S3_REGION="${_S3_REGION:-${S3_REGION:-}}"
 
-# ── Skip flags ────────────────────────────────────────────────────────────────────
+YES="${YES:-false}"
+
+# ── Skip flags ────────────────────────────────────────────────────────────────
 SKIP_K0S="${SKIP_K0S:-false}"
 SKIP_HAPROXY="${SKIP_HAPROXY:-false}"
 SKIP_SECRETS="${SKIP_SECRETS:-false}"
 SKIP_LGTM="${SKIP_LGTM:-false}"
 SKIP_BACKUP="${SKIP_BACKUP:-false}"
-YES="${YES:-false}"
 
-# ── Phase runner helpers ──────────────────────────────────────────────────────
+# ── Phase runner ──────────────────────────────────────────────────────────────
 _phase_banner() {
   echo ""
   echo -e "${BOLD}${CYAN}┌──────────────────────────────────────────────────────┐${NC}"
@@ -128,17 +115,20 @@ _run_phase() {
   fi
   _phase_banner "Phase ${num}: ${label}"
   local t=$SECONDS
-  bash "${script}"
+  S3_BUCKET="${S3_BUCKET}" \
+    S3_REGION="${S3_REGION}" \
+    YES="${YES}" \
+    bash "${script}"
   echo -e "${GREEN}  ✓  Phase ${num} complete in $((SECONDS - t))s${NC}"
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Pre-flight: verify all required files are present before starting
+# Pre-flight
 # ══════════════════════════════════════════════════════════════════════════════
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}║  LGTM Full Stack Install                                 ║${NC}"
-echo -e "${BOLD}║  k0s · HAproxy · Loki/Tempo/Mimir/Grafana             ║${NC}"
+echo -e "${BOLD}║  k0s · HAproxy · Loki · Tempo · Mimir · Grafana         ║${NC}"
 echo -e "${BOLD}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -178,10 +168,40 @@ done
 [[ "${MISSING}" == "false" ]] || die "Missing files detected — ensure the full project is uploaded."
 success "All required files present"
 
+# ── Resolve S3 interactively if not provided via flags ────────────────────────
+if [[ -z "${S3_BUCKET}" ]]; then
+  echo ""
+  read -r -p "S3 base bucket name: " S3_BUCKET
+  S3_BUCKET="${S3_BUCKET:-lgtm-observability}"
+fi
+
+if [[ -z "${S3_REGION}" ]]; then
+  read -r -p "S3 region [default: us-east-1]: " S3_REGION
+  S3_REGION="${S3_REGION:-us-east-1}"
+fi
+
+# Resolve all derived bucket names via common.sh helper
+# This is the single source of truth — install_LGTM.sh reads these exports
+configure_s3_buckets "${S3_BUCKET}" "${S3_REGION}"
+
+echo ""
+info "S3 Configuration:"
+print_s3_config
+echo ""
+
+# Export fully resolved vars for all child phases
+export S3_BUCKET S3_REGION \
+  S3_BUCKET_LOKI \
+  S3_BUCKET_TEMPO \
+  S3_BUCKET_MIMIR \
+  S3_BUCKET_MIMIR_ALERTMANAGER \
+  S3_BUCKET_MIMIR_RULER \
+  S3_BUCKET_GRAFANA
+
 # ── Confirm ───────────────────────────────────────────────────────────────────
 if [[ "${YES}" != "true" ]]; then
   echo ""
-  warn "This will install k0s, HAproxy, and LGTM stack."
+  warn "This will install k0s, HAproxy, and the full LGTM stack."
   warn "Intended for a FRESH Debian 12 ARM64 instance (t4g.xlarge)."
   echo ""
   read -r -p "  Continue? [y/N] " confirm
@@ -190,7 +210,7 @@ if [[ "${YES}" != "true" ]]; then
     exit 0
   }
 else
-  info "Running in non-interactive mode (YES=true)"
+  info "Running in non-interactive mode (--yes)"
 fi
 
 TOTAL_START=$SECONDS
@@ -210,42 +230,17 @@ _run_phase 3 "Secrets — Grafana admin credentials" \
 _run_phase 4 "LGTM — Loki · Tempo · Mimir · Grafana" \
   "${SKIP_LGTM}" "${SCRIPTS_DIR}/install_LGTM.sh"
 
-# ── S3 Backup Configuration (asked after LGTM install) ────────────────────────
+# ── Backup phase ──────────────────────────────────────────────────────────────
 if [[ "${SKIP_BACKUP}" != "true" ]]; then
-  echo ""
-  info "=== S3 Backup Configuration ==="
-  echo ""
-  
-  if [[ -z "${S3_BUCKET}" ]]; then
-    read -r -p "Enter S3 bucket name for backups: " S3_BUCKET
-  else
-    info "Using S3 bucket from argument: ${S3_BUCKET}"
-  fi
-  
-  if [[ -z "${S3_BUCKET}" ]]; then
-    warn "No S3 bucket provided - backup phase will be skipped"
-    SKIP_BACKUP=true
-  else
-    if [[ -z "${S3_REGION}" ]]; then
-      read -r -p "Enter S3 region (default: us-east-1): " S3_REGION_INPUT
-      S3_REGION="${S3_REGION_INPUT:-us-east-1}"
-    else
-      info "Using S3 region from argument: ${S3_REGION}"
-    fi
-    
-    read -r -p "Local retention days (default: 7): " LOCAL_RETENTION_INPUT
-    LOCAL_RETENTION_DAYS="${LOCAL_RETENTION_INPUT:-7}"
-    
+  if [[ -z "${LOCAL_RETENTION_DAYS:-}" ]]; then
     echo ""
-    info "S3 Backup: s3://${S3_BUCKET} (${S3_REGION})"
-    info "Local retention: ${LOCAL_RETENTION_DAYS} days"
-    echo ""
-    
-    export S3_BUCKET S3_REGION LOCAL_RETENTION_DAYS
+    read -r -p "Local backup retention days [default: 7]: " _ret
+    LOCAL_RETENTION_DAYS="${_ret:-7}"
+    export LOCAL_RETENTION_DAYS
   fi
 fi
 
-_run_phase 6 "Backup — S3 backup configuration" \
+_run_phase 5 "Backup — S3 backup configuration" \
   "${SKIP_BACKUP}" "${SCRIPTS_DIR}/backup_all.sh"
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -254,20 +249,21 @@ _run_phase 6 "Backup — S3 backup configuration" \
 TOTAL_MIN=$(((SECONDS - TOTAL_START) / 60))
 TOTAL_SEC=$(((SECONDS - TOTAL_START) % 60))
 
+# Get node IP for summary
+NODE_IP=$(kubectl get nodes \
+  -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' \
+  2>/dev/null || echo "<node-ip>")
+
 echo ""
 echo -e "${GREEN}╔══════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║  All phases complete in ${TOTAL_MIN}m ${TOTAL_SEC}s                              ║${NC}"
+printf "${GREEN}║  All phases complete in %dm %ds%-28s║${NC}\n" \
+  "${TOTAL_MIN}" "${TOTAL_SEC}" ""
 echo -e "${GREEN}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
-echo "  Nodes:       kubectl get nodes -o wide"
-echo "  Pods:        kubectl get pods -n monitoring -o wide"
-echo "  Helm:        helm list -n monitoring"
-echo "  Certs:       kubectl get certificates -n monitoring"
+echo "  Nodes:    kubectl get nodes -o wide"
+echo "  Pods:     kubectl get pods -n monitoring -o wide"
+echo "  Helm:     helm list -n monitoring"
 echo ""
-echo "  Grafana:     https://grafana.example.com"
-echo "               (DNS A record → this instance's public IP)"
-echo ""
-echo "  Export root CA for browser trust:"
-echo "    kubectl get secret lgtm-root-ca-secret -n monitoring \\"
-echo "      -o jsonpath='{.data.ca\\.crt}' | base64 -d > lgtm-root-ca.crt"
+echo "  Grafana:  http://${NODE_IP}:30080/"
+echo "  ALB target: ${NODE_IP}:30080  (health: /healthz)"
 echo ""

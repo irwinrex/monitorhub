@@ -35,7 +35,7 @@ check_version_drift() {
   local deployed_chart
   deployed_chart=$(helm list -n "${namespace}" \
     --filter "^${release}$" \
-    --output json 2>/dev/null | \
+    --output json 2>/dev/null |
     python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['chart'] if d else '')" 2>/dev/null || true)
 
   # Extract version suffix after last '-' (e.g. "loki-6.53.0" → "6.53.0")
@@ -97,17 +97,23 @@ echo ""
 echo "=== S3 Bucket Configuration ==="
 echo ""
 
+# Only prompt if not already set by parent (install_all.sh passes these via env)
 if [[ -z "${S3_BUCKET:-}" ]]; then
   read -r -p "S3 bucket name: " S3_BUCKET
+  S3_BUCKET="${S3_BUCKET:-lgtm-observability}"
 fi
-S3_BUCKET="${S3_BUCKET:-lgtm-observability}"
 
 if [[ -z "${S3_REGION:-}" ]]; then
-  read -r -p "S3 region [default: us-east-1]: " S3_REGION_INPUT
+  # FIX: only prompt and set default when S3_REGION is genuinely absent
+  # Previously: S3_REGION_INPUT was used unconditionally, so when the read
+  # was skipped (var already set), S3_REGION_INPUT was unset and the fallback
+  # :-us-east-1 silently overwrote the correct region passed from install_all.sh
+  read -r -p "S3 region [default: us-east-1]: " S3_REGION
+  S3_REGION="${S3_REGION:-us-east-1}"
 fi
-S3_REGION="${S3_REGION_INPUT:-us-east-1}"
 
-# Configure bucket names from shared function
+# Configure all derived bucket names via shared helper in common.sh
+# This is idempotent — safe to call even when vars are already exported
 configure_s3_buckets "${S3_BUCKET}" "${S3_REGION}"
 
 info "S3 Configuration:"
@@ -187,6 +193,7 @@ else
 fi
 
 # Grafana
+# Datasources are fully configured in grafana-values.yaml — no separate ConfigMap needed
 if ! check_version_drift "grafana" "${MONITORING_NS}" "${GRAFANA_CHART_VERSION}"; then
   info "Installing/Upgrading Grafana ${GRAFANA_CHART_VERSION}..."
   apply_values "${VALUES_DIR}/grafana-values.yaml" /tmp/grafana-values.yaml
@@ -204,7 +211,7 @@ fi
 info "Applying Ingress..."
 kubectl apply -f - <<EOF
 ---
-# Grafana - NO basic auth
+# Grafana - NO basic auth (Grafana handles its own login)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
