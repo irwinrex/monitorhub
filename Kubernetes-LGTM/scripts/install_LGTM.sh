@@ -233,13 +233,15 @@ EOF
 info "Applying Ingress..."
 kubectl apply -f - <<EOF
 ---
+# Grafana - NO basic auth
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: lgtm-ingress
+  name: grafana-ingress
   namespace: ${MONITORING_NS}
   annotations:
     haproxy.org/timeout-server: "60s"
+    haproxy.org/proxy-body-size: "50m"
 spec:
   ingressClassName: haproxy
   rules:
@@ -252,6 +254,44 @@ spec:
                 name: grafana
                 port:
                   number: 3000
+---
+# API endpoints (Mimir, Loki, Tempo) - WITH basic auth
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: lgtm-api-ingress
+  namespace: ${MONITORING_NS}
+  annotations:
+    haproxy.org/timeout-server: "60s"
+    haproxy.org/proxy-body-size: "50m"
+    ingress.kubernetes.io/auth-type: basic-auth
+    ingress.kubernetes.io/auth-secret: grafana-basic-auth
+spec:
+  ingressClassName: haproxy
+  rules:
+    - http:
+        paths:
+          - path: /mimir
+            pathType: Prefix
+            backend:
+              service:
+                name: mimir-gateway
+                port:
+                  number: 80
+          - path: /loki
+            pathType: Prefix
+            backend:
+              service:
+                name: loki
+                port:
+                  number: 3100
+          - path: /tempo
+            pathType: Prefix
+            backend:
+              service:
+                name: tempo
+                port:
+                  number: 3200
 EOF
 
 # ── Summary ───────────────────────────────────────────────────────────────────
@@ -260,6 +300,9 @@ kubectl get pods -n "${MONITORING_NS}" -o wide
 
 echo ""
 success "install_LGTM.sh complete"
-info "Access: http://<instance-ip>/"
-info "Login:  admin / (check secret)"
+info "Access Grafana:   http://<ip>/ (no auth)"
+info "Access Mimir:     http://<ip>/mimir (basic auth required)"
+info "Access Loki:      http://<ip>/loki (basic auth required)"
+info "Access Tempo:     http://<ip>/tempo (basic auth required)"
+info "Login Grafana:    admin / (check secret)"
 echo ""
