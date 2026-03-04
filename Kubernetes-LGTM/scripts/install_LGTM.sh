@@ -96,10 +96,10 @@ fi
 S3_REGION="${S3_REGION:-us-east-1}"
 
 # Generate component-specific bucket names
-S3_BUCKET_LOKI="${S3_BUCKET}-loki"
-S3_BUCKET_TEMPO="${S3_BUCKET}-tempo"
-S3_BUCKET_MIMIR="${S3_BUCKET}-mimir"
-S3_BUCKET_GRAFANA="${S3_BUCKET}-grafana"
+S3_BUCKET_LOKI="${S3_BUCKET}-loki-data"
+S3_BUCKET_TEMPO="${S3_BUCKET}-tempo-data"
+S3_BUCKET_MIMIR="${S3_BUCKET}-mimir-data"
+S3_BUCKET_GRAFANA="${S3_BUCKET}-grafana-data"
 
 export S3_BUCKET S3_REGION S3_BUCKET_LOKI S3_BUCKET_TEMPO S3_BUCKET_MIMIR S3_BUCKET_GRAFANA
 
