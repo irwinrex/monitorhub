@@ -101,17 +101,21 @@ S3_REGION="${S3_REGION:-us-east-1}"
 S3_BUCKET_LOKI="${S3_BUCKET}-loki-data"
 S3_BUCKET_TEMPO="${S3_BUCKET}-tempo-data"
 S3_BUCKET_MIMIR="${S3_BUCKET}-mimir-data"
+S3_BUCKET_MIMIR_ALERTMANAGER="${S3_BUCKET}-mimir-alertmanager-data"
+S3_BUCKET_MIMIR_RULER="${S3_BUCKET_MIMIR}-mimir-ruler-data"
 S3_BUCKET_GRAFANA="${S3_BUCKET}-grafana-data"
 
-export S3_BUCKET S3_REGION S3_BUCKET_LOKI S3_BUCKET_TEMPO S3_BUCKET_MIMIR S3_BUCKET_GRAFANA
+export S3_BUCKET S3_REGION S3_BUCKET_LOKI S3_BUCKET_TEMPO S3_BUCKET_MIMIR S3_BUCKET_MIMIR_ALERTMANAGER S3_BUCKET_MIMIR_RULER S3_BUCKET_GRAFANA
 
 info "S3 Configuration:"
-echo "  Base Bucket:  ${S3_BUCKET}"
-echo "  Loki Bucket:  ${S3_BUCKET_LOKI}"
-echo "  Tempo Bucket: ${S3_BUCKET_TEMPO}"
-echo "  Mimir Bucket: ${S3_BUCKET_MIMIR}"
-echo "  Grafana Bucket: ${S3_BUCKET_GRAFANA}"
-echo "  Region:       ${S3_REGION}"
+echo "  Base Bucket:        ${S3_BUCKET}"
+echo "  Loki Bucket:        ${S3_BUCKET_LOKI}"
+echo "  Tempo Bucket:       ${S3_BUCKET_TEMPO}"
+echo "  Mimir Bucket:       ${S3_BUCKET_MIMIR}"
+echo "  Mimir Alertmanager: ${S3_BUCKET_MIMIR_ALERTMANAGER}"
+echo "  Mimir Ruler:        ${S3_BUCKET_MIMIR_RULER}"
+echo "  Grafana Bucket:     ${S3_BUCKET_GRAFANA}"
+echo "  Region:             ${S3_REGION}"
 
 VALUES_DIR="$(resolve_values_dir)"
 
