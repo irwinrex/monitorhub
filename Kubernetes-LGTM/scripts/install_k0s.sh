@@ -86,7 +86,7 @@ if [[ "$SKIP_INSTALL" == "false" ]]; then
 
   info "Downloading k0s ${K0S_VERSION} (arm64)..."
   rm -f /usr/local/bin/k0s 2>/dev/null || true
-  
+
   K0S_INSTALL_PATH=/usr/local/bin \
     K0S_VERSION="${K0S_VERSION}" \
     curl -sSLf https://get.k0s.sh | sh
@@ -105,18 +105,37 @@ if [[ "$SKIP_INSTALL" == "false" ]]; then
   mkdir -p /etc/k0s
   k0s config create >/etc/k0s/k0s.yaml
 
+  # FIX: Configure kube-router to use port 8282 for metrics instead of the
+  # default 8080. kube-router (k0s's built-in CNI) binds 0.0.0.0:8080 by
+  # default, which conflicts with HAProxy's hostNetwork fallback port and
+  # prevents HAProxy from ever binding its intended port 80 correctly.
+  # Moving kube-router metrics to 8282 frees 8080 and ensures HAProxy can
+  # claim port 80 without silent fallback.
   python3 - <<'PYEOF'
 import yaml
 path = "/etc/k0s/k0s.yaml"
 with open(path) as f:
     cfg = yaml.safe_load(f)
+
 spec = cfg.setdefault("spec", {})
+
+# API server tuning
 spec.setdefault("api", {}).setdefault("extraArgs", {}).update({
     "max-requests-inflight":          "400",
     "max-mutating-requests-inflight": "200",
 })
+
+# Move kube-router metrics off :8080 so HAProxy can bind :80 cleanly.
+# kube-router defaults to 8080 which causes HAProxy (hostNetwork) to
+# silently fall back to 8080 instead of binding its intended port 80.
+network = spec.setdefault("network", {})
+network["provider"] = "kuberouter"
+network.setdefault("kubeRouter", {})["metricsPort"] = 8282
+
 with open(path, "w") as f:
     yaml.dump(cfg, f, default_flow_style=False)
+
+print("k0s config written: kube-router metricsPort=8282, API tuning applied")
 PYEOF
 
   info "Resetting and Installing k0s systemd service..."
@@ -150,6 +169,18 @@ PYEOF
     sleep 2
   done
   echo
+
+  # Verify kube-router is on the correct port after startup
+  info "Verifying kube-router metrics port..."
+  sleep 5
+  if ss -tulpn 2>/dev/null | grep -q "kube-router"; then
+    KROUTER_PORT=$(ss -tulpn | grep "kube-router" | grep -oE ':[0-9]+' | head -1 | tr -d ':')
+    if [[ "$KROUTER_PORT" == "8282" ]]; then
+      success "kube-router is correctly on port 8282 — port 8080 is free for HAProxy."
+    else
+      warn "kube-router is on port ${KROUTER_PORT} instead of 8282. Check /etc/k0s/k0s.yaml network.kubeRouter.metricsPort"
+    fi
+  fi
 fi
 
 # ── 3. Post-Install Config (Always Run) ───────────────────────────────────────
@@ -199,38 +230,38 @@ helm repo update >/dev/null
 info "Creating namespaces..."
 kubectl create namespace "${MONITORING_NS}" --dry-run=client -o yaml | kubectl apply -f -
 
-# ── 4. Upgrade k0s (if UPGRADE=true) ────────────────────────────────────────────
+# ── 4. Upgrade k0s (if UPGRADE=true) ──────────────────────────────────────────
 if [[ "${UPGRADE}" == "true" ]]; then
   echo ""
   header "Upgrading k0s to ${K0S_VERSION}"
-  
+
   # Backup before upgrade
   info "Backing up k0s before upgrade..."
   BACKUP_DIR="/var/backups/k0s"
   TIMESTAMP=$(date +%Y%m%d-%H%M%S)
   mkdir -p "${BACKUP_DIR}"
-  
+
   BACKUP_FILE="${BACKUP_DIR}/k0s-backup-${TIMESTAMP}.tar.gz"
   tar -czf "${BACKUP_FILE}" \
     -C / var/lib/k0s/pki \
     -C / var/lib/k0s/manifests \
     -C / etc/k0s 2>/dev/null || true
   cp /var/lib/k0s/pki/admin.conf "${BACKUP_DIR}/kubeconfig-${TIMESTAMP}" 2>/dev/null || true
-  
+
   success "Backup created: ${BACKUP_FILE}"
-  
+
   # Stop k0s
   info "Stopping k0s..."
   k0s stop
-  
+
   # Download and install new k0s binary
   info "Downloading k0s ${K0S_VERSION}..."
   rm -f /usr/local/bin/k0s
-  
+
   K0S_INSTALL_PATH=/usr/local/bin \
     K0S_VERSION="${K0S_VERSION}" \
     curl -sSLf https://get.k0s.sh | sh
-  
+
   # Verify new version
   NEW_VER="$(k0s version 2>/dev/null || true)"
   if [[ "${NEW_VER}" != *"${K0S_VERSION}"* ]]; then
@@ -240,13 +271,29 @@ if [[ "${UPGRADE}" == "true" ]]; then
       -o /usr/local/bin/k0s
     chmod +x /usr/local/bin/k0s
   fi
-  
+
   info "k0s version: $(k0s version)"
-  
+
+  # Re-apply kube-router metricsPort on upgrade in case config was regenerated
+  info "Ensuring kube-router metricsPort=8282 in config..."
+  python3 - <<'PYEOF'
+import yaml
+path = "/etc/k0s/k0s.yaml"
+with open(path) as f:
+    cfg = yaml.safe_load(f)
+spec = cfg.setdefault("spec", {})
+network = spec.setdefault("network", {})
+network["provider"] = "kuberouter"
+network.setdefault("kubeRouter", {})["metricsPort"] = 8282
+with open(path, "w") as f:
+    yaml.dump(cfg, f, default_flow_style=False)
+print("kube-router metricsPort=8282 confirmed in config")
+PYEOF
+
   # Start k0s
   info "Starting k0s..."
   k0s start
-  
+
   # Wait for API
   info "Waiting for k0s API..."
   for i in $(seq 1 60); do
@@ -259,10 +306,10 @@ if [[ "${UPGRADE}" == "true" ]]; then
     sleep 2
   done
   echo
-  
+
   # Wait for node
   kubectl wait node --all --for=condition=Ready --timeout=180s >/dev/null
-  
+
   success "k0s upgraded to ${K0S_VERSION}"
   echo ""
 fi
