@@ -1,29 +1,17 @@
 # =============================================================================
 # mimir-values.yaml — grafana/mimir-distributed chart 6.0.5
 # Single-node lab deployment with S3 storage
-# All keys verified against chart defaults via `helm show values`
 # =============================================================================
 
 fullnameOverride: mimir
 
-# Disable bundled MinIO — using external S3
 minio:
   enabled: false
-
-# Disable Kafka — ingest_storage is auto-templated from kafka.enabled
-# Setting kafka.enabled=false tells the chart to omit the kafka address block
-# which would otherwise cause "kafka address not configured" errors
 kafka:
   enabled: false
-
-# Disable rollout operator — not needed for single-node, no rolling zone upgrades
 rollout_operator:
   enabled: false
 
-# =============================================================================
-# Mimir structured config — injected directly into /etc/mimir/mimir.yaml
-# DO NOT add auth_enabled here — not a valid field in chart 6.0.5
-# =============================================================================
 mimir:
   structuredConfig:
 
@@ -32,11 +20,9 @@ mimir:
       kafka:
         address: ""
 
-    # Usage stats - reporting to Grafana (requires S3 endpoint)
     usage_stats:
       enabled: false
 
-    # S3 for all storage backends — envsubst fills ${S3_REGION} / ${S3_BUCKET_MIMIR}
     common:
       storage:
         backend: s3
@@ -66,29 +52,22 @@ mimir:
         region: ${S3_REGION}
         bucket_name: ${S3_BUCKET_MIMIR}
 
-    # Single replica — no need for replication
     ingester:
       ring:
         replication_factor: 1
+      push_grpc_method_enabled: true
 
-    # queryScheduler disabled (replicas: 0 below) — use dns discovery instead
     query_scheduler:
       service_discovery_mode: dns
 
     querier:
       max_concurrent: 2
 
-    # Conservative limits for lab use
     limits:
       ingestion_rate: 10000
       ingestion_burst_size: 20000
       max_global_series_per_user: 100000
 
-# =============================================================================
-# Component replicas and resources
-# =============================================================================
-
-# ── Ingester ──────────────────────────────────────────────────────────────────
 ingester:
   replicas: 1
   zoneAwareReplication:
@@ -103,7 +82,6 @@ ingester:
       cpu: 500m
       memory: 1Gi
 
-# ── Store Gateway — snake_case key required by chart 6.0.5 ───────────────────
 store_gateway:
   replicas: 1
   zoneAwareReplication:
@@ -118,7 +96,6 @@ store_gateway:
       cpu: 250m
       memory: 512Mi
 
-# ── Compactor ─────────────────────────────────────────────────────────────────
 compactor:
   replicas: 1
   persistentVolume:
@@ -131,7 +108,6 @@ compactor:
       cpu: 250m
       memory: 512Mi
 
-# ── Distributor ───────────────────────────────────────────────────────────────
 distributor:
   replicas: 1
   resources:
@@ -142,7 +118,6 @@ distributor:
       cpu: 250m
       memory: 256Mi
 
-# ── Querier ───────────────────────────────────────────────────────────────────
 querier:
   replicas: 1
   resources:
@@ -153,7 +128,6 @@ querier:
       cpu: 250m
       memory: 512Mi
 
-# ── Query Frontend ────────────────────────────────────────────────────────────
 query_frontend:
   replicas: 1
   resources:
@@ -164,11 +138,9 @@ query_frontend:
       cpu: 100m
       memory: 128Mi
 
-# ── Query Scheduler — disabled, using dns discovery mode above ────────────────
 query_scheduler:
   replicas: 0
 
-# ── Alertmanager ──────────────────────────────────────────────────────────────
 alertmanager:
   replicas: 1
   persistentVolume:
@@ -181,11 +153,10 @@ alertmanager:
       cpu: 100m
       memory: 128Mi
 
-# ── Ruler — disabled for basic lab setup ─────────────────────────────────────
 ruler:
   replicas: 0
 
-# ── Overrides Exporter — snake_case key required by chart 6.0.5 ──────────────
+# FIX: snake_case, explicitly defined to prevent uncontrolled replica count
 overrides_exporter:
   replicas: 1
   resources:
@@ -196,7 +167,6 @@ overrides_exporter:
       cpu: 50m
       memory: 64Mi
 
-# ── Gateway ───────────────────────────────────────────────────────────────────
 gateway:
   replicas: 1
   resources:
@@ -207,9 +177,6 @@ gateway:
       cpu: 100m
       memory: 64Mi
 
-# =============================================================================
-# Disable all caches — not needed for lab, saves significant memory
-# =============================================================================
 chunks-cache:
   enabled: false
 index-cache:
@@ -219,20 +186,12 @@ metadata-cache:
 results-cache:
   enabled: false
 
-# =============================================================================
-# Disable meta-monitoring — no self-scraping needed in lab
-# =============================================================================
 metaMonitoring:
   serviceMonitor:
     enabled: false
   grafanaAgent:
     enabled: false
 
-# =============================================================================
-# Global — Go runtime tuning applied to all pods via extraEnv
-# GOMAXPROCS: cap goroutine threads to 2 (matches CPU limit)
-# GOMEMLIMIT: soft memory ceiling, reduces GC pressure near OOM
-# =============================================================================
 global:
   extraEnv:
     - name: GOMAXPROCS

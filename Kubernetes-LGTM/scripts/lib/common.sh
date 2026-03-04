@@ -22,7 +22,7 @@ export LINKERD_VERSION="stable-2.14.11" # https://github.com/linkerd/linkerd2/re
 #   Both repos are registered in install_LGTM.sh.
 export LOKI_CHART_VERSION="6.53.0"        # grafana-community/loki
 export TEMPO_CHART_VERSION="1.24.4"       # grafana-community/tempo (single binary)
-export MIMIR_CHART_VERSION="6.0.5"        # grafana/mimir-distributed (latest stable; weekly builds excluded)
+export MIMIR_CHART_VERSION="6.0.5"        # grafana/mimir-distributed
 export GRAFANA_CHART_VERSION="10.5.15"    # grafana/grafana
 # Alertmanager is built into Mimir - no separate chart needed
 
