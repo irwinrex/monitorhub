@@ -60,6 +60,7 @@ ingester:
   replicas: 1
   zoneAwareReplication:
     enabled: false
+    zones: []
   persistentVolume:
     enabled: false
   resources:
@@ -74,6 +75,7 @@ storeGateway:
   replicas: 1
   zoneAwareReplication:
     enabled: false
+    zones: []
   persistentVolume:
     enabled: false
   resources:
@@ -86,6 +88,9 @@ storeGateway:
 
 alertmanager:
   replicas: 1
+  zoneAwareReplication:
+    enabled: false
+    zones: []
   persistentVolume:
     enabled: false
   resources:
