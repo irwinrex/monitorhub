@@ -246,6 +246,37 @@ printf "${GREEN}║  All phases complete in %dm %ds%-28s║${NC}\n" \
   "${TOTAL_MIN}" "${TOTAL_SEC}" ""
 echo -e "${GREEN}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
+
+# Get passwords from secrets
+GRAFANA_PASS=$(kubectl get secret grafana-admin -n monitoring -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d || echo "check secret")
+
+# Extract basic auth credentials from the secret
+# The auth field contains "user:password" in htpasswd format
+BASIC_AUTH=$(kubectl get secret grafana-basic-auth -n monitoring -o jsonpath='{.data.auth}' 2>/dev/null | base64 -d || echo "")
+BASIC_AUTH_USER=$(echo "$BASIC_AUTH" | cut -d':' -f1)
+BASIC_AUTH_PASS=$(echo "$BASIC_AUTH" | cut -d':' -f2-)
+
+echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
+echo -e "${YELLOW}  ACCESS CREDENTIALS${NC}"
+echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
+echo ""
+echo -e "${CYAN}Grafana:${NC}"
+echo "  URL:      http://${NODE_IP}/"
+echo "  User:     admin"
+echo "  Password: ${GRAFANA_PASS}"
+echo ""
+echo -e "${CYAN}API Endpoints (Mimir, Loki, Tempo):${NC}"
+echo "  URL:      http://${NODE_IP}/metrics, /logs, /traces"
+echo "  User:     ${BASIC_AUTH_USER:-admin}"
+echo "  Password: ${BASIC_AUTH_PASS:-check secret}"
+echo ""
+echo -e "${CYAN}HAProxy Stats:${NC}"
+echo "  URL:      http://${NODE_IP}:1024"
+echo "  User:     admin"
+echo "  Password: admin"
+echo ""
+echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
+echo ""
 echo "  Nodes:    kubectl get nodes -o wide"
 echo "  Pods:     kubectl get pods -n monitoring -o wide"
 echo "  Helm:     helm list -n monitoring"

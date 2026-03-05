@@ -70,12 +70,12 @@ kubectl create secret generic "${SECRET_NAME}" \
   --from-literal=admin-user=admin \
   --from-literal=admin-password="${GRAFANA_PASS}"
 
-# ── HAproxy Basic Auth Secret ─────────────────────────────────────────────────
+# ── HAproxy Basic Auth Secret (for Loki, Tempo, Mimir) ─────────────────────────
 BASIC_AUTH_SECRET="grafana-basic-auth"
 BASIC_AUTH_USER="${BASIC_AUTH_USER:-admin}"
-BASIC_AUTH_PASS="${BASIC_AUTH_PASS:-${GRAFANA_PASS}}"
+BASIC_AUTH_PASS="${BASIC_AUTH_PASS:-$(openssl rand -hex 16)}"
 
-info "Creating HAproxy basic auth secret..."
+info "Creating HAproxy basic auth secret for API endpoints (LGTM)..."
 if command -v htpasswd &>/dev/null; then
   HTPASSWD=$(htpasswd -nbm "${BASIC_AUTH_USER}" "${BASIC_AUTH_PASS}" 2>/dev/null || die "htpasswd failed")
 else
@@ -89,7 +89,8 @@ kubectl create secret generic "${BASIC_AUTH_SECRET}" \
   --from-literal=auth="${HTPASSWD}" \
   --dry-run=client -o yaml | kubectl apply -f -
 
-success "HAproxy basic auth configured (${BASIC_AUTH_USER})"
+export BASIC_AUTH_USER BASIC_AUTH_PASS
+success "HAproxy basic auth configured (user: ${BASIC_AUTH_USER}, pass: ${BASIC_AUTH_PASS})"
 
 echo ""
 echo -e "${YELLOW}┌──────────────────────────────────────────────────────────┐${NC}"
