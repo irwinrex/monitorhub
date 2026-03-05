@@ -64,14 +64,19 @@ while [[ $# -gt 0 ]]; do
     YES="true"
     shift
     ;;
+  --force-recreate)
+    FORCE_RECREATE="true"
+    shift
+    ;;
   -h | --help)
     echo "Usage: sudo bash install_all.sh [OPTIONS]"
     echo ""
     echo "Options:"
     echo "  -b, --bucket-name    S3 base bucket name"
-    echo "  -r, --region         S3 region (e.g., us-east-1)"
-    echo "  -y, --yes            Non-interactive mode"
-    echo "  -h, --help           Show this help"
+  echo "  -r, --region         S3 region (e.g., us-east-1)"
+  echo "  -y, --yes            Non-interactive mode"
+  echo "  --force-recreate    Force recreate secrets"
+  echo "  -h, --help           Show this help"
     echo ""
     echo "Examples:"
     echo "  sudo bash install_all.sh -b my-bucket -r us-east-1 -y"
@@ -97,6 +102,7 @@ SKIP_HAPROXY="${SKIP_HAPROXY:-false}"
 SKIP_SECRETS="${SKIP_SECRETS:-false}"
 SKIP_LGTM="${SKIP_LGTM:-false}"
 SKIP_BACKUP="${SKIP_BACKUP:-false}"
+FORCE_RECREATE="${FORCE_RECREATE:-false}"
 
 # ── Phase runner ──────────────────────────────────────────────────────────────
 _phase_banner() {
@@ -117,6 +123,7 @@ _run_phase() {
   S3_BUCKET="${S3_BUCKET}" \
     S3_REGION="${S3_REGION}" \
     YES="${YES}" \
+    FORCE_RECREATE="${FORCE_RECREATE:-false}" \
     bash "${script}"
   echo -e "${GREEN}  ✓  Phase ${num} complete in $((SECONDS - t))s${NC}"
 }
