@@ -14,6 +14,15 @@ if ! kubectl get namespace "${MONITORING_NS}" &>/dev/null 2>&1; then
   die "Namespace '${MONITORING_NS}' does not exist."
 fi
 
+if ! kubectl get namespace kube-system &>/dev/null 2>&1; then
+  die "Namespace 'kube-system' does not exist."
+fi
+
+if ! command -v htpasswd >/dev/null 2>&1; then
+  warn "htpasswd not found, installing apache2-utils..."
+  apt-get update -qq && apt-get install -y apache2-utils -qq >/dev/null 2>&1 || true
+fi
+
 FORCE_RECREATE="${FORCE_RECREATE:-false}"
 SECRET_NAME="grafana-admin"
 
@@ -52,22 +61,40 @@ if kubectl get secret "${BASIC_AUTH_SECRET}" -n kube-system &>/dev/null; then
   fi
 fi
 
-if ! kubectl get secret "${BASIC_AUTH_SECRET}" -n kube-system &>/dev/null; then
+if ! kubectl get secret "${BASIC_AUTH_SECRET}" -n kube-system &>/dev/null || [[ "${FORCE_RECREATE}" == "true" ]]; then
   BASIC_AUTH_USER="${BASIC_AUTH_USER:-admin}"
   BASIC_AUTH_PASS="${BASIC_AUTH_PASS:-$(openssl rand -hex 16)}"
 
-  if command -v htpasswd >/dev/null 2>&1; then
-    HTPASSWD=$(htpasswd -nbm "${BASIC_AUTH_USER}" "${BASIC_AUTH_PASS}")
-  else
-    HTPASSWD=$(openssl passwd -apr1 "${BASIC_AUTH_PASS}")
-    HTPASSWD="${BASIC_AUTH_USER}:${HTPASSWD}"
+  if ! command -v htpasswd >/dev/null 2>&1; then
+    die "htpasswd is required but not installed. Install apache2-utils manually."
   fi
+
+  HTPASSWD=$(htpasswd -nbm "${BASIC_AUTH_USER}" "${BASIC_AUTH_PASS}")
 
   kubectl create secret generic "${BASIC_AUTH_SECRET}" \
     --namespace kube-system \
     --from-literal=auth="${HTPASSWD}" \
     --from-literal=username="${BASIC_AUTH_USER}" \
     --from-literal=password="${BASIC_AUTH_PASS}"
+
+  info "Verifying secret..."
+  VERIFIED=$(kubectl get secret "${BASIC_AUTH_SECRET}" -n kube-system -o jsonpath='{.data.auth}' | base64 -d)
+  if [[ -n "$VERIFIED" ]]; then
+    success "Basic auth secret verified"
+  fi
+
+  info "Testing basic auth with HAProxy..."
+  NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || echo "")
+  if [[ -n "$NODE_IP" ]]; then
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -u "${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}" "http://${NODE_IP}/metrics" 2>/dev/null || echo "000")
+    if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "401" ]]; then
+      success "Basic auth test completed (HTTP ${HTTP_CODE})"
+    else
+      warn "Basic auth test returned HTTP ${HTTP_CODE}"
+    fi
+  else
+    warn "Could not determine node IP for curl test"
+  fi
 fi
 
 success "HAProxy basic auth configured"
@@ -85,16 +112,15 @@ if kubectl get secret "${HAPROXY_STATS_SECRET}" -n kube-system &>/dev/null; then
   fi
 fi
 
-if ! kubectl get secret "${HAPROXY_STATS_SECRET}" -n kube-system &>/dev/null; then
+if ! kubectl get secret "${HAPROXY_STATS_SECRET}" -n kube-system &>/dev/null || [[ "${FORCE_RECREATE}" == "true" ]]; then
   HAPROXY_STATS_USER="${HAPROXY_STATS_USER:-admin}"
   HAPROXY_STATS_PASS="${HAPROXY_STATS_PASS:-admin}"
 
-  if command -v htpasswd >/dev/null 2>&1; then
-    STATS_HTPASSWD=$(htpasswd -nbm "${HAPROXY_STATS_USER}" "${HAPROXY_STATS_PASS}")
-  else
-    STATS_HTPASSWD=$(openssl passwd -apr1 "${HAPROXY_STATS_PASS}")
-    STATS_HTPASSWD="${HAPROXY_STATS_USER}:${STATS_HTPASSWD}"
+  if ! command -v htpasswd >/dev/null 2>&1; then
+    die "htpasswd is required but not installed. Install apache2-utils manually."
   fi
+
+  STATS_HTPASSWD=$(htpasswd -nbm "${HAPROXY_STATS_USER}" "${HAPROXY_STATS_PASS}")
 
   kubectl create secret generic "${HAPROXY_STATS_SECRET}" \
     --namespace kube-system \
