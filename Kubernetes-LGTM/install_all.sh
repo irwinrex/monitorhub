@@ -281,8 +281,10 @@ echo "  Password: ${BASIC_AUTH_PASS:-check secret}"
 echo ""
 echo -e "${CYAN}HAProxy Stats:${NC}"
 echo "  URL:      http://${NODE_IP}:1024"
-echo "  User:     admin"
-echo "  Password: admin"
+HAPROXY_STATS_USER=$(kubectl get secret haproxy-stats -n kube-system -o jsonpath='{.data.username}' 2>/dev/null | base64 -d || echo "admin")
+HAPROXY_STATS_PASS=$(kubectl get secret haproxy-stats -n kube-system -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "check secret")
+echo "  User:     ${HAPROXY_STATS_USER}"
+echo "  Password: ${HAPROXY_STATS_PASS}"
 echo ""
 echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
 echo ""

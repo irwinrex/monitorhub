@@ -71,4 +71,37 @@ if ! kubectl get secret "${BASIC_AUTH_SECRET}" -n "${MONITORING_NS}" &>/dev/null
 fi
 
 success "HAProxy basic auth configured"
+
+HAPROXY_STATS_SECRET="haproxy-stats"
+
+info "Creating HAProxy stats secret..."
+
+if kubectl get secret "${HAPROXY_STATS_SECRET}" -n kube-system &>/dev/null; then
+  if [[ "${FORCE_RECREATE}" == "true" ]]; then
+    warn "FORCE_RECREATE=true - deleting existing haproxy-stats secret..."
+    kubectl delete secret "${HAPROXY_STATS_SECRET}" -n kube-system
+  else
+    success "HAProxy stats secret already exists"
+  fi
+fi
+
+if ! kubectl get secret "${HAPROXY_STATS_SECRET}" -n kube-system &>/dev/null; then
+  HAPROXY_STATS_USER="${HAPROXY_STATS_USER:-admin}"
+  HAPROXY_STATS_PASS="${HAPROXY_STATS_PASS:-admin}"
+
+  if command -v htpasswd >/dev/null 2>&1; then
+    STATS_HTPASSWD=$(htpasswd -nbm "${HAPROXY_STATS_USER}" "${HAPROXY_STATS_PASS}")
+  else
+    STATS_HTPASSWD=$(openssl passwd -apr1 "${HAPROXY_STATS_PASS}")
+    STATS_HTPASSWD="${HAPROXY_STATS_USER}:${STATS_HTPASSWD}"
+  fi
+
+  kubectl create secret generic "${HAPROXY_STATS_SECRET}" \
+    --namespace kube-system \
+    --from-literal=auth="${STATS_HTPASSWD}" \
+    --from-literal=username="${HAPROXY_STATS_USER}" \
+    --from-literal=password="${HAPROXY_STATS_PASS}"
+fi
+
+success "HAProxy stats secret configured"
 echo ""
