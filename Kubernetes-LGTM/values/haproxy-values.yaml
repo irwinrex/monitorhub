@@ -1,6 +1,5 @@
 # =============================================================================
 # HAProxy Ingress Controller Configuration
-# HAProxy routes incoming traffic to your services (Grafana, Loki, Mimir, Tempo)
 # =============================================================================
 
 controller:
@@ -28,70 +27,28 @@ controller:
 
   # HAProxy timeout and option settings
   config:
-    timeout-connect: "10s"         # Max time to connect to backend
-    timeout-client:  "60s"          # Max time for client to send data
-    timeout-server:  "60s"         # Max time for backend to respond
-    timeout-http-request: "30s"    # Max time for HTTP request
-    timeout-keep-alive: "30s"      # Keep-alive timeout
-    timeout-tunnel: "3600s"       # Tunnel/websocket timeout
-    forwarded-for: "true"          # Add X-Forwarded-For header
-    ssl-redirect: "false"          # Don't redirect HTTP to HTTPS
-    use-forwarded-headers: "true"  # Use forwarded headers
-    http-connection-mode: "http-server-close"  # Close connection after response
+    timeout-connect: "10s"
+    timeout-client:  "60s"
+    timeout-server:  "60s"
+    timeout-http-request: "30s"
+    timeout-keep-alive: "30s"
+    timeout-tunnel: "3600s"
+    forwarded-for: "true"
+    ssl-redirect: "false"
+    use-forwarded-headers: "true"
+    http-connection-mode: "http-server-close"
     option: "httpchk forwardfor httplog dontlognull redispatch"
-    default-server: "inter 3s rise 2 fall 3"  # Health check settings
-    maxconn: "4000"                # Max connections per frontend
-
-  # Extra HAProxy configuration - rate limiting stick table
-  extraConfig: |
-    # Rate limiting stick table
-    stick-table type ip size 100k expire 30s store conn_rate(30s),http_req_rate(30s)
-
-  # Backend rate limiting - keep simple to avoid conflicts
-  extraBackendConfig:
-    annotations:
-      haproxy.org/rate-limit-requests: "50"
-
-  # Extra service annotations
-  extraService:
-    enabled: true
-    annotations: {}
-
-  # Path-based routing backends (HTTP - mTLS handled by Linkerd)
-  extraBackends:
-    # Mimir API - metrics data
-    mimir-backend:
-      enabled: true
-      endpoints:
-        - http://mimir-gateway.monitoring.svc.cluster.local:80
-      port: 80
-      backendServerProtocol: HTTP
-      pathRewrite: "/mimir(.*) /$1"
-    # Loki - log data
-    loki-backend:
-      enabled: true
-      endpoints:
-        - http://loki.monitoring.svc.cluster.local:3100
-      port: 3100
-      backendServerProtocol: HTTP
-      pathRewrite: "/loki(.*) /$1"
-    # Tempo - trace data
-    tempo-backend:
-      enabled: true
-      endpoints:
-        - http://tempo.monitoring.svc.cluster.local:3200
-      port: 3200
-      backendServerProtocol: HTTP
-      pathRewrite: "/tempo(.*) /$1"
+    default-server: "inter 3s rise 2 fall 3"
+    maxconn: "4000"
 
   # Resource limits
   resources:
     requests:
-      cpu:    100m   # Request 100 millicpus
-      memory: 128Mi  # Request 128 MB RAM
+      cpu:    100m
+      memory: 128Mi
     limits:
-      cpu:    250m   # Max 250 millicpus
-      memory: 256Mi  # Max 256 MB RAM
+      cpu:    250m
+      memory: 256Mi
 
   # Health check configuration
   healthCheck:
@@ -101,7 +58,7 @@ controller:
   stats:
     enabled: true
     port: 1024
-    auth: "admin:admin"  # Username:password for stats page
+    auth: "admin:admin"
 
   # Prometheus metrics
   metrics:
@@ -109,7 +66,7 @@ controller:
 
   # Pod annotations
   podAnnotations:
-    cluster-autoscaler.kubernetes.io/safe-to-evict: "false"  # Don't evict during scale-down
+    cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
 
   # Tolerations - allow running on control plane
   tolerations:
