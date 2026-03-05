@@ -25,9 +25,8 @@ controller:
   service:
     type: ClusterIP
 
-  # HAProxy config - empty annotations to avoid default rate-limit
+  # HAProxy config
   config:
-    annotations: {}
     timeout-connect: "10s"
     timeout-client:  "60s"
     timeout-server:  "60s"
