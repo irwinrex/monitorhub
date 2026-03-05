@@ -23,6 +23,8 @@ grafana.ini:
   users:
     auto_assign_org: true
     auto_assign_org_role: Viewer
+  news:
+    news_enabled: false
 
 # =============================================================================
 # Datasources

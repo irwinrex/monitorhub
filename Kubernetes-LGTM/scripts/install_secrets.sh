@@ -4,8 +4,8 @@
 # Creates Kubernetes secrets required before Helm charts are deployed.
 #
 # Secrets managed:
-#   grafana-admin  (namespace: monitoring)  — Grafana admin login
-#   basic-auth     (namespace: kube-system) — HAProxy basic auth for LGTM APIs
+#   grafana-admin    (namespace: monitoring)  — Grafana admin login
+#   lgtm-basic-auth  (namespace: monitoring)  — HAProxy basic auth for LGTM APIs
 #
 # Options:
 #   -f, --force                Force recreate all secrets
@@ -97,20 +97,20 @@ if ! kubectl get secret "${SECRET_NAME}" -n "${MONITORING_NS}" &>/dev/null; then
   echo ""
 fi
 
-# ── HAProxy Basic Auth Secret (kube-system namespace) ─────────────────────────
-# Stored in kube-system — HAProxy reads secrets from its own namespace only.
-# Referenced in ingress: haproxy.org/auth-secret: "kube-system/basic-auth"
-BASIC_AUTH_SECRET="basic-auth"
+# ── HAProxy Basic Auth Secret (monitoring namespace) ─────────────────────────
+# HAProxy can read secrets from monitoring namespace using namespace/secret-name
+# Referenced in ingress: haproxy.org/auth-secret: "monitoring/lgtm-basic-auth"
+BASIC_AUTH_SECRET="lgtm-basic-auth"
 BASIC_AUTH_USER="${BASIC_AUTH_USER:-admin}"
 
-if kubectl get secret "${BASIC_AUTH_SECRET}" -n kube-system &>/dev/null; then
+if kubectl get secret "${BASIC_AUTH_SECRET}" -n "${MONITORING_NS}" &>/dev/null; then
   if [[ "${FORCE_RECREATE}" == "true" ]]; then
     warn "FORCE_RECREATE=true — deleting existing secret ${BASIC_AUTH_SECRET}..."
-    kubectl delete secret "${BASIC_AUTH_SECRET}" -n kube-system
+    kubectl delete secret "${BASIC_AUTH_SECRET}" -n "${MONITORING_NS}"
   else
     success "HAProxy basic auth secret already exists — skipping"
     # Export for install_all.sh summary even when skipping
-    BASIC_AUTH_PASS=$(kubectl get secret "${BASIC_AUTH_SECRET}" -n kube-system \
+    BASIC_AUTH_PASS=$(kubectl get secret "${BASIC_AUTH_SECRET}" -n "${MONITORING_NS}" \
       -o jsonpath='{.data.password}' | base64 -d)
     export BASIC_AUTH_USER BASIC_AUTH_PASS
     success "install_secrets.sh complete"
@@ -141,7 +141,7 @@ info "htpasswd hash verified OK"
 printf '%s' "${HTPASSWD}" >/tmp/_basic_auth
 
 kubectl create secret generic "${BASIC_AUTH_SECRET}" \
-  --namespace kube-system \
+  --namespace "${MONITORING_NS}" \
   --from-file=auth=/tmp/_basic_auth \
   --from-literal=username="${BASIC_AUTH_USER}" \
   --from-literal=password="${BASIC_AUTH_PASS}" \
@@ -156,7 +156,7 @@ echo -e "${YELLOW}│  User    : ${BASIC_AUTH_USER}                             
 echo -e "${YELLOW}│  Password: ${BOLD}${BASIC_AUTH_PASS}${NC}${YELLOW}                        │${NC}"
 echo -e "${YELLOW}│                                                          │${NC}"
 echo -e "${YELLOW}│  Retrieve later:                                         │${NC}"
-echo -e "${YELLOW}│  kubectl get secret basic-auth -n kube-system \\         │${NC}"
+echo -e "${YELLOW}│  kubectl get secret lgtm-basic-auth -n monitoring \\      │${NC}"
 echo -e "${YELLOW}│    -o jsonpath='{.data.password}' | base64 -d           │${NC}"
 echo -e "${YELLOW}└──────────────────────────────────────────────────────────┘${NC}"
 echo ""

@@ -245,9 +245,9 @@ DISPLAY_IP="${PUBLIC_IP:-${PRIVATE_IP:-localhost}}"
 # Fetch credentials from secrets
 GRAFANA_PASS=$(kubectl get secret grafana-admin -n monitoring \
   -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d || echo "")
-BASIC_AUTH_USER=$(kubectl get secret basic-auth -n kube-system \
+BASIC_AUTH_USER=$(kubectl get secret lgtm-basic-auth -n monitoring \
   -o jsonpath='{.data.username}' 2>/dev/null | base64 -d || echo "")
-BASIC_AUTH_PASS=$(kubectl get secret basic-auth -n kube-system \
+BASIC_AUTH_PASS=$(kubectl get secret lgtm-basic-auth -n monitoring \
   -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "")
 
 echo ""
@@ -275,8 +275,8 @@ if [[ -n "${BASIC_AUTH_USER}" && -n "${BASIC_AUTH_PASS}" ]]; then
   echo "  User:     ${BASIC_AUTH_USER}"
   echo "  Password: ${BASIC_AUTH_PASS}"
 else
-  _user=$(kubectl get secret basic-auth -n kube-system -o jsonpath='{.data.username}' 2>/dev/null | base64 -d || echo "<not found>")
-  _pass=$(kubectl get secret basic-auth -n kube-system -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "<not found>")
+  _user=$(kubectl get secret lgtm-basic-auth -n monitoring -o jsonpath='{.data.username}' 2>/dev/null | base64 -d || echo "<not found>")
+  _pass=$(kubectl get secret lgtm-basic-auth -n monitoring -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "<not found>")
   echo "  User:     ${_user}"
   echo "  Password: ${_pass}"
 fi
@@ -308,36 +308,59 @@ echo -e "${YELLOW}  ENDPOINT TESTS${NC}"
 echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
 echo ""
 
-_test_endpoint() {
-  local label="$1" url="$2" auth="$3"
-  local http_code
-  http_code=$(curl -s -o /dev/null -w "%{http_code}" \
-    ${auth:+-u "$auth"} --max-time 5 "$url" 2>/dev/null || echo "000")
-  if [[ "$http_code" =~ ^[2-4] ]]; then
-    success "${label}: HTTP ${http_code}"
-  else
-    warn "${label}: HTTP ${http_code} — connection failed or timed out"
+# Wait for HAProxy to bind port 80
+info "Waiting for HAProxy port 80..."
+_port_ready=0
+for _i in $(seq 1 15); do
+  if ss -tulpn 2>/dev/null | grep -q ':80 '; then
+    _port_ready=1
+    break
   fi
-}
-
-# Grafana — no auth
-_test_endpoint "Grafana  (/)" \
-  "http://localhost/" \
-  ""
-
-# LGTM APIs — basic auth required
-if [[ -n "${BASIC_AUTH_USER}" && -n "${BASIC_AUTH_PASS}" ]]; then
-  AUTH="${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}"
-  _test_endpoint "Mimir    (/metrics)" "http://localhost/metrics" "$AUTH"
-  _test_endpoint "Loki     (/logs)" "http://localhost/logs" "$AUTH"
-  _test_endpoint "Tempo    (/traces)" "http://localhost/traces" "$AUTH"
-
-  # Also verify 401 is returned without credentials
-  info "Verifying auth enforcement (expect 401)..."
-  _test_endpoint "Mimir no-auth (expect 401)" "http://localhost/metrics" ""
+  sleep 2
+done
+if [[ $_port_ready -eq 0 ]]; then
+  warn "HAProxy port 80 not bound after 30s — skipping endpoint tests"
+  warn "Check: kubectl get pods -n kube-system -l app.kubernetes.io/instance=haproxy-ingress"
+  echo ""
 else
-  warn "Basic auth credentials not found in secrets — skipping API tests"
-  warn "Run: kubectl get secret basic-auth -n kube-system -o yaml"
-fi
+
+  _test_endpoint() {
+    local label="$1" url="$2" user="${3:-}" pass="${4:-}"
+    local http_code
+    if [[ -n "$user" && -n "$pass" ]]; then
+      http_code=$(curl -s -o /dev/null -w "%{http_code}" -u "${user}:${pass}" --max-time 5 "$url" 2>/dev/null)
+    else
+      http_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "$url" 2>/dev/null)
+    fi
+    http_code="${http_code:-000}"
+    if [[ "$http_code" =~ ^[2-4] ]]; then
+      success "${label}: HTTP ${http_code}"
+    else
+      warn "${label}: HTTP ${http_code} — connection failed or timed out"
+    fi
+  }
+
+  # Pull credentials fresh if not in env
+  if [[ -z "${BASIC_AUTH_USER:-}" || -z "${BASIC_AUTH_PASS:-}" ]]; then
+    BASIC_AUTH_USER=$(kubectl get secret lgtm-basic-auth -n monitoring -o jsonpath='{.data.username}' 2>/dev/null | base64 -d || echo "")
+    BASIC_AUTH_PASS=$(kubectl get secret lgtm-basic-auth -n monitoring -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "")
+  fi
+
+  # Grafana — no auth
+  _test_endpoint "Grafana  (/)" "http://localhost/" "" ""
+
+  # LGTM APIs — basic auth required
+  if [[ -n "${BASIC_AUTH_USER}" && -n "${BASIC_AUTH_PASS}" ]]; then
+    _test_endpoint "Mimir    (/metrics)" "http://localhost/metrics" "${BASIC_AUTH_USER}" "${BASIC_AUTH_PASS}"
+    _test_endpoint "Loki     (/logs)" "http://localhost/logs" "${BASIC_AUTH_USER}" "${BASIC_AUTH_PASS}"
+    _test_endpoint "Tempo    (/traces)" "http://localhost/traces" "${BASIC_AUTH_USER}" "${BASIC_AUTH_PASS}"
+
+    info "Verifying auth enforcement (expect 401)..."
+    _test_endpoint "Mimir no-auth (expect 401)" "http://localhost/metrics" "" ""
+  else
+    warn "Basic auth credentials not found — skipping API tests"
+  fi
+
+fi # end port check
 
 echo ""
