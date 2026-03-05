@@ -131,18 +131,22 @@ info "Creating HAProxy basic auth secret in kube-system..."
 HTPASSWD=$(htpasswd -nbm "${BASIC_AUTH_USER}" "${BASIC_AUTH_PASS}")
 
 # Verify the hash works before storing
-echo "${HTPASSWD}" >/tmp/_auth_verify
+printf '%s' "${HTPASSWD}" >/tmp/_auth_verify
 htpasswd -vb /tmp/_auth_verify "${BASIC_AUTH_USER}" "${BASIC_AUTH_PASS}" &>/dev/null ||
   die "htpasswd hash verification failed — password not stored"
 rm -f /tmp/_auth_verify
 info "htpasswd hash verified OK"
 
+# Write to file — avoids shell $ expansion corrupting the apr1 hash
+printf '%s' "${HTPASSWD}" >/tmp/_basic_auth
+
 kubectl create secret generic "${BASIC_AUTH_SECRET}" \
   --namespace kube-system \
-  --from-literal=auth="${HTPASSWD}" \
+  --from-file=auth=/tmp/_basic_auth \
   --from-literal=username="${BASIC_AUTH_USER}" \
   --from-literal=password="${BASIC_AUTH_PASS}" \
   --dry-run=client -o yaml | kubectl apply -f -
+rm -f /tmp/_basic_auth
 
 echo ""
 echo -e "${YELLOW}┌──────────────────────────────────────────────────────────┐${NC}"

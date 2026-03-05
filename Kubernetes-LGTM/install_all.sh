@@ -271,8 +271,15 @@ echo -e "${CYAN}API Endpoints (Mimir, Loki, Tempo):${NC}"
 echo "  Mimir:    http://${DISPLAY_IP}/metrics"
 echo "  Loki:     http://${DISPLAY_IP}/logs"
 echo "  Tempo:    http://${DISPLAY_IP}/traces"
-echo "  User:     ${BASIC_AUTH_USER:-<run: kubectl get secret basic-auth -n kube-system -o jsonpath='{.data.username}' | base64 -d>}"
-echo "  Password: ${BASIC_AUTH_PASS:-<run: kubectl get secret basic-auth -n kube-system -o jsonpath='{.data.password}' | base64 -d>}"
+if [[ -n "${BASIC_AUTH_USER}" && -n "${BASIC_AUTH_PASS}" ]]; then
+  echo "  User:     ${BASIC_AUTH_USER}"
+  echo "  Password: ${BASIC_AUTH_PASS}"
+else
+  _user=$(kubectl get secret basic-auth -n kube-system -o jsonpath='{.data.username}' 2>/dev/null | base64 -d || echo "<not found>")
+  _pass=$(kubectl get secret basic-auth -n kube-system -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "<not found>")
+  echo "  User:     ${_user}"
+  echo "  Password: ${_pass}"
+fi
 echo ""
 
 echo -e "${CYAN}HAProxy Stats:${NC}"
