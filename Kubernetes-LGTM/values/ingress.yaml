@@ -2,30 +2,17 @@
 # Ingress Configuration for HAProxy
 #
 # Architecture:
-#   - Grafana exposed at /  (browser UI)
-#   - Mimir/Loki/Tempo each get their own Ingress so path-rewrite can strip
-#     the prefix per-backend. HAProxy path-rewrite is per-Ingress, not
-#     per-path, so one Ingress per backend is required for correct stripping.
-#
-# External agents push to:
-#   http://<NODE_IP>/mimir/...  → mimir-gateway:80/...
-#   http://<NODE_IP>/loki/...   → loki:3100/...
-#   http://<NODE_IP>/tempo/...  → tempo:3200/...
+#   - Grafana  → /
+#   - Mimir    → /metrics/...  → mimir-gateway:80/...
+#   - Loki     → /logs/...     → loki:3100/...
+#   - Tempo    → /traces/...   → tempo:3200/...
 # =============================================================================
 ---
-# Grafana — browser UI
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: grafana-ingress
   namespace: monitoring
-  annotations:
-    haproxy.org/timeout-server:         "60s"
-    haproxy.org/proxy-body-size:        "50m"
-    haproxy.org/rate-limit-requests:    "50"
-    haproxy.org/rate-limit-period:      "10s"
-    haproxy.org/rate-limit-size:        "100k"
-    haproxy.org/rate-limit-status-code: "429"
 spec:
   ingressClassName: haproxy
   rules:
@@ -39,29 +26,19 @@ spec:
                 port:
                   number: 80
 ---
-# Mimir — metrics ingestion/query
-# Strips /mimir prefix: /mimir/api/v1/push → /api/v1/push
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: mimir-ingress
   namespace: monitoring
   annotations:
-    haproxy.org/timeout-server:         "60s"
-    haproxy.org/proxy-body-size:        "50m"
-    haproxy.org/rate-limit-requests:    "200"
-    haproxy.org/rate-limit-period:      "10s"
-    haproxy.org/rate-limit-size:        "100k"
-    haproxy.org/rate-limit-status-code: "429"
-    haproxy.org/path-rewrite:           "/mimir/(.*) /\1"
-    ingress.kubernetes.io/auth-type:    basic-auth
-    ingress.kubernetes.io/auth-secret:  grafana-basic-auth
+    haproxy.org/path-rewrite: "/metrics/(.*) /\\1"
 spec:
   ingressClassName: haproxy
   rules:
     - http:
         paths:
-          - path: /mimir
+          - path: /metrics
             pathType: Prefix
             backend:
               service:
@@ -69,29 +46,19 @@ spec:
                 port:
                   number: 80
 ---
-# Loki — log ingestion/query
-# Strips /loki prefix: /loki/loki/api/v1/push → /loki/api/v1/push
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: loki-ingress
   namespace: monitoring
   annotations:
-    haproxy.org/timeout-server:         "60s"
-    haproxy.org/proxy-body-size:        "50m"
-    haproxy.org/rate-limit-requests:    "200"
-    haproxy.org/rate-limit-period:      "10s"
-    haproxy.org/rate-limit-size:        "100k"
-    haproxy.org/rate-limit-status-code: "429"
-    haproxy.org/path-rewrite:           "/loki/(.*) /\1"
-    ingress.kubernetes.io/auth-type:    basic-auth
-    ingress.kubernetes.io/auth-secret:  grafana-basic-auth
+    haproxy.org/path-rewrite: "/logs/(.*) /\\1"
 spec:
   ingressClassName: haproxy
   rules:
     - http:
         paths:
-          - path: /loki
+          - path: /logs
             pathType: Prefix
             backend:
               service:
@@ -99,29 +66,19 @@ spec:
                 port:
                   number: 3100
 ---
-# Tempo — trace ingestion/query
-# Strips /tempo prefix: /tempo/api/traces → /api/traces
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: tempo-ingress
   namespace: monitoring
   annotations:
-    haproxy.org/timeout-server:         "60s"
-    haproxy.org/proxy-body-size:        "50m"
-    haproxy.org/rate-limit-requests:    "200"
-    haproxy.org/rate-limit-period:      "10s"
-    haproxy.org/rate-limit-size:        "100k"
-    haproxy.org/rate-limit-status-code: "429"
-    haproxy.org/path-rewrite:           "/tempo/(.*) /\1"
-    ingress.kubernetes.io/auth-type:    basic-auth
-    ingress.kubernetes.io/auth-secret:  grafana-basic-auth
+    haproxy.org/path-rewrite: "/traces/(.*) /\\1"
 spec:
   ingressClassName: haproxy
   rules:
     - http:
         paths:
-          - path: /tempo
+          - path: /traces
             pathType: Prefix
             backend:
               service:

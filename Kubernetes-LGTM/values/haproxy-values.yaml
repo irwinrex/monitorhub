@@ -1,43 +1,45 @@
 # =============================================================================
 # HAProxy Ingress Controller Configuration
-# Global controller config only — routing and rate limiting live in ingress.yaml
+# Global controller config only — routing lives in ingress.yaml
 # =============================================================================
 controller:
   replicaCount: 1
 
+  # Pod binds directly to the node NIC via hostNetwork.
+  # External traffic bypasses the ClusterIP service entirely.
+  # ClusterIP is kept for in-cluster health checks only.
   hostNetwork: true
   hostPorts:
     enable: true
     http:  80
-    https: 0      # HTTPS disabled
+    https: 0      # TLS not used — disable port binding entirely
     stat:  1024
 
   ingressClass: haproxy
   ingressClassResource:
-    name: haproxy
+    name:    haproxy
     enabled: true
     default: true
 
   service:
-    type: ClusterIP
+    type: ClusterIP   # Unused for external traffic; kept for in-cluster access
 
-  # Global HAProxy defaults — timeouts, connection options only.
-  # Do NOT put rate-limit-* keys here. They are Ingress/Service-scoped
-  # annotations and will cause validation errors when set globally without
-  # a corresponding rate-limit-requests key in every reconciliation cycle.
+  # Global HAProxy defaults — timeouts and connection options only.
+  # Do NOT add rate-limit-* keys here. They are Ingress-annotation-scoped
+  # and will cause validation errors when set globally.
   config:
     timeout-connect:       "10s"
     timeout-client:        "60s"
     timeout-server:        "60s"
     timeout-http-request:  "30s"
     timeout-keep-alive:    "30s"
-    timeout-tunnel:        "3600s"
+    timeout-tunnel:        "3600s"  # Reserved for future WebSocket/gRPC use
     forwarded-for:         "true"
     ssl-redirect:          "false"
     use-forwarded-headers: "true"
     http-connection-mode:  "http-server-close"
     dontlognull:           "true"
-    maxconn:               "4000"
+    maxconn:               "8000"   # Sized for concurrent Alloy metrics+logs+traces
 
   resources:
     requests:
@@ -52,8 +54,8 @@ controller:
 
   stats:
     enabled: true
-    port: 1024
-    auth: "admin:admin"
+    port:    1024
+    auth:    "admin:changeme"   # TODO: replace with a strong password or external secret
 
   metrics:
     enabled: true
@@ -61,22 +63,16 @@ controller:
   podAnnotations:
     cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
 
+  # Allow scheduling onto control-plane nodes (required for single-node k0s)
   tolerations:
-    - key: "node-role.kubernetes.io/control-plane"
+    - key:      "node-role.kubernetes.io/control-plane"
       operator: "Exists"
-      effect: "NoSchedule"
+      effect:   "NoSchedule"
 
-  podAntiAffinity:
-    preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 100
-        podAntiAffinityTerm:
-          labelSelector:
-            matchLabels:
-              app.kubernetes.io/name: haproxy
-          topologyKey: kubernetes.io/hostname
+  # podAntiAffinity intentionally omitted — only meaningful at replicaCount > 1
 
 defaultBackend:
-  enabled: true
+  enabled:      true
   replicaCount: 1
   resources:
     requests: { cpu: 10m,  memory: 32Mi }

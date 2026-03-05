@@ -10,7 +10,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/common.sh
 source "${SCRIPT_DIR}/lib/common.sh"
 
-require_root
 require_helm
 
 # Setup Environment
@@ -27,7 +26,7 @@ if [[ ! -f "${INGRESS_YAML}" ]]; then
   die "Ingress file not found: ${INGRESS_YAML}"
 fi
 
-# 2. Clean Previous Failed Installs (if any)
+# 1. Clean Previous Failed Installs (if any)
 # ------------------------------------------------------------------------------
 STATUS=$(helm status haproxy-ingress -n kube-system -o jsonpath='{.info.status}' 2>/dev/null || echo "not-found")
 
@@ -36,45 +35,38 @@ if [[ "$STATUS" == "failed" || "$STATUS" == "pending-install" || "$STATUS" == "p
   helm uninstall haproxy-ingress -n kube-system --wait || true
 fi
 
-# Unconditionally purge stale rate-limit keys from the ConfigMap.
-# The chart names it haproxy-ingress-kubernetes-ingress (not haproxy-ingress).
+# Unconditionally purge stale rate-limit keys from the ConfigMap (if present).
 CM_NAME="haproxy-ingress-kubernetes-ingress"
 if kubectl get configmap "${CM_NAME}" -n kube-system &>/dev/null; then
   info "Purging stale rate-limit keys from ConfigMap/${CM_NAME} (if present)..."
   for KEY in rate-limit-requests rate-limit-period rate-limit-size rate-limit-status-code; do
-    kubectl patch configmap "${CM_NAME}" -n kube-system \
-      --type=json \
-      -p="[{\"op\":\"remove\",\"path\":\"/data/${KEY}\"}]" 2>/dev/null \
-      && info "  Removed stale key: ${KEY}" || true
+    if kubectl get configmap "${CM_NAME}" -n kube-system \
+      -o jsonpath="{.data.${KEY}}" 2>/dev/null | grep -q .; then
+      kubectl patch configmap "${CM_NAME}" -n kube-system \
+        --type=json \
+        -p="[{\"op\":\"remove\",\"path\":\"/data/${KEY}\"}]"
+      info "  Removed stale key: ${KEY}"
+    fi
   done
 fi
 
-# 3. Pre-flight: Check Port 80 availability
+# 2. Pre-flight: Check Port 80 availability
 # ------------------------------------------------------------------------------
-info "Checking port 80 availability..."
+info "Checking port 80 availability on this host..."
 
-NODES=$(kubectl get nodes -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
-
-PORT_CONFLICT=0
-for NODE in $NODES; do
-  if ss -tulpn 2>/dev/null | grep -qE ':(80)\s'; then
-    if ! ss -tulpn 2>/dev/null | grep -E ':(80)\s' | grep -qi "haproxy"; then
-      warn "Port 80 is in use on this host (node: $(hostname)):"
-      ss -tulpn | grep -E ':(80)\s' || true
-      PORT_CONFLICT=1
-    fi
-  fi
-  if ss -tulpn 2>/dev/null | grep -qE ':8080\s'; then
-    warn "Port 8080 is in use — this may be a previous HAProxy install that failed"
-    ss -tulpn | grep -E ':8080\s' || true
-  fi
-done
-
-if [[ $PORT_CONFLICT -eq 1 ]]; then
+if ss -tulpn 2>/dev/null | grep -qE '\b:80\b' &&
+  ! ss -tulpn 2>/dev/null | grep -E '\b:80\b' | grep -qi haproxy; then
+  warn "Port 80 is in use on this host:"
+  ss -tulpn | grep -E '\b:80\b' || true
   die "Port 80 conflict detected. Stop the conflicting service before installing HAProxy."
 fi
 
-# 4. Install / Upgrade
+if ss -tulpn 2>/dev/null | grep -qE '\b:8080\b'; then
+  warn "Port 8080 is in use — this may be a previous HAProxy install that failed:"
+  ss -tulpn | grep -E '\b:8080\b' || true
+fi
+
+# 3. Install / Upgrade
 # ------------------------------------------------------------------------------
 info "Updating Helm repositories..."
 helm repo add haproxytech https://haproxytech.github.io/helm-charts --force-update
@@ -118,12 +110,16 @@ if [[ $EXIT_CODE -ne 0 ]]; then
   die "Installation failed. See debug info above."
 fi
 
-# 5. Post-install: Verify HAProxy is actually bound to port 80
+# 4. Post-install: Verify HAProxy is actually bound to port 80
 # ------------------------------------------------------------------------------
-info "Verifying HAProxy port binding..."
-sleep 3
+info "Waiting for HAProxy to bind to port 80 (up to 40s)..."
 
-HAPROXY_PORT=$(ss -tulpn 2>/dev/null | grep -i haproxy | grep -oE ':(80|8080|443)' | head -1 | tr -d ':' || echo "")
+HAPROXY_PORT=""
+for i in $(seq 1 20); do
+  HAPROXY_PORT=$(ss -tulpn 2>/dev/null | grep -i haproxy | grep -oE ':(80|8080|443)' | head -1 | tr -d ':' || echo "")
+  [[ -n "$HAPROXY_PORT" ]] && break
+  sleep 2
+done
 
 if [[ "$HAPROXY_PORT" == "80" ]]; then
   success "HAProxy is correctly bound to port 80."
@@ -150,7 +146,7 @@ else
   warn "Manually verify: ss -tulpn | grep haproxy"
 fi
 
-# 6. Verify Ingress controller is ready
+# 5. Verify Ingress controller is ready
 # ------------------------------------------------------------------------------
 info "Checking Ingress controller readiness..."
 
@@ -164,18 +160,90 @@ else
   success "HAProxy pod is Ready."
 fi
 
-# 7. Apply Ingress routes
+# 6. Apply Ingress routes
 # ------------------------------------------------------------------------------
-NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}' 2>/dev/null || echo "")
-if [[ -z "${NODE_IP}" ]]; then
-  NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || echo "")
+# Resolve NODE_IP — try cloud metadata endpoints for public IP first,
+# then fall back to kubectl InternalIP (bare metal / private-only VMs).
+resolve_public_ip() {
+  local IP=""
+
+  # AWS
+  IP=$(curl -sf --max-time 2 \
+    http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "")
+  [[ -n "$IP" ]] && {
+    echo "$IP"
+    return
+  }
+
+  # GCP
+  IP=$(curl -sf --max-time 2 \
+    -H "Metadata-Flavor: Google" \
+    "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip" \
+    2>/dev/null || echo "")
+  [[ -n "$IP" ]] && {
+    echo "$IP"
+    return
+  }
+
+  # Azure
+  IP=$(curl -sf --max-time 2 \
+    -H "Metadata: true" \
+    "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress?api-version=2021-02-01" \
+    2>/dev/null || echo "")
+  [[ -n "$IP" ]] && {
+    echo "$IP"
+    return
+  }
+
+  # Hetzner
+  IP=$(curl -sf --max-time 2 \
+    http://169.254.169.254/hetzner/v1/metadata/public-ipv4 2>/dev/null || echo "")
+  [[ -n "$IP" ]] && {
+    echo "$IP"
+    return
+  }
+
+  # DigitalOcean
+  IP=$(curl -sf --max-time 2 \
+    http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address 2>/dev/null || echo "")
+  [[ -n "$IP" ]] && {
+    echo "$IP"
+    return
+  }
+
+  echo ""
+}
+
+info "Resolving node IP..."
+PUBLIC_IP=$(resolve_public_ip)
+PRIVATE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || echo "")
+
+if [[ -n "$PUBLIC_IP" ]]; then
+  NODE_IP="$PUBLIC_IP"
+  info "  Public IP  (metadata): ${PUBLIC_IP}"
+  [[ -n "$PRIVATE_IP" ]] && info "  Private IP (kubectl):  ${PRIVATE_IP}"
+elif [[ -n "$PRIVATE_IP" ]]; then
+  NODE_IP="$PRIVATE_IP"
+  warn "  No public IP found via metadata — using private IP: ${PRIVATE_IP}"
+  warn "  HAProxy will only be reachable within the private network."
+else
+  NODE_IP=""
+  warn "  Could not determine node IP. Verify manually after install."
 fi
 
 info "Applying Ingress routes..."
-kubectl delete ingress -n monitoring --all --wait=true 2>/dev/null || true
 kubectl apply -f "${INGRESS_YAML}"
 
 success "install_HAproxy.sh complete"
 info "HAProxy bound to host ports 80 (HTTP) | Stats on :1024"
-[[ -n "${NODE_IP}" ]] && info "Access: http://${NODE_IP}/ (Grafana) | /mimir | /loki | /tempo"
+if [[ -n "${NODE_IP}" ]]; then
+  info "Access via ${NODE_IP}:"
+  info "  Grafana  → http://${NODE_IP}/"
+  info "  Mimir    → http://${NODE_IP}/metrics"
+  info "  Loki     → http://${NODE_IP}/logs"
+  info "  Tempo    → http://${NODE_IP}/traces"
+  if [[ -n "${PRIVATE_IP}" && "${NODE_IP}" != "${PRIVATE_IP}" ]]; then
+    info "Also reachable on private network via ${PRIVATE_IP}"
+  fi
+fi
 echo ""
