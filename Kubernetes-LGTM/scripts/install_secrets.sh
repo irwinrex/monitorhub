@@ -45,12 +45,12 @@ if ! kubectl get secret "${SECRET_NAME}" -n "${MONITORING_NS}" &>/dev/null; then
     --from-literal=admin-password="${GRAFANA_PASS}"
 
   echo ""
-  echo -e "${YELLOW}┌──────────────────────────────────────────────────────────┐${NC}"
-  echo -e "${YELLOW}│  GRAFANA ADMIN CREDENTIALS — save now, shown once only   │${NC}"
-  echo -e "${YELLOW}│                                                          │${NC}"
-  echo -e "${YELLOW}│  User    : admin                                         │${NC}"
-  echo -e "${YELLOW}│  Password: ${BOLD}${GRAFANA_PASS}${NC}${YELLOW}                        │${NC}"
-  echo -e "${YELLOW}└──────────────────────────────────────────────────────────┘${NC}"
+  echo -e "${YELLOW}┌────────────────────────────────────────────────────────────────────────────────────┐${NC}"
+  echo -e "${YELLOW}│  GRAFANA ADMIN CREDENTIALS — save now, shown once only                             │${NC}"
+  echo -e "${YELLOW}│                                                                                    │${NC}"
+  echo -e "${YELLOW}│  User    : admin                                                                   │${NC}"
+  echo -e "${YELLOW}│  Password: ${BOLD}${GRAFANA_PASS}${NC}${YELLOW}                                    │${NC}"
+  echo -e "${YELLOW}└────────────────────────────────────────────────────────────────────────────────────┘${NC}"
   echo ""
 fi
 
@@ -76,7 +76,6 @@ BASIC_AUTH_PASS="${BASIC_AUTH_PASS:-$(openssl rand -hex 16)}"
 info "Creating HAProxy basic auth secret..."
 
 # ------------------------------------------------------------------------------
-# FIX: Use openssl to generate Standard MD5 ($1$) instead of Apache MD5 ($apr1$)
 # HAProxy containers (often Alpine/musl) cannot always verify $apr1$ hashes.
 # ------------------------------------------------------------------------------
 HASH=$(openssl passwd -1 "${BASIC_AUTH_PASS}")
@@ -93,12 +92,12 @@ kubectl create secret generic "${BASIC_AUTH_SECRET}" \
 rm -f /tmp/_lgtm_auth
 
 echo ""
-echo -e "${YELLOW}┌──────────────────────────────────────────────────────────┐${NC}"
-echo -e "${YELLOW}│  LGTM BASIC AUTH CREDENTIALS — save now, shown once only │${NC}"
-echo -e "${YELLOW}│                                                          │${NC}"
-echo -e "${YELLOW}│  User    : ${BASIC_AUTH_USER}                                        │${NC}"
-echo -e "${YELLOW}│  Password: ${BOLD}${BASIC_AUTH_PASS}${NC}${YELLOW}                        │${NC}"
-echo -e "${YELLOW}└──────────────────────────────────────────────────────────┘${NC}"
+echo -e "${YELLOW}┌──────────────────────────────────────────────────────────────────────────────────────────────────┐${NC}"
+echo -e "${YELLOW}│  LGTM BASIC AUTH CREDENTIALS — save now, shown once only                                         │${NC}"
+echo -e "${YELLOW}│                                                                                                  │${NC}"
+echo -e "${YELLOW}│  User    : ${BASIC_AUTH_USER}                                                                    │${NC}"
+echo -e "${YELLOW}│  Password: ${BOLD}${BASIC_AUTH_PASS}${NC}${YELLOW}                                               │${NC}"
+echo -e "${YELLOW}└──────────────────────────────────────────────────────────────────────────────────────────────────┘${NC}"
 echo ""
 
 export BASIC_AUTH_USER BASIC_AUTH_PASS
