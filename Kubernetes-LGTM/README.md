@@ -15,8 +15,7 @@
 │   ├── install_k0s.sh          ← Phase 1: k0s + Helm
 │   ├── install_secrets.sh      ← Phase 2: Grafana admin secret
 │   ├── install_LGTM.sh         ← Phase 3: Loki + Tempo + Mimir + Grafana
-│   ├── install_HAproxy.sh      ← Phase 4: HAProxy Ingress + Ingress routes
-│   └── backup_all.sh            ← Backup LGTM data to S3
+│   └── install_HAproxy.sh      ← Phase 4: HAProxy Ingress + Ingress routes
 │
 └── values/
     ├── haproxy-values.yaml     ← HAProxy DaemonSet configuration

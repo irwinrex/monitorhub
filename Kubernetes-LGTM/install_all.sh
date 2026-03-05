@@ -21,10 +21,9 @@
 #
 # Available skip flags:
 #   SKIP_K0S=true        skip scripts/install_k0s.sh
-#   SKIP_HAPROXY=true    skip scripts/install_HAproxy.sh
-#   SKIP_SECRETS=true    skip scripts/install_secrets.sh
-#   SKIP_LGTM=true       skip scripts/install_LGTM.sh
-#   SKIP_BACKUP=true     skip scripts/backup_all.sh
+#   SKIP_HAPROXY=true   skip scripts/install_HAproxy.sh
+#   SKIP_SECRETS=true   skip scripts/install_secrets.sh
+#   SKIP_LGTM=true      skip scripts/install_LGTM.sh
 # ==============================================================================
 set -euo pipefail
 IFS=$'\n\t'
@@ -229,19 +228,6 @@ _run_phase 3 "LGTM — Loki · Tempo · Mimir · Grafana" \
 
 _run_phase 4 "HAproxy — Ingress Controller (deployed after LGTM)" \
   "${SKIP_HAPROXY}" "${SCRIPTS_DIR}/install_HAproxy.sh"
-
-# ── Backup phase ──────────────────────────────────────────────────────────────
-if [[ "${SKIP_BACKUP}" != "true" ]]; then
-  if [[ -z "${LOCAL_RETENTION_DAYS:-}" ]]; then
-    echo ""
-    read -r -p "Local backup retention days [default: 7]: " _ret
-    LOCAL_RETENTION_DAYS="${_ret:-7}"
-    export LOCAL_RETENTION_DAYS
-  fi
-fi
-
-_run_phase 5 "Backup — S3 backup configuration" \
-  "${SKIP_BACKUP}" "${SCRIPTS_DIR}/backup_all.sh"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Done
