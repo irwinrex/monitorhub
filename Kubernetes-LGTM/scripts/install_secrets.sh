@@ -32,6 +32,34 @@ require_kubeconfig
 # Skip if secrets already exist
 if kubectl get secret grafana-admin -n "${MONITORING_NS}" &>/dev/null; then
   success "Grafana admin secret already exists"
+fi
+
+# Always create/update basic auth secret
+BASIC_AUTH_SECRET="grafana-basic-auth"
+BASIC_AUTH_USER="${BASIC_AUTH_USER:-admin}"
+BASIC_AUTH_PASS="${BASIC_AUTH_PASS:-$(openssl rand -hex 16)}"
+
+info "Creating HAproxy basic auth secret for API endpoints (LGTM)..."
+if command -v htpasswd &>/dev/null; then
+  HTPASSWD=$(htpasswd -nbm "${BASIC_AUTH_USER}" "${BASIC_AUTH_PASS}" 2>/dev/null || die "htpasswd failed"
+else
+  info "htpasswd not available - using openssl for basic auth"
+  HTPASSWD=$(openssl passwd -apr1 "${BASIC_AUTH_PASS}" 2>/dev/null | head -1)
+  HTPASSWD="${BASIC_AUTH_USER}:${HTPASSWD}"
+fi
+
+kubectl create secret generic "${BASIC_AUTH_SECRET}" \
+  --namespace "${MONITORING_NS}" \
+  --from-literal=auth="${HTPASSWD}" \
+  --from-literal=username="${BASIC_AUTH_USER}" \
+  --from-literal=password="${BASIC_AUTH_PASS}" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+success "HAproxy basic auth configured (user: ${BASIC_AUTH_USER}, pass: ${BASIC_AUTH_PASS})"
+
+# Skip grafana-admin creation if it already exists
+if kubectl get secret grafana-admin -n "${MONITORING_NS}" &>/dev/null; then
+  success "Grafana admin secret already exists - skipping creation"
   exit 0
 fi
 
