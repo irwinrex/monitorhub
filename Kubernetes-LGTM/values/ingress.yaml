@@ -1,11 +1,5 @@
 # =============================================================================
 # Ingress Configuration for HAProxy
-#
-# Architecture:
-#   - Grafana  → /
-#   - Mimir    → /metrics/... → mimir-gateway:80/...
-#   - Loki     → /logs/...    → loki:3100/...
-#   - Tempo    → /traces/...  → tempo:4318/...  (OTLP HTTP)
 # =============================================================================
 ---
 apiVersion: networking.k8s.io/v1
@@ -13,9 +7,6 @@ kind: Ingress
 metadata:
   name: grafana-ingress
   namespace: monitoring
-  annotations:
-    haproxy.org/timeout-server:  "60s"
-    haproxy.org/proxy-body-size: "50m"
 spec:
   ingressClassName: haproxy
   rules:
@@ -34,16 +25,12 @@ kind: Ingress
 metadata:
   name: mimir-ingress
   namespace: monitoring
-  annotations:
-    haproxy.org/timeout-server:  "60s"
-    haproxy.org/proxy-body-size: "50m"
-    haproxy.org/path-rewrite:    "/metrics/(.*) /\1"
 spec:
   ingressClassName: haproxy
   rules:
     - http:
         paths:
-          - path: /metrics
+          - path: /mimir
             pathType: Prefix
             backend:
               service:
@@ -56,16 +43,12 @@ kind: Ingress
 metadata:
   name: loki-ingress
   namespace: monitoring
-  annotations:
-    haproxy.org/timeout-server:  "60s"
-    haproxy.org/proxy-body-size: "50m"
-    haproxy.org/path-rewrite:    "/logs/(.*) /\1"
 spec:
   ingressClassName: haproxy
   rules:
     - http:
         paths:
-          - path: /logs
+          - path: /loki
             pathType: Prefix
             backend:
               service:
@@ -78,16 +61,12 @@ kind: Ingress
 metadata:
   name: tempo-ingress
   namespace: monitoring
-  annotations:
-    haproxy.org/timeout-server:  "60s"
-    haproxy.org/proxy-body-size: "50m"
-    haproxy.org/path-rewrite:    "/traces/(.*) /\1"
 spec:
   ingressClassName: haproxy
   rules:
     - http:
         paths:
-          - path: /traces
+          - path: /tempo
             pathType: Prefix
             backend:
               service:
