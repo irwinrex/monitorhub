@@ -13,14 +13,18 @@ controller:
       https: 0
       stat:  1024
 
+  # Required when useHostNetwork is true
+  dnsPolicy: ClusterFirstWithHostNet
+
   ingressClass: haproxy
   ingressClassResource:
     name:    haproxy
     enabled: true
     default: true
 
+  # Disable service when using hostPorts
   service:
-    type: ClusterIP
+    enabled: false
 
   config:
     timeout-connect:       "10s"
