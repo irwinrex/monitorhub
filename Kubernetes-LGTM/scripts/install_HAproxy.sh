@@ -15,14 +15,6 @@ require_helm
 
 # 1. Setup Environment
 # ------------------------------------------------------------------------------
-if [[ -z "${KUBECONFIG:-}" ]]; then
-  if [[ -f "/root/.kube/config" ]]; then
-    export KUBECONFIG="/root/.kube/config"
-  elif [[ -f "/var/lib/k0s/pki/admin.conf" ]]; then
-    export KUBECONFIG="/var/lib/k0s/pki/admin.conf"
-  fi
-fi
-
 : "${HAPROXY_CHART_VERSION:=1.44.3}"
 HAPROXY_VALUES="${SCRIPT_DIR}/../values/haproxy-values.yaml"
 INGRESS_YAML="${SCRIPT_DIR}/../values/ingress.yaml"
@@ -45,6 +37,16 @@ STATUS=$(helm status haproxy-ingress -n kube-system -o jsonpath='{.info.status}'
 if [[ "$STATUS" == "failed" || "$STATUS" == "pending-install" || "$STATUS" == "pending-upgrade" || "$STATUS" == "pending-rollback" ]]; then
   warn "Found broken Helm release (status: $STATUS). Uninstalling..."
   helm uninstall haproxy-ingress -n kube-system --wait || true
+
+  # Purge stale ConfigMap keys that Helm leaves behind on broken installs.
+  # rate-limit-* keys are Ingress-scoped and must never live in the ConfigMap.
+  # If they survive a failed install, the controller errors on every reconcile.
+  info "Purging stale rate-limit keys from ConfigMap (if present)..."
+  for KEY in rate-limit-requests rate-limit-period rate-limit-size rate-limit-status-code; do
+    kubectl patch configmap haproxy-ingress -n kube-system \
+      --type=json \
+      -p="[{\"op\":\"remove\",\"path\":\"/data/${KEY}\"}]" 2>/dev/null || true
+  done
 fi
 
 # 3. Pre-flight: Check Port 80 availability on ALL schedulable nodes

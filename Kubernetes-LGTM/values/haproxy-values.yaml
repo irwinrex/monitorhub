@@ -1,52 +1,44 @@
 # =============================================================================
 # HAProxy Ingress Controller Configuration
+# Global controller config only — routing and rate limiting live in ingress.yaml
 # =============================================================================
-
 controller:
-  # Number of HAProxy replicas
   replicaCount: 1
 
-  # Use host network - binds directly to host ports
   hostNetwork: true
   hostPorts:
     enable: true
-    http:   80    # HTTP port
-    https:  0     # HTTPS disabled (using plain HTTP)
-    stat:   1024  # Stats page port
+    http:  80
+    https: 0      # HTTPS disabled
+    stat:  1024
 
-  # Ingress class configuration
   ingressClass: haproxy
   ingressClassResource:
     name: haproxy
     enabled: true
-    default: true  # Make this the default ingress class
+    default: true
 
-  # Service type - ClusterIP for internal routing
   service:
     type: ClusterIP
 
-  # HAProxy config
+  # Global HAProxy defaults — timeouts, connection options only.
+  # Do NOT put rate-limit-* keys here. They are Ingress/Service-scoped
+  # annotations and will cause validation errors when set globally without
+  # a corresponding rate-limit-requests key in every reconciliation cycle.
   config:
-    timeout-connect: "10s"
-    timeout-client:  "60s"
-    timeout-server:  "60s"
-    timeout-http-request: "30s"
-    timeout-keep-alive: "30s"
-    timeout-tunnel: "3600s"
-    forwarded-for: "true"
-    ssl-redirect: "false"
+    timeout-connect:       "10s"
+    timeout-client:        "60s"
+    timeout-server:        "60s"
+    timeout-http-request:  "30s"
+    timeout-keep-alive:    "30s"
+    timeout-tunnel:        "3600s"
+    forwarded-for:         "true"
+    ssl-redirect:          "false"
     use-forwarded-headers: "true"
-    http-connection-mode: "http-server-close"
-    option: "httpchk forwardfor httplog dontlognull redispatch"
-    default-server: "inter 3s rise 2 fall 3"
-    maxconn: "4000"
-    # Rate limiting (all 4 required)
-    rate-limit-requests: "50"
-    rate-limit-period: "10s"
-    rate-limit-size: "100k"
-    rate-limit-status-code: "429"
+    http-connection-mode:  "http-server-close"
+    dontlognull:           "true"
+    maxconn:               "4000"
 
-  # Resource limits
   resources:
     requests:
       cpu:    100m
@@ -55,31 +47,25 @@ controller:
       cpu:    250m
       memory: 256Mi
 
-  # Health check configuration
   healthCheck:
     nodePort: 0
 
-  # Statistics page
   stats:
     enabled: true
     port: 1024
     auth: "admin:admin"
 
-  # Prometheus metrics
   metrics:
     enabled: true
 
-  # Pod annotations
   podAnnotations:
     cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
 
-  # Tolerations - allow running on control plane
   tolerations:
     - key: "node-role.kubernetes.io/control-plane"
       operator: "Exists"
       effect: "NoSchedule"
 
-  # Pod anti-affinity - prefer different nodes
   podAntiAffinity:
     preferredDuringSchedulingIgnoredDuringExecution:
       - weight: 100
@@ -89,12 +75,11 @@ controller:
               app.kubernetes.io/name: haproxy
           topologyKey: kubernetes.io/hostname
 
-# Default backend - handles 404 errors
 defaultBackend:
   enabled: true
   replicaCount: 1
   resources:
     requests: { cpu: 10m,  memory: 32Mi }
-    limits:   { cpu: 100m,  memory: 128Mi }
+    limits:   { cpu: 100m, memory: 128Mi }
   podAnnotations:
     cluster-autoscaler.kubernetes.io/safe-to-evict: "false"

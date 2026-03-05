@@ -16,6 +16,15 @@ source "${SCRIPT_DIR}/lib/common.sh"
 
 require_root
 
+# ── Setup KUBECONFIG ────────────────────────────────────────────────────────────
+if [[ -z "${KUBECONFIG:-}" ]]; then
+  if [[ -f "/root/.kube/config" ]]; then
+    export KUBECONFIG="/root/.kube/config"
+  elif [[ -f "/var/lib/k0s/pki/admin.conf" ]]; then
+    export KUBECONFIG="/var/lib/k0s/pki/admin.conf"
+  fi
+fi
+
 # ── Check for upgrade mode ─────────────────────────────────────────────────────
 : "${UPGRADE:=false}"
 
