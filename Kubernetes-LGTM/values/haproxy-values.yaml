@@ -6,15 +6,14 @@ controller:
   kind: DaemonSet
 
   daemonset:
-    useHostNetwork: true
+    useHostNetwork: false
     useHostPort: true
     hostPorts:
       http:  80
       https: 0
       stat:  1024
 
-  # Required when useHostNetwork is true
-  dnsPolicy: ClusterFirstWithHostNet
+  dnsPolicy: ClusterFirst
 
   ingressClass: haproxy
   ingressClassResource:
@@ -22,7 +21,6 @@ controller:
     enabled: true
     default: true
 
-  # Disable service when using hostPorts
   service:
     enabled: false
 
