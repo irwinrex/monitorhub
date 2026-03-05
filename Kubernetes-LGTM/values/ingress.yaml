@@ -1,19 +1,31 @@
 # =============================================================================
 # Ingress Configuration for HAProxy
-# Rate limiting, headers, and auth are scoped per-Ingress — not in the ConfigMap.
+#
+# Architecture:
+#   - Grafana exposed at /  (browser UI)
+#   - Mimir/Loki/Tempo each get their own Ingress so path-rewrite can strip
+#     the prefix per-backend. HAProxy path-rewrite is per-Ingress, not
+#     per-path, so one Ingress per backend is required for correct stripping.
+#
+# External agents push to:
+#   http://<NODE_IP>/mimir/...  → mimir-gateway:80/...
+#   http://<NODE_IP>/loki/...   → loki:3100/...
+#   http://<NODE_IP>/tempo/...  → tempo:3200/...
 # =============================================================================
 ---
-# Grafana — no basic auth (Grafana handles its own login)
-# No rate limiting here: Grafana is browser-driven and human-facing.
-# Rate limiting on the UI would lock out dashboards under normal load.
+# Grafana — browser UI
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: grafana-ingress
   namespace: monitoring
   annotations:
-    haproxy.org/timeout-server:    "60s"
-    haproxy.org/proxy-body-size:   "50m"
+    haproxy.org/timeout-server:         "60s"
+    haproxy.org/proxy-body-size:        "50m"
+    haproxy.org/rate-limit-requests:    "50"
+    haproxy.org/rate-limit-period:      "10s"
+    haproxy.org/rate-limit-size:        "100k"
+    haproxy.org/rate-limit-status-code: "429"
 spec:
   ingressClassName: haproxy
   rules:
@@ -27,31 +39,23 @@ spec:
                 port:
                   number: 80
 ---
-# LGTM API endpoints (Mimir, Loki, Tempo) — basic auth + rate limiting
-# rate-limit-* annotations are Ingress/Service-scoped only.
-# All four must be present together on the same object — never in the ConfigMap.
+# Mimir — metrics ingestion/query
+# Strips /mimir prefix: /mimir/api/v1/push → /api/v1/push
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: lgtm-api-ingress
+  name: mimir-ingress
   namespace: monitoring
   annotations:
     haproxy.org/timeout-server:         "60s"
     haproxy.org/proxy-body-size:        "50m"
-    # Rate limiting — all four annotations are required together on this object
-    haproxy.org/rate-limit-requests:    "50"
+    haproxy.org/rate-limit-requests:    "200"
     haproxy.org/rate-limit-period:      "10s"
     haproxy.org/rate-limit-size:        "100k"
     haproxy.org/rate-limit-status-code: "429"
-    # Security headers
-    haproxy.org/response-set-header: |
-      X-Frame-Options "SAMEORIGIN"
-      X-Content-Type-Options "nosniff"
-      X-XSS-Protection "1; mode=block"
-      Referrer-Policy "strict-origin-when-cross-origin"
-    # Basic auth
-    ingress.kubernetes.io/auth-type:   basic-auth
-    ingress.kubernetes.io/auth-secret: grafana-basic-auth
+    haproxy.org/path-rewrite:           "/mimir/(.*) /\1"
+    ingress.kubernetes.io/auth-type:    basic-auth
+    ingress.kubernetes.io/auth-secret:  grafana-basic-auth
 spec:
   ingressClassName: haproxy
   rules:
@@ -64,6 +68,29 @@ spec:
                 name: mimir-gateway
                 port:
                   number: 80
+---
+# Loki — log ingestion/query
+# Strips /loki prefix: /loki/loki/api/v1/push → /loki/api/v1/push
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: loki-ingress
+  namespace: monitoring
+  annotations:
+    haproxy.org/timeout-server:         "60s"
+    haproxy.org/proxy-body-size:        "50m"
+    haproxy.org/rate-limit-requests:    "200"
+    haproxy.org/rate-limit-period:      "10s"
+    haproxy.org/rate-limit-size:        "100k"
+    haproxy.org/rate-limit-status-code: "429"
+    haproxy.org/path-rewrite:           "/loki/(.*) /\1"
+    ingress.kubernetes.io/auth-type:    basic-auth
+    ingress.kubernetes.io/auth-secret:  grafana-basic-auth
+spec:
+  ingressClassName: haproxy
+  rules:
+    - http:
+        paths:
           - path: /loki
             pathType: Prefix
             backend:
@@ -71,6 +98,29 @@ spec:
                 name: loki
                 port:
                   number: 3100
+---
+# Tempo — trace ingestion/query
+# Strips /tempo prefix: /tempo/api/traces → /api/traces
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tempo-ingress
+  namespace: monitoring
+  annotations:
+    haproxy.org/timeout-server:         "60s"
+    haproxy.org/proxy-body-size:        "50m"
+    haproxy.org/rate-limit-requests:    "200"
+    haproxy.org/rate-limit-period:      "10s"
+    haproxy.org/rate-limit-size:        "100k"
+    haproxy.org/rate-limit-status-code: "429"
+    haproxy.org/path-rewrite:           "/tempo/(.*) /\1"
+    ingress.kubernetes.io/auth-type:    basic-auth
+    ingress.kubernetes.io/auth-secret:  grafana-basic-auth
+spec:
+  ingressClassName: haproxy
+  rules:
+    - http:
+        paths:
           - path: /tempo
             pathType: Prefix
             backend:

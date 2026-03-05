@@ -13,9 +13,9 @@ source "${SCRIPT_DIR}/lib/common.sh"
 require_root
 require_helm
 
-# 1. Setup Environment
+# Setup Environment
 # ------------------------------------------------------------------------------
-: "${HAPROXY_CHART_VERSION:=1.44.3}"
+: "${HAPROXY_CHART_VERSION:=1.49.0}"
 HAPROXY_VALUES="${SCRIPT_DIR}/../values/haproxy-values.yaml"
 INGRESS_YAML="${SCRIPT_DIR}/../values/ingress.yaml"
 
@@ -29,32 +29,29 @@ fi
 
 # 2. Clean Previous Failed Installs (if any)
 # ------------------------------------------------------------------------------
-# If a previous install failed, Helm upgrade gets stuck.
-# Only uninstall if the release is in a broken state.
-
 STATUS=$(helm status haproxy-ingress -n kube-system -o jsonpath='{.info.status}' 2>/dev/null || echo "not-found")
 
 if [[ "$STATUS" == "failed" || "$STATUS" == "pending-install" || "$STATUS" == "pending-upgrade" || "$STATUS" == "pending-rollback" ]]; then
   warn "Found broken Helm release (status: $STATUS). Uninstalling..."
   helm uninstall haproxy-ingress -n kube-system --wait || true
+fi
 
-  # Purge stale ConfigMap keys that Helm leaves behind on broken installs.
-  # rate-limit-* keys are Ingress-scoped and must never live in the ConfigMap.
-  # If they survive a failed install, the controller errors on every reconcile.
-  info "Purging stale rate-limit keys from ConfigMap (if present)..."
+# Unconditionally purge stale rate-limit keys from the ConfigMap.
+# The chart names it haproxy-ingress-kubernetes-ingress (not haproxy-ingress).
+CM_NAME="haproxy-ingress-kubernetes-ingress"
+if kubectl get configmap "${CM_NAME}" -n kube-system &>/dev/null; then
+  info "Purging stale rate-limit keys from ConfigMap/${CM_NAME} (if present)..."
   for KEY in rate-limit-requests rate-limit-period rate-limit-size rate-limit-status-code; do
-    kubectl patch configmap haproxy-ingress -n kube-system \
+    kubectl patch configmap "${CM_NAME}" -n kube-system \
       --type=json \
-      -p="[{\"op\":\"remove\",\"path\":\"/data/${KEY}\"}]" 2>/dev/null || true
+      -p="[{\"op\":\"remove\",\"path\":\"/data/${KEY}\"}]" 2>/dev/null \
+      && info "  Removed stale key: ${KEY}" || true
   done
 fi
 
-# 3. Pre-flight: Check Port 80 availability on ALL schedulable nodes
+# 3. Pre-flight: Check Port 80 availability
 # ------------------------------------------------------------------------------
-# HAProxy uses hostNetwork, so it binds to the node it lands on — not necessarily
-# the host running this script.
-
-info "Checking port 80 availability on schedulable nodes..."
+info "Checking port 80 availability..."
 
 NODES=$(kubectl get nodes -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
 
@@ -74,12 +71,11 @@ for NODE in $NODES; do
 done
 
 if [[ $PORT_CONFLICT -eq 1 ]]; then
-  die "Port 80 conflict detected. Stop the conflicting service before installing HAProxy (hostNetwork mode)."
+  die "Port 80 conflict detected. Stop the conflicting service before installing HAProxy."
 fi
 
 # 4. Install / Upgrade
 # ------------------------------------------------------------------------------
-# Always run helm upgrade --install to apply any YAML changes
 info "Updating Helm repositories..."
 helm repo add haproxytech https://haproxytech.github.io/helm-charts --force-update
 helm repo update haproxytech >/dev/null
@@ -170,10 +166,16 @@ fi
 
 # 7. Apply Ingress routes
 # ------------------------------------------------------------------------------
+NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}' 2>/dev/null || echo "")
+if [[ -z "${NODE_IP}" ]]; then
+  NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || echo "")
+fi
+
 info "Applying Ingress routes..."
-kubectl delete ingress -n monitoring --all 2>/dev/null || true
+kubectl delete ingress -n monitoring --all --wait=true 2>/dev/null || true
 kubectl apply -f "${INGRESS_YAML}"
 
 success "install_HAproxy.sh complete"
 info "HAProxy bound to host ports 80 (HTTP) | Stats on :1024"
+[[ -n "${NODE_IP}" ]] && info "Access: http://${NODE_IP}/ (Grafana) | /mimir | /loki | /tempo"
 echo ""
