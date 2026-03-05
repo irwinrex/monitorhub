@@ -247,13 +247,23 @@ echo -e "${GREEN}╚════════════════════
 echo ""
 
 # Get passwords from secrets
-GRAFANA_PASS=$(kubectl get secret grafana-admin -n monitoring -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d || echo "check secret")
+GRAFANA_PASS_RAW=$(kubectl get secret grafana-admin -n monitoring -o jsonpath='{.data.admin-password}' 2>/dev/null || echo "")
+if [[ -n "$GRAFANA_PASS_RAW" ]]; then
+  GRAFANA_PASS=$(echo "$GRAFANA_PASS_RAW" | base64 -d 2>/dev/null || echo "decode failed")
+else
+  GRAFANA_PASS="check secret"
+fi
 
 # Extract basic auth credentials from the secret
-# The auth field contains "user:password" in htpasswd format
-BASIC_AUTH=$(kubectl get secret grafana-basic-auth -n monitoring -o jsonpath='{.data.auth}' 2>/dev/null | base64 -d || echo "")
-BASIC_AUTH_USER=$(echo "$BASIC_AUTH" | cut -d':' -f1)
-BASIC_AUTH_PASS=$(echo "$BASIC_AUTH" | cut -d':' -f2-)
+BASIC_AUTH_RAW=$(kubectl get secret grafana-basic-auth -n monitoring -o jsonpath='{.data.auth}' 2>/dev/null || echo "")
+if [[ -n "$BASIC_AUTH_RAW" ]]; then
+  BASIC_AUTH_DECODED=$(echo "$BASIC_AUTH_RAW" | base64 -d 2>/dev/null || echo "")
+  BASIC_AUTH_USER=$(echo "$BASIC_AUTH_DECODED" | cut -d':' -f1)
+  BASIC_AUTH_PASS=$(echo "$BASIC_AUTH_DECODED" | cut -d':' -f2-)
+else
+  BASIC_AUTH_USER="admin"
+  BASIC_AUTH_PASS="check secret"
+fi
 
 echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
 echo -e "${YELLOW}  ACCESS CREDENTIALS${NC}"
