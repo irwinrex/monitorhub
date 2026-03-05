@@ -15,9 +15,6 @@
 # Non-interactive mode:
 #   bash install_all.sh -y
 #
-# Force recreate secrets:
-#   bash install_all.sh -y -f
-#
 # Skip completed phases after a partial/failed install:
 #   SKIP_K0S=true SKIP_HAPROXY=true bash install_all.sh
 #
@@ -64,10 +61,6 @@ while [[ $# -gt 0 ]]; do
     YES="true"
     shift
     ;;
-  -f | --force-recreate)
-    FORCE_RECREATE="true"
-    shift
-    ;;
   -h | --help)
     echo "Usage: bash install_all.sh [OPTIONS]"
     echo ""
@@ -75,7 +68,6 @@ while [[ $# -gt 0 ]]; do
     echo "  -b, --bucket-name    S3 base bucket name"
     echo "  -r, --region         S3 region (e.g., us-east-1)"
     echo "  -y, --yes            Non-interactive mode"
-    echo "  -f, --force-recreate Force recreate secrets"
     echo "  -h, --help           Show this help"
     echo ""
     echo "Examples:"
@@ -119,7 +111,6 @@ _run_phase() {
   S3_BUCKET="${S3_BUCKET}" \
     S3_REGION="${S3_REGION}" \
     YES="${YES}" \
-    FORCE_RECREATE="${FORCE_RECREATE}" \
     bash "${script}"
   echo -e "${GREEN}  ✓  Phase ${num} complete in $((SECONDS - t))s${NC}"
 }
