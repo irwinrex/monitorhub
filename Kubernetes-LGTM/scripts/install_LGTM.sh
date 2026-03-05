@@ -104,10 +104,6 @@ if [[ -z "${S3_BUCKET:-}" ]]; then
 fi
 
 if [[ -z "${S3_REGION:-}" ]]; then
-  # FIX: only prompt and set default when S3_REGION is genuinely absent
-  # Previously: S3_REGION_INPUT was used unconditionally, so when the read
-  # was skipped (var already set), S3_REGION_INPUT was unset and the fallback
-  # :-us-east-1 silently overwrote the correct region passed from install_all.sh
   read -r -p "S3 region [default: us-east-1]: " S3_REGION
   S3_REGION="${S3_REGION:-us-east-1}"
 fi

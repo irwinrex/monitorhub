@@ -30,26 +30,16 @@ if [[ ! -f "${HAPROXY_VALUES}" ]]; then
   die "Values file not found: ${HAPROXY_VALUES}"
 fi
 
-# 2. Check & Clean Previous Installs
+# 2. Clean Previous Failed Installs (if any)
 # ------------------------------------------------------------------------------
-# If a previous install failed, Helm upgrade often gets stuck.
-# Detect 'failed' / 'pending-*' status and uninstall to ensure a clean slate.
-if helm list -n kube-system -q 2>/dev/null | grep -q "^haproxy-ingress$"; then
-  STATUS=$(helm status haproxy-ingress -n kube-system -o jsonpath='{.info.status}' 2>/dev/null || echo "unknown")
+# If a previous install failed, Helm upgrade gets stuck.
+# Only uninstall if the release is in a broken state.
 
-  if [[ "$STATUS" == "deployed" ]]; then
-    if kubectl get pods -n kube-system -l app.kubernetes.io/instance=haproxy-ingress \
-        --field-selector=status.phase=Running 2>/dev/null | grep -q "Running"; then
-      success "HAproxy is already installed and healthy. Skipping."
-      exit 0
-    else
-      warn "HAproxy is marked 'deployed' but pods are not Running. Re-installing..."
-      helm uninstall haproxy-ingress -n kube-system --wait || true
-    fi
-  elif [[ "$STATUS" == "failed" || "$STATUS" == "pending-install" || "$STATUS" == "pending-upgrade" ]]; then
-    warn "Found broken Helm release (status: $STATUS). Uninstalling to get a clean slate..."
-    helm uninstall haproxy-ingress -n kube-system --wait || true
-  fi
+STATUS=$(helm status haproxy-ingress -n kube-system -o jsonpath='{.info.status}' 2>/dev/null || echo "not-found")
+
+if [[ "$STATUS" == "failed" || "$STATUS" == "pending-install" || "$STATUS" == "pending-upgrade" || "$STATUS" == "pending-rollback" ]]; then
+  warn "Found broken Helm release (status: $STATUS). Uninstalling..."
+  helm uninstall haproxy-ingress -n kube-system --wait || true
 fi
 
 # 3. Pre-flight: Check Port 80 availability on ALL schedulable nodes
@@ -82,6 +72,7 @@ fi
 
 # 4. Install / Upgrade
 # ------------------------------------------------------------------------------
+# Always run helm upgrade --install to apply any YAML changes
 info "Updating Helm repositories..."
 helm repo add haproxytech https://haproxytech.github.io/helm-charts --force-update
 helm repo update haproxytech >/dev/null
