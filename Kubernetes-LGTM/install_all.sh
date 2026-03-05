@@ -298,3 +298,60 @@ echo "  Mimir:    http://${NODE_IP}/mimir"
 echo "  Loki:     http://${NODE_IP}/loki"
 echo "  Tempo:    http://${NODE_IP}/tempo"
 echo ""
+
+# ══════════════════════════════════════════════════════════════════════
+# TESTS
+# ══════════════════════════════════════════════════════════════════════
+echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
+echo -e "${YELLOW}  ENDPOINT TESTS${NC}"
+echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
+echo ""
+
+if [[ -n "$NODE_IP" ]]; then
+  FAILED=0
+  
+  info "Testing Grafana (/)..."
+  HTTP_RESP=$(curl -v "http://${NODE_IP}/" 2>&1 | grep "< HTTP" || echo "< HTTP 000")
+  if echo "$HTTP_RESP" | grep -qE "< HTTP [24]"; then
+    success "${HTTP_RESP}"
+  else
+    warn "${HTTP_RESP}"
+    FAILED=1
+  fi
+  
+  info "Testing Mimir (/mimir)..."
+  HTTP_RESP=$(curl -v -u "${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}" "http://${NODE_IP}/mimir" 2>&1 | grep "< HTTP" || echo "< HTTP 000")
+  if echo "$HTTP_RESP" | grep -qE "< HTTP [24]"; then
+    success "${HTTP_RESP}"
+  else
+    warn "${HTTP_RESP}"
+    FAILED=1
+  fi
+  
+  info "Testing Loki (/loki)..."
+  HTTP_RESP=$(curl -v -u "${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}" "http://${NODE_IP}/loki" 2>&1 | grep "< HTTP" || echo "< HTTP 000")
+  if echo "$HTTP_RESP" | grep -qE "< HTTP [24]"; then
+    success "${HTTP_RESP}"
+  else
+    warn "${HTTP_RESP}"
+    FAILED=1
+  fi
+  
+  info "Testing Tempo (/tempo)..."
+  HTTP_RESP=$(curl -v -u "${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}" "http://${NODE_IP}/tempo" 2>&1 | grep "< HTTP" || echo "< HTTP 000")
+  if echo "$HTTP_RESP" | grep -qE "< HTTP [24]"; then
+    success "${HTTP_RESP}"
+  else
+    warn "${HTTP_RESP}"
+    FAILED=1
+  fi
+  
+  if [[ $FAILED -eq 0 ]]; then
+    success "All endpoint tests passed"
+  else
+    warn "Some endpoint tests failed"
+  fi
+else
+  warn "Could not determine node IP for tests"
+fi
+echo ""

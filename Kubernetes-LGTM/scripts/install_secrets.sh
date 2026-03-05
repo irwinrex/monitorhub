@@ -107,27 +107,30 @@ if ! kubectl get secret "${BASIC_AUTH_SECRET}" -n kube-system &>/dev/null || [[ 
   if [[ -n "$NODE_IP" ]]; then
     FAILED=0
     
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -u "${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}" "http://${NODE_IP}/metrics" 2>/dev/null || echo "000")
-    if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "401" ]]; then
-      success "Mimir (/metrics) test: HTTP ${HTTP_CODE}"
+    info "Testing Mimir (/metrics)..."
+    HTTP_RESP=$(curl -v -u "${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}" "http://${NODE_IP}/metrics" 2>&1 | grep "< HTTP" || echo "< HTTP 000")
+    if echo "$HTTP_RESP" | grep -qE "< HTTP [24]"; then
+      success "${HTTP_RESP}"
     else
-      warn "Mimir (/metrics) test: HTTP ${HTTP_CODE}"
+      warn "${HTTP_RESP}"
       FAILED=1
     fi
     
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -u "${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}" "http://${NODE_IP}/logs" 2>/dev/null || echo "000")
-    if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "401" ]]; then
-      success "Loki (/logs) test: HTTP ${HTTP_CODE}"
+    info "Testing Loki (/logs)..."
+    HTTP_RESP=$(curl -v -u "${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}" "http://${NODE_IP}/logs" 2>&1 | grep "< HTTP" || echo "< HTTP 000")
+    if echo "$HTTP_RESP" | grep -qE "< HTTP [24]"; then
+      success "${HTTP_RESP}"
     else
-      warn "Loki (/logs) test: HTTP ${HTTP_CODE}"
+      warn "${HTTP_RESP}"
       FAILED=1
     fi
     
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -u "${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}" "http://${NODE_IP}/traces" 2>/dev/null || echo "000")
-    if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "401" ]]; then
-      success "Tempo (/traces) test: HTTP ${HTTP_CODE}"
+    info "Testing Tempo (/traces)..."
+    HTTP_RESP=$(curl -v -u "${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}" "http://${NODE_IP}/traces" 2>&1 | grep "< HTTP" || echo "< HTTP 000")
+    if echo "$HTTP_RESP" | grep -qE "< HTTP [24]"; then
+      success "${HTTP_RESP}"
     else
-      warn "Tempo (/traces) test: HTTP ${HTTP_CODE}"
+      warn "${HTTP_RESP}"
       FAILED=1
     fi
     
