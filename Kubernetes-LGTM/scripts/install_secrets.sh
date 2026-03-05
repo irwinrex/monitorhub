@@ -39,20 +39,20 @@ if [[ "${GRAFANA_SECRET_EXISTS:-false}" != "true" ]]; then
     --from-literal=admin-password="${GRAFANA_PASS}"
 fi
 
-BASIC_AUTH_SECRET="grafana-basic-auth"
+BASIC_AUTH_SECRET="basic-auth"
 
-info "Creating HAProxy basic auth secret..."
+info "Creating HAProxy basic auth secret in kube-system (HAProxy's namespace)..."
 
-if kubectl get secret "${BASIC_AUTH_SECRET}" -n "${MONITORING_NS}" &>/dev/null; then
+if kubectl get secret "${BASIC_AUTH_SECRET}" -n kube-system &>/dev/null; then
   if [[ "${FORCE_RECREATE}" == "true" ]]; then
     warn "FORCE_RECREATE=true - deleting existing basic-auth secret..."
-    kubectl delete secret "${BASIC_AUTH_SECRET}" -n "${MONITORING_NS}"
+    kubectl delete secret "${BASIC_AUTH_SECRET}" -n kube-system
   else
     success "HAProxy basic auth secret already exists"
   fi
 fi
 
-if ! kubectl get secret "${BASIC_AUTH_SECRET}" -n "${MONITORING_NS}" &>/dev/null; then
+if ! kubectl get secret "${BASIC_AUTH_SECRET}" -n kube-system &>/dev/null; then
   BASIC_AUTH_USER="${BASIC_AUTH_USER:-admin}"
   BASIC_AUTH_PASS="${BASIC_AUTH_PASS:-$(openssl rand -hex 16)}"
 
@@ -64,7 +64,7 @@ if ! kubectl get secret "${BASIC_AUTH_SECRET}" -n "${MONITORING_NS}" &>/dev/null
   fi
 
   kubectl create secret generic "${BASIC_AUTH_SECRET}" \
-    --namespace "${MONITORING_NS}" \
+    --namespace kube-system \
     --from-literal=auth="${HTPASSWD}" \
     --from-literal=username="${BASIC_AUTH_USER}" \
     --from-literal=password="${BASIC_AUTH_PASS}"

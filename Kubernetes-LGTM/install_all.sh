@@ -262,8 +262,8 @@ else
 fi
 
 # Get basic auth credentials (plain password)
-BASIC_AUTH_USER=$(kubectl get secret grafana-basic-auth -n monitoring -o jsonpath='{.data.username}' 2>/dev/null | base64 -d || echo "admin")
-BASIC_AUTH_PASS=$(kubectl get secret grafana-basic-auth -n monitoring -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "check secret")
+BASIC_AUTH_USER=$(kubectl get secret basic-auth -n kube-system -o jsonpath='{.data.username}' 2>/dev/null | base64 -d || echo "admin")
+BASIC_AUTH_PASS=$(kubectl get secret basic-auth -n kube-system -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "check secret")
 
 echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
 echo -e "${YELLOW}  ACCESS CREDENTIALS${NC}"
