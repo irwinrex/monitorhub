@@ -64,7 +64,7 @@ while [[ $# -gt 0 ]]; do
     YES="true"
     shift
     ;;
-  --force-recreate)
+  -f | --force-recreate)
     FORCE_RECREATE="true"
     shift
     ;;
@@ -73,14 +73,15 @@ while [[ $# -gt 0 ]]; do
     echo ""
     echo "Options:"
     echo "  -b, --bucket-name    S3 base bucket name"
-  echo "  -r, --region         S3 region (e.g., us-east-1)"
-  echo "  -y, --yes            Non-interactive mode"
-  echo "  --force-recreate    Force recreate secrets"
-  echo "  -h, --help           Show this help"
+    echo "  -r, --region         S3 region (e.g., us-east-1)"
+    echo "  -y, --yes            Non-interactive mode"
+    echo "  -f, --force-recreate Force recreate secrets"
+    echo "  -h, --help           Show this help"
     echo ""
     echo "Examples:"
     echo "  sudo bash install_all.sh -b my-bucket -r us-east-1 -y"
     echo "  S3_BUCKET=my-bucket S3_REGION=us-east-1 sudo -E bash install_all.sh -y"
+    echo "  sudo bash install_all.sh -y -f"
     exit 0
     ;;
   *)

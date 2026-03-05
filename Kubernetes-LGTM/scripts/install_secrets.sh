@@ -8,6 +8,25 @@ source "${SCRIPT_DIR}/lib/common.sh"
 require_root
 require_kubeconfig
 
+FORCE_RECREATE="${FORCE_RECREATE:-false}"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -f | --force)
+    FORCE_RECREATE="true"
+    shift
+    ;;
+  -h | --help)
+    echo "Usage: $0 [-f|--force]"
+    echo "  -f, --force  Force recreate secrets"
+    exit 0
+    ;;
+  *)
+    shift
+    ;;
+  esac
+done
+
 : "${MONITORING_NS:=monitoring}"
 
 if ! kubectl get namespace "${MONITORING_NS}" &>/dev/null 2>&1; then
@@ -83,17 +102,40 @@ if ! kubectl get secret "${BASIC_AUTH_SECRET}" -n kube-system &>/dev/null || [[ 
     success "Basic auth secret verified"
   fi
 
-  info "Testing basic auth with HAProxy..."
+  info "Testing basic auth with HAProxy endpoints..."
   NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || echo "")
   if [[ -n "$NODE_IP" ]]; then
+    FAILED=0
+    
     HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -u "${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}" "http://${NODE_IP}/metrics" 2>/dev/null || echo "000")
     if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "401" ]]; then
-      success "Basic auth test completed (HTTP ${HTTP_CODE})"
+      success "Mimir (/metrics) test: HTTP ${HTTP_CODE}"
     else
-      warn "Basic auth test returned HTTP ${HTTP_CODE}"
+      warn "Mimir (/metrics) test: HTTP ${HTTP_CODE}"
+      FAILED=1
+    fi
+    
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -u "${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}" "http://${NODE_IP}/logs" 2>/dev/null || echo "000")
+    if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "401" ]]; then
+      success "Loki (/logs) test: HTTP ${HTTP_CODE}"
+    else
+      warn "Loki (/logs) test: HTTP ${HTTP_CODE}"
+      FAILED=1
+    fi
+    
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -u "${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}" "http://${NODE_IP}/traces" 2>/dev/null || echo "000")
+    if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "401" ]]; then
+      success "Tempo (/traces) test: HTTP ${HTTP_CODE}"
+    else
+      warn "Tempo (/traces) test: HTTP ${HTTP_CODE}"
+      FAILED=1
+    fi
+    
+    if [[ $FAILED -eq 0 ]]; then
+      success "All endpoint tests passed"
     fi
   else
-    warn "Could not determine node IP for curl test"
+    warn "Could not determine node IP for curl tests"
   fi
 fi
 
