@@ -13,6 +13,11 @@ metadata:
   annotations:
     haproxy.org/timeout-server: "60s"
     haproxy.org/proxy-body-size: "50m"
+    # Rate limiting (all 4 required together)
+    haproxy.org/rate-limit-requests: "50"
+    haproxy.org/rate-limit-period: "10s"
+    haproxy.org/rate-limit-size: "100k"
+    haproxy.org/rate-limit-status-code: "429"
 spec:
   ingressClassName: haproxy
   rules:
@@ -35,6 +40,11 @@ metadata:
   annotations:
     haproxy.org/timeout-server: "60s"
     haproxy.org/proxy-body-size: "50m"
+    # Rate limiting (all 4 required together)
+    haproxy.org/rate-limit-requests: "50"
+    haproxy.org/rate-limit-period: "10s"
+    haproxy.org/rate-limit-size: "100k"
+    haproxy.org/rate-limit-status-code: "429"
     # Basic auth
     ingress.kubernetes.io/auth-type: basic-auth
     ingress.kubernetes.io/auth-secret: grafana-basic-auth
