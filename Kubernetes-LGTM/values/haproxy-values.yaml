@@ -40,6 +40,11 @@ controller:
     option: "httpchk forwardfor httplog dontlognull redispatch"
     default-server: "inter 3s rise 2 fall 3"
     maxconn: "4000"
+    # Rate limiting (all 4 required)
+    rate-limit-requests: "50"
+    rate-limit-period: "10s"
+    rate-limit-size: "100k"
+    rate-limit-status-code: "429"
 
   # Resource limits
   resources:
