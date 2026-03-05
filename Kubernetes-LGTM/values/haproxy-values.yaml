@@ -1,15 +1,17 @@
 # =============================================================================
 # HAProxy Ingress Controller Configuration
+# Global controller config only — routing lives in ingress.yaml
 # =============================================================================
 controller:
-  replicaCount: 1
+  kind: DaemonSet
 
-  hostNetwork: true
-  hostPorts:
-    enable: true
-    http:  80
-    https: 0
-    stat:  1024
+  daemonset:
+    useHostNetwork: true
+    useHostPort: true
+    hostPorts:
+      http:  80
+      https: 0
+      stat:  1024
 
   ingressClass: haproxy
   ingressClassResource:
