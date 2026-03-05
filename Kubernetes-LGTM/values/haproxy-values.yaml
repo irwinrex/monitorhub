@@ -1,18 +1,14 @@
 # =============================================================================
 # HAProxy Ingress Controller Configuration
-# Global controller config only — routing lives in ingress.yaml
 # =============================================================================
 controller:
   replicaCount: 1
 
-  # Pod binds directly to the node NIC via hostNetwork.
-  # External traffic bypasses the ClusterIP service entirely.
-  # ClusterIP is kept for in-cluster health checks only.
   hostNetwork: true
   hostPorts:
     enable: true
     http:  80
-    https: 0      # TLS not used — disable port binding entirely
+    https: 0
     stat:  1024
 
   ingressClass: haproxy
@@ -22,24 +18,21 @@ controller:
     default: true
 
   service:
-    type: ClusterIP   # Unused for external traffic; kept for in-cluster access
+    type: ClusterIP
 
-  # Global HAProxy defaults — timeouts and connection options only.
-  # Do NOT add rate-limit-* keys here. They are Ingress-annotation-scoped
-  # and will cause validation errors when set globally.
   config:
     timeout-connect:       "10s"
     timeout-client:        "60s"
     timeout-server:        "60s"
     timeout-http-request:  "30s"
     timeout-keep-alive:    "30s"
-    timeout-tunnel:        "3600s"  # Reserved for future WebSocket/gRPC use
+    timeout-tunnel:        "3600s"
     forwarded-for:         "true"
     ssl-redirect:          "false"
     use-forwarded-headers: "true"
     http-connection-mode:  "http-server-close"
     dontlognull:           "true"
-    maxconn:               "8000"   # Sized for concurrent Alloy metrics+logs+traces
+    maxconn:               "2000"
 
   resources:
     requests:
@@ -55,7 +48,7 @@ controller:
   stats:
     enabled: true
     port:    1024
-    auth:    "admin:changeme"   # TODO: replace with a strong password or external secret
+    auth:    "admin:admin"
 
   metrics:
     enabled: true
@@ -63,13 +56,10 @@ controller:
   podAnnotations:
     cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
 
-  # Allow scheduling onto control-plane nodes (required for single-node k0s)
   tolerations:
     - key:      "node-role.kubernetes.io/control-plane"
       operator: "Exists"
       effect:   "NoSchedule"
-
-  # podAntiAffinity intentionally omitted — only meaningful at replicaCount > 1
 
 defaultBackend:
   enabled:      true
