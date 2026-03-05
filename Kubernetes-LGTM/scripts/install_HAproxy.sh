@@ -234,6 +234,12 @@ fi
 info "Applying Ingress routes..."
 kubectl apply -f "${INGRESS_YAML}"
 
+info "Restarting HAProxy via Helm to pick up new config..."
+helm upgrade haproxy-ingress haproxytech/kubernetes-ingress \
+  --namespace kube-system \
+  --reuse-values \
+  --wait --timeout 5m || true
+
 success "install_HAproxy.sh complete"
 info "HAProxy bound to host ports 80 (HTTP) | Stats on :1024"
 
