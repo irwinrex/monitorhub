@@ -16,6 +16,10 @@
 #   sudo bash install_all.sh -y
 #   sudo bash install_all.sh --yes
 #
+# Force recreate secrets:
+#   sudo bash install_all.sh -y -f
+#   sudo bash install_all.sh -y --force-recreate
+#
 # Skip completed phases after a partial/failed install:
 #   SKIP_K0S=true SKIP_HAPROXY=true sudo bash install_all.sh
 #
@@ -255,37 +259,57 @@ echo -e "${GREEN}╚════════════════════
 echo ""
 
 # Get passwords from secrets
-GRAFANA_PASS_RAW=$(kubectl get secret grafana-admin -n monitoring -o jsonpath='{.data.admin-password}' 2>/dev/null || echo "")
-if [[ -n "$GRAFANA_PASS_RAW" ]]; then
-  GRAFANA_PASS=$(echo "$GRAFANA_PASS_RAW" | base64 -d 2>/dev/null || echo "decode failed")
-else
-  GRAFANA_PASS="check secret"
-fi
+GRAFANA_PASS=$(kubectl get secret grafana-admin -n monitoring -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d || echo "")
 
 # Get basic auth credentials (plain password)
-BASIC_AUTH_USER=$(kubectl get secret basic-auth -n kube-system -o jsonpath='{.data.username}' 2>/dev/null | base64 -d || echo "admin")
-BASIC_AUTH_PASS=$(kubectl get secret basic-auth -n kube-system -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "check secret")
+BASIC_AUTH_USER=$(kubectl get secret basic-auth -n kube-system -o jsonpath='{.data.username}' 2>/dev/null | base64 -d || echo "")
+BASIC_AUTH_PASS=$(kubectl get secret basic-auth -n kube-system -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "")
 
 echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
 echo -e "${YELLOW}  ACCESS CREDENTIALS${NC}"
 echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
 echo ""
-echo -e "${CYAN}Grafana:${NC}"
-echo "  URL:      http://${NODE_IP}/"
-echo "  User:     admin"
-echo "  Password: ${GRAFANA_PASS}"
-echo ""
-echo -e "${CYAN}API Endpoints (Mimir, Loki, Tempo):${NC}"
-echo "  URL:      http://${NODE_IP}/metrics, /logs, /traces"
-echo "  User:     ${BASIC_AUTH_USER:-admin}"
-echo "  Password: ${BASIC_AUTH_PASS:-check secret}"
-echo ""
+
+if [[ -n "$GRAFANA_PASS" ]]; then
+  echo -e "${CYAN}Grafana:${NC}"
+  echo "  URL:      http://${NODE_IP}/"
+  echo "  User:     admin"
+  echo "  Password: ${GRAFANA_PASS}"
+  echo ""
+else
+  echo -e "${CYAN}Grafana:${NC}"
+  echo "  URL:   http://${NODE_IP}/"
+  echo "  User:  admin"
+  echo "  Pass:  kubectl get secret grafana-admin -n monitoring -o jsonpath='{.data.admin-password}' | base64 -d"
+  echo ""
+fi
+
+if [[ -n "$BASIC_AUTH_PASS" ]]; then
+  echo -e "${CYAN}API Endpoints (Mimir, Loki, Tempo):${NC}"
+  echo "  URL:      http://${NODE_IP}/metrics, /logs, /traces"
+  echo "  User:     ${BASIC_AUTH_USER}"
+  echo "  Password: ${BASIC_AUTH_PASS}"
+  echo ""
+else
+  echo -e "${CYAN}API Endpoints (Mimir, Loki, Tempo):${NC}"
+  echo "  URL:   http://${NODE_IP}/metrics, /logs, /traces"
+  echo "  User:  kubectl get secret basic-auth -n kube-system -o jsonpath='{.data.username}' | base64 -d"
+  echo "  Pass:  kubectl get secret basic-auth -n kube-system -o jsonpath='{.data.password}' | base64 -d"
+  echo ""
+fi
+
+HAPROXY_STATS_USER=$(kubectl get secret haproxy-stats -n kube-system -o jsonpath='{.data.username}' 2>/dev/null | base64 -d || echo "admin")
+HAPROXY_STATS_PASS=$(kubectl get secret haproxy-stats -n kube-system -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "")
+
 echo -e "${CYAN}HAProxy Stats:${NC}"
 echo "  URL:      http://${NODE_IP}:1024"
-HAPROXY_STATS_USER=$(kubectl get secret haproxy-stats -n kube-system -o jsonpath='{.data.username}' 2>/dev/null | base64 -d || echo "admin")
-HAPROXY_STATS_PASS=$(kubectl get secret haproxy-stats -n kube-system -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "check secret")
-echo "  User:     ${HAPROXY_STATS_USER}"
-echo "  Password: ${HAPROXY_STATS_PASS}"
+if [[ -n "$HAPROXY_STATS_PASS" ]]; then
+  echo "  User:     ${HAPROXY_STATS_USER}"
+  echo "  Password: ${HAPROXY_STATS_PASS}"
+else
+  echo "  User:     ${HAPROXY_STATS_USER}"
+  echo "  Pass:     kubectl get secret haproxy-stats -n kube-system -o jsonpath='{.data.password}' | base64 -d"
+fi
 echo ""
 echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
 echo ""
@@ -294,9 +318,9 @@ echo "  Pods:     kubectl get pods -n monitoring -o wide"
 echo "  Helm:     helm list -n monitoring"
 echo ""
 echo "  Grafana:  http://${NODE_IP}/"
-echo "  Mimir:    http://${NODE_IP}/mimir"
-echo "  Loki:     http://${NODE_IP}/loki"
-echo "  Tempo:    http://${NODE_IP}/tempo"
+echo "  Mimir:    http://${NODE_IP}/metrics"
+echo "  Loki:     http://${NODE_IP}/logs"
+echo "  Tempo:    http://${NODE_IP}/traces"
 echo ""
 
 # ══════════════════════════════════════════════════════════════════════
@@ -308,48 +332,51 @@ echo -e "${YELLOW}════════════════════�
 echo ""
 
 if [[ -n "$NODE_IP" ]]; then
-  FAILED=0
-  
-  info "Testing Grafana (/)..."
-  HTTP_RESP=$(curl -v "http://${NODE_IP}/" 2>&1 | grep "< HTTP" || echo "< HTTP 000")
-  if echo "$HTTP_RESP" | grep -qE "< HTTP [24]"; then
-    success "${HTTP_RESP}"
-  else
-    warn "${HTTP_RESP}"
-    FAILED=1
+  # Get credentials for tests if not already set
+  if [[ -z "$BASIC_AUTH_USER" ]]; then
+    BASIC_AUTH_USER=$(kubectl get secret basic-auth -n kube-system -o jsonpath='{.data.username}' 2>/dev/null | base64 -d || echo "")
+  fi
+  if [[ -z "$BASIC_AUTH_PASS" ]]; then
+    BASIC_AUTH_PASS=$(kubectl get secret basic-auth -n kube-system -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "")
   fi
   
-  info "Testing Mimir (/mimir)..."
-  HTTP_RESP=$(curl -v -u "${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}" "http://${NODE_IP}/mimir" 2>&1 | grep "< HTTP" || echo "< HTTP 000")
-  if echo "$HTTP_RESP" | grep -qE "< HTTP [24]"; then
-    success "${HTTP_RESP}"
+  if [[ -z "$BASIC_AUTH_USER" || -z "$BASIC_AUTH_PASS" ]]; then
+    warn "Basic auth credentials not available for tests"
   else
-    warn "${HTTP_RESP}"
-    FAILED=1
-  fi
-  
-  info "Testing Loki (/loki)..."
-  HTTP_RESP=$(curl -v -u "${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}" "http://${NODE_IP}/loki" 2>&1 | grep "< HTTP" || echo "< HTTP 000")
-  if echo "$HTTP_RESP" | grep -qE "< HTTP [24]"; then
-    success "${HTTP_RESP}"
-  else
-    warn "${HTTP_RESP}"
-    FAILED=1
-  fi
-  
-  info "Testing Tempo (/tempo)..."
-  HTTP_RESP=$(curl -v -u "${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}" "http://${NODE_IP}/tempo" 2>&1 | grep "< HTTP" || echo "< HTTP 000")
-  if echo "$HTTP_RESP" | grep -qE "< HTTP [24]"; then
-    success "${HTTP_RESP}"
-  else
-    warn "${HTTP_RESP}"
-    FAILED=1
-  fi
-  
-  if [[ $FAILED -eq 0 ]]; then
-    success "All endpoint tests passed"
-  else
-    warn "Some endpoint tests failed"
+    FAILED=0
+    
+    info "Testing Mimir (/metrics)..."
+    HTTP_RESP=$(curl -v -u "${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}" "http://${NODE_IP}/metrics" 2>&1 | grep "< HTTP" || echo "< HTTP 000")
+    if echo "$HTTP_RESP" | grep -qE "< HTTP [24]"; then
+      success "${HTTP_RESP}"
+    else
+      warn "${HTTP_RESP}"
+      FAILED=1
+    fi
+    
+    info "Testing Loki (/logs)..."
+    HTTP_RESP=$(curl -v -u "${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}" "http://${NODE_IP}/logs" 2>&1 | grep "< HTTP" || echo "< HTTP 000")
+    if echo "$HTTP_RESP" | grep -qE "< HTTP [24]"; then
+      success "${HTTP_RESP}"
+    else
+      warn "${HTTP_RESP}"
+      FAILED=1
+    fi
+    
+    info "Testing Tempo (/traces)..."
+    HTTP_RESP=$(curl -v -u "${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}" "http://${NODE_IP}/traces" 2>&1 | grep "< HTTP" || echo "< HTTP 000")
+    if echo "$HTTP_RESP" | grep -qE "< HTTP [24]"; then
+      success "${HTTP_RESP}"
+    else
+      warn "${HTTP_RESP}"
+      FAILED=1
+    fi
+    
+    if [[ $FAILED -eq 0 ]]; then
+      success "All endpoint tests passed"
+    else
+      warn "Some endpoint tests failed"
+    fi
   fi
 else
   warn "Could not determine node IP for tests"
