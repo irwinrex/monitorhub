@@ -4,11 +4,11 @@
 # Creates Kubernetes secrets required before Helm charts are deployed.
 #
 # Secrets managed:
-#   grafana-admin    (namespace: monitoring)  — Grafana admin login
-#   basic-auth       (namespace: kube-system) — HAProxy basic auth for LGTM APIs
+#   grafana-admin  (namespace: monitoring)  — Grafana admin login
+#   basic-auth     (namespace: kube-system) — HAProxy basic auth for LGTM APIs
 #
 # Options:
-#   -f, --force                Force recreate secrets
+#   -f, --force                Force recreate all secrets
 #   GRAFANA_ADMIN_PASSWORD="x" bash scripts/install_secrets.sh
 #   BASIC_AUTH_USER="myuser"   bash scripts/install_secrets.sh
 #   BASIC_AUTH_PASS="mypass"   bash scripts/install_secrets.sh
@@ -30,20 +30,16 @@ while [[ $# -gt 0 ]]; do
     shift
     ;;
   -h | --help)
-    echo "Usage: $0 [OPTIONS]"
+    echo "Usage: $0 [-f|--force]"
+    echo "  -f  Force recreate all secrets"
     echo ""
-    echo "Options:"
-    echo "  -f, --force  Force recreate secrets"
-    echo ""
-    echo "Environment variables:"
-    echo "  GRAFANA_ADMIN_PASSWORD  Set Grafana admin password"
-    echo "  BASIC_AUTH_USER        Set basic auth username"
-    echo "  BASIC_AUTH_PASS        Set basic auth password"
+    echo "Env vars:"
+    echo "  GRAFANA_ADMIN_PASSWORD  Grafana admin password"
+    echo "  BASIC_AUTH_USER         Basic auth username (default: admin)"
+    echo "  BASIC_AUTH_PASS         Basic auth password"
     exit 0
     ;;
-  *)
-    shift
-    ;;
+  *) shift ;;
   esac
 done
 
@@ -54,7 +50,12 @@ if ! kubectl get namespace "${MONITORING_NS}" &>/dev/null; then
   die "Namespace '${MONITORING_NS}' does not exist. Run install_k0s.sh first."
 fi
 
-FORCE_RECREATE="${FORCE_RECREATE:-false}"
+# Ensure htpasswd is available — install if missing
+if ! command -v htpasswd &>/dev/null; then
+  info "htpasswd not found — installing apache2-utils..."
+  apt-get install -y apache2-utils -qq ||
+    die "Failed to install apache2-utils. Install manually: apt-get install apache2-utils"
+fi
 
 # ── Grafana Admin Secret (monitoring namespace) ────────────────────────────────
 SECRET_NAME="grafana-admin"
@@ -97,8 +98,8 @@ if ! kubectl get secret "${SECRET_NAME}" -n "${MONITORING_NS}" &>/dev/null; then
 fi
 
 # ── HAProxy Basic Auth Secret (kube-system namespace) ─────────────────────────
-# Stored in kube-system so HAProxy ingress controller can read it directly.
-# Referenced in ingress annotations as: haproxy.org/auth-secret: "kube-system/basic-auth"
+# Stored in kube-system — HAProxy reads secrets from its own namespace only.
+# Referenced in ingress: haproxy.org/auth-secret: "kube-system/basic-auth"
 BASIC_AUTH_SECRET="basic-auth"
 BASIC_AUTH_USER="${BASIC_AUTH_USER:-admin}"
 
@@ -108,6 +109,11 @@ if kubectl get secret "${BASIC_AUTH_SECRET}" -n kube-system &>/dev/null; then
     kubectl delete secret "${BASIC_AUTH_SECRET}" -n kube-system
   else
     success "HAProxy basic auth secret already exists — skipping"
+    # Export for install_all.sh summary even when skipping
+    BASIC_AUTH_PASS=$(kubectl get secret "${BASIC_AUTH_SECRET}" -n kube-system \
+      -o jsonpath='{.data.password}' | base64 -d)
+    export BASIC_AUTH_USER BASIC_AUTH_PASS
+    success "install_secrets.sh complete"
     exit 0
   fi
 fi
@@ -121,12 +127,15 @@ fi
 
 info "Creating HAProxy basic auth secret in kube-system..."
 
-if command -v htpasswd &>/dev/null; then
-  HTPASSWD=$(htpasswd -nbm "${BASIC_AUTH_USER}" "${BASIC_AUTH_PASS}")
-else
-  info "htpasswd not found — using openssl apr1 fallback"
-  HTPASSWD="${BASIC_AUTH_USER}:$(openssl passwd -apr1 "${BASIC_AUTH_PASS}")"
-fi
+# htpasswd -nbm = apr1 (MD5) hash — required by HAProxy, bcrypt not supported
+HTPASSWD=$(htpasswd -nbm "${BASIC_AUTH_USER}" "${BASIC_AUTH_PASS}")
+
+# Verify the hash works before storing
+echo "${HTPASSWD}" >/tmp/_auth_verify
+htpasswd -vb /tmp/_auth_verify "${BASIC_AUTH_USER}" "${BASIC_AUTH_PASS}" &>/dev/null ||
+  die "htpasswd hash verification failed — password not stored"
+rm -f /tmp/_auth_verify
+info "htpasswd hash verified OK"
 
 kubectl create secret generic "${BASIC_AUTH_SECRET}" \
   --namespace kube-system \
