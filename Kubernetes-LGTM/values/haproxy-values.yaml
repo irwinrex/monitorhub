@@ -37,30 +37,25 @@ controller:
     forwarded-for: "true"          # Add X-Forwarded-For header
     ssl-redirect: "false"          # Don't redirect HTTP to HTTPS
     use-forwarded-headers: "true"  # Use forwarded headers
-    http-server-close: "true"      # Close connection after response
+    http-connection-mode: "http-server-close"  # Close connection after response
     option: "httpchk forwardfor httplog dontlognull redispatch"
     default-server: "inter 3s rise 2 fall 3"  # Health check settings
     maxconn: "4000"                # Max connections per frontend
 
   # Extra HAProxy configuration - rate limiting stick table
-  # Note: Security headers are now applied via Ingress annotations in ingress-values.yaml
-  # to avoid HAProxy parsing errors with raw directives in extraConfig
   extraConfig: |
-    # Rate limiting stick table - used by rate-limit annotations
+    # Rate limiting stick table
     stick-table type ip size 100k expire 30s store conn_rate(30s),http_req_rate(30s)
 
-  # Backend rate limiting annotations - applied to all backends
+  # Backend rate limiting - keep simple to avoid conflicts
   extraBackendConfig:
     annotations:
-      haproxy.org/rate-limit: "100"
       haproxy.org/rate-limit-requests: "50"
 
-  # Extra service annotations - MUST include rate-limit-requests or HAProxy errors
+  # Extra service annotations
   extraService:
     enabled: true
-    annotations:
-      haproxy.org/rate-limit: "100"
-      haproxy.org/rate-limit-requests: "50"
+    annotations: {}
 
   # Path-based routing backends (HTTP - mTLS handled by Linkerd)
   extraBackends:

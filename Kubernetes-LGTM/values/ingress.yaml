@@ -1,0 +1,65 @@
+# =============================================================================
+# Ingress Configuration for HAProxy
+# Routes traffic to Grafana, Loki, Mimir, and Tempo services
+# =============================================================================
+---
+# Grafana - NO basic auth (Grafana handles its own login)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana-ingress
+  namespace: monitoring
+  annotations:
+    haproxy.org/timeout-server: "60s"
+    haproxy.org/proxy-body-size: "50m"
+spec:
+  ingressClassName: haproxy
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 80
+---
+# API endpoints (Mimir, Loki, Tempo) - WITH basic auth
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: lgtm-api-ingress
+  namespace: monitoring
+  annotations:
+    haproxy.org/timeout-server: "60s"
+    haproxy.org/proxy-body-size: "50m"
+    haproxy.org/rate-limit-requests: "50"
+    ingress.kubernetes.io/auth-type: basic-auth
+    ingress.kubernetes.io/auth-secret: grafana-basic-auth
+spec:
+  ingressClassName: haproxy
+  rules:
+    - http:
+        paths:
+          - path: /mimir
+            pathType: Prefix
+            backend:
+              service:
+                name: mimir-gateway
+                port:
+                  number: 80
+          - path: /loki
+            pathType: Prefix
+            backend:
+              service:
+                name: loki
+                port:
+                  number: 3100
+          - path: /tempo
+            pathType: Prefix
+            backend:
+              service:
+                name: tempo
+                port:
+                  number: 3200

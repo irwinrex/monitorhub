@@ -25,9 +25,14 @@ fi
 
 : "${HAPROXY_CHART_VERSION:=1.44.3}"
 HAPROXY_VALUES="${SCRIPT_DIR}/../values/haproxy-values.yaml"
+INGRESS_YAML="${SCRIPT_DIR}/../values/ingress.yaml"
 
 if [[ ! -f "${HAPROXY_VALUES}" ]]; then
   die "Values file not found: ${HAPROXY_VALUES}"
+fi
+
+if [[ ! -f "${INGRESS_YAML}" ]]; then
+  die "Ingress file not found: ${INGRESS_YAML}"
 fi
 
 # 2. Clean Previous Failed Installs (if any)
@@ -160,6 +165,12 @@ if [[ "$READY" != "true" ]]; then
 else
   success "HAProxy pod is Ready."
 fi
+
+# 7. Apply Ingress routes
+# ------------------------------------------------------------------------------
+info "Applying Ingress routes..."
+kubectl delete ingress -n monitoring --all 2>/dev/null || true
+kubectl apply -f "${INGRESS_YAML}"
 
 success "install_HAproxy.sh complete"
 info "HAProxy bound to host ports 80 (HTTP) | Stats on :1024"

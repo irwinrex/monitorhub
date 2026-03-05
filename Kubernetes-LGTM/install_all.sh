@@ -155,7 +155,8 @@ for vfile in \
   "${VALUES_DIR}/tempo-values.yaml" \
   "${VALUES_DIR}/mimir-values.yaml" \
   "${VALUES_DIR}/grafana-values.yaml" \
-  "${VALUES_DIR}/haproxy-values.yaml"; do
+  "${VALUES_DIR}/haproxy-values.yaml" \
+  "${VALUES_DIR}/ingress.yaml"; do
   if [[ -f "$vfile" ]]; then
     info "  found: ${vfile##"${ROOT_DIR}/"}"
   else
@@ -228,72 +229,6 @@ _run_phase 3 "LGTM — Loki · Tempo · Mimir · Grafana" \
 
 _run_phase 4 "HAproxy — Ingress Controller (deployed after LGTM)" \
   "${SKIP_HAPROXY}" "${SCRIPTS_DIR}/install_HAproxy.sh"
-
-# ── Apply Ingress for basic auth (requires HAProxy to be running) ───────────────
-if [[ "${SKIP_HAPROXY}" != "true" ]]; then
-  _phase_banner "Configuring Ingress with basic auth"
-  kubectl apply -f - <<EOF
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: grafana-ingress
-  namespace: monitoring
-  annotations:
-    haproxy.org/timeout-server: "60s"
-    haproxy.org/proxy-body-size: "50m"
-spec:
-  ingressClassName: haproxy
-  rules:
-    - http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: grafana
-                port:
-                  number: 80
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: lgtm-api-ingress
-  namespace: monitoring
-  annotations:
-    haproxy.org/timeout-server: "60s"
-    haproxy.org/proxy-body-size: "50m"
-    ingress.kubernetes.io/auth-type: basic-auth
-    ingress.kubernetes.io/auth-secret: grafana-basic-auth
-spec:
-  ingressClassName: haproxy
-  rules:
-    - http:
-        paths:
-          - path: /mimir
-            pathType: Prefix
-            backend:
-              service:
-                name: mimir-gateway
-                port:
-                  number: 80
-          - path: /loki
-            pathType: Prefix
-            backend:
-              service:
-                name: loki
-                port:
-                  number: 3100
-          - path: /tempo
-            pathType: Prefix
-            backend:
-              service:
-                name: tempo
-                port:
-                  number: 3200
-EOF
-  success "Ingress with basic auth configured"
-fi
 
 # ── Backup phase ──────────────────────────────────────────────────────────────
 if [[ "${SKIP_BACKUP}" != "true" ]]; then
