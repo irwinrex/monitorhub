@@ -67,7 +67,7 @@ metadata:
     haproxy.org/path-rewrite: "/mimir"
     # Basic auth
     haproxy.org/auth-type:   "basic-auth"
-    haproxy.org/auth-secret: "monitoring/lgtm-basic-auth"
+    haproxy.org/auth-secret: "monitoring/grafana-basic-auth"
     # Gzip for query responses
     haproxy.org/compression-algo: "gzip"
     haproxy.org/compression-type: "application/json application/x-protobuf"
@@ -111,7 +111,7 @@ metadata:
     haproxy.org/path-rewrite: "/loki"
     # Basic auth
     haproxy.org/auth-type:   "basic-auth"
-    haproxy.org/auth-secret: "monitoring/lgtm-basic-auth"
+    haproxy.org/auth-secret: "monitoring/grafana-basic-auth"
     # Gzip for query responses
     haproxy.org/compression-algo: "gzip"
     haproxy.org/compression-type: "application/json application/x-protobuf"
@@ -155,7 +155,7 @@ metadata:
     haproxy.org/path-rewrite: "/tempo"
     # Basic auth
     haproxy.org/auth-type:   "basic-auth"
-    haproxy.org/auth-secret: "monitoring/lgtm-basic-auth"
+    haproxy.org/auth-secret: "monitoring/grafana-basic-auth"
     # Gzip for query responses
     haproxy.org/compression-algo: "gzip"
     haproxy.org/compression-type: "application/json application/x-protobuf"
