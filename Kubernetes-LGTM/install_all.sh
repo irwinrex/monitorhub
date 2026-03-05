@@ -139,8 +139,7 @@ for script in \
   "${SCRIPTS_DIR}/install_k0s.sh" \
   "${SCRIPTS_DIR}/install_HAproxy.sh" \
   "${SCRIPTS_DIR}/install_secrets.sh" \
-  "${SCRIPTS_DIR}/install_LGTM.sh" \
-  "${SCRIPTS_DIR}/backup_all.sh"; do
+  "${SCRIPTS_DIR}/install_LGTM.sh"; do
   if [[ -f "$script" ]]; then
     info "  found: ${script##"${ROOT_DIR}/"}"
   else
