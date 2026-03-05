@@ -25,12 +25,14 @@ kind: Ingress
 metadata:
   name: mimir-ingress
   namespace: monitoring
+  annotations:
+    haproxy.org/path-rewrite: "/mimir"
 spec:
   ingressClassName: haproxy
   rules:
     - http:
         paths:
-          - path: /mimir
+          - path: /metrics
             pathType: Prefix
             backend:
               service:
@@ -43,12 +45,14 @@ kind: Ingress
 metadata:
   name: loki-ingress
   namespace: monitoring
+  annotations:
+    haproxy.org/path-rewrite: "/loki"
 spec:
   ingressClassName: haproxy
   rules:
     - http:
         paths:
-          - path: /loki
+          - path: /logs
             pathType: Prefix
             backend:
               service:
@@ -61,12 +65,14 @@ kind: Ingress
 metadata:
   name: tempo-ingress
   namespace: monitoring
+  annotations:
+    haproxy.org/path-rewrite: "/tempo"
 spec:
   ingressClassName: haproxy
   rules:
     - http:
         paths:
-          - path: /tempo
+          - path: /traces
             pathType: Prefix
             backend:
               service:
