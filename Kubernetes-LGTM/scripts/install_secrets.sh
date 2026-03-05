@@ -2,14 +2,6 @@
 # ==============================================================================
 # scripts/install_secrets.sh
 # Creates Kubernetes secrets required before Helm charts are deployed.
-#
-# Secrets managed:
-#   grafana-admin    (namespace: monitoring)  — Grafana admin login
-#   lgtm-basic-auth  (namespace: monitoring)  — HAProxy basic auth for LGTM APIs
-#
-# Usage:
-#   bash scripts/install_secrets.sh
-#   bash scripts/install_secrets.sh -b mybucket -r us-east-1
 # ==============================================================================
 set -euo pipefail
 IFS=$'\n\t'
@@ -20,98 +12,94 @@ source "${SCRIPTS_DIR:-$SCRIPT_DIR}/lib/common.sh"
 require_kubeconfig
 
 : "${MONITORING_NS:=monitoring}"
+: "${FORCE_RECREATE:=false}"
 
 if ! kubectl get namespace "${MONITORING_NS}" &>/dev/null; then
   die "Namespace '${MONITORING_NS}' does not exist. Run install_k0s.sh first."
 fi
 
-if ! command -v htpasswd &>/dev/null; then
-  info "htpasswd not found — installing apache2-utils..."
-  apt-get install -y apache2-utils -qq ||
-    die "Failed to install apache2-utils"
+# Ensure openssl is available (standard on almost all linux)
+if ! command -v openssl &>/dev/null; then
+  die "openssl is required but not found."
 fi
-
-# ── Parse args ─────────────────────────────────────────────────────────────────
-_BUCKET=""
-_REGION=""
-
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-  -b|--bucket) _BUCKET="$2"; shift 2 ;;
-  -r|--region) _REGION="$2"; shift 2 ;;
-  *) shift ;;
-  esac
-done
-
-[[ -n "$_BUCKET" ]] && S3_BUCKET="$_BUCKET"
-[[ -n "$_REGION" ]] && S3_REGION="$_REGION"
 
 # ── Grafana Admin Secret ───────────────────────────────────────────────────────
-echo ""
-echo -e "${CYAN}━━━ Grafana Admin Credentials ━━━${NC}"
-echo ""
+SECRET_NAME="grafana-admin"
 
-if [[ -z "${GRAFANA_ADMIN_PASSWORD:-}" ]]; then
-  read -r -p "Grafana admin password: " GRAFANA_ADMIN_PASSWORD
+if kubectl get secret "${SECRET_NAME}" -n "${MONITORING_NS}" &>/dev/null; then
+  if [[ "${FORCE_RECREATE}" == "true" ]]; then
+    warn "FORCE_RECREATE=true — deleting ${SECRET_NAME}..."
+    kubectl delete secret "${SECRET_NAME}" -n "${MONITORING_NS}"
+  else
+    success "Grafana admin secret already exists — skipping"
+  fi
 fi
-GRAFANA_PASS="${GRAFANA_ADMIN_PASSWORD:-admin}"
 
-kubectl delete secret grafana-admin -n "${MONITORING_NS}" 2>/dev/null || true
+if ! kubectl get secret "${SECRET_NAME}" -n "${MONITORING_NS}" &>/dev/null; then
+  GRAFANA_PASS="${GRAFANA_ADMIN_PASSWORD:-$(openssl rand -hex 32)}"
+  info "Creating Grafana admin secret..."
 
-kubectl create secret generic grafana-admin \
-  --namespace "${MONITORING_NS}" \
-  --from-literal=admin-user=admin \
-  --from-literal=admin-password="${GRAFANA_PASS}"
+  kubectl create secret generic "${SECRET_NAME}" \
+    --namespace "${MONITORING_NS}" \
+    --from-literal=admin-user=admin \
+    --from-literal=admin-password="${GRAFANA_PASS}"
 
-echo ""
-success "Grafana admin secret created"
-echo "  User:     admin"
-echo "  Password: ${GRAFANA_PASS}"
-echo ""
-
-# ── HAProxy Basic Auth Secret ─────────────────────────────────────────────────
-echo -e "${CYAN}━━━ HAProxy Basic Auth Credentials ━━━${NC}"
-echo ""
-
-if [[ -z "${BASIC_AUTH_USER:-}" ]]; then
-  read -r -p "Basic auth username [admin]: " BASIC_AUTH_USER
-fi
-BASIC_AUTH_USER="${BASIC_AUTH_USER:-admin}"
-
-if [[ -z "${BASIC_AUTH_PASS:-}" ]]; then
-  read -r -s -p "Basic auth password: " BASIC_AUTH_PASS
+  echo ""
+  echo -e "${YELLOW}┌──────────────────────────────────────────────────────────┐${NC}"
+  echo -e "${YELLOW}│  GRAFANA ADMIN CREDENTIALS — save now, shown once only   │${NC}"
+  echo -e "${YELLOW}│                                                          │${NC}"
+  echo -e "${YELLOW}│  User    : admin                                         │${NC}"
+  echo -e "${YELLOW}│  Password: ${BOLD}${GRAFANA_PASS}${NC}${YELLOW}                        │${NC}"
+  echo -e "${YELLOW}└──────────────────────────────────────────────────────────┘${NC}"
   echo ""
 fi
-BASIC_AUTH_PASS="${BASIC_AUTH_PASS:-admin}"
 
+# ── HAProxy Basic Auth Secret ──────────────────────────────────────────────────
+BASIC_AUTH_SECRET="lgtm-basic-auth"
+BASIC_AUTH_USER="${BASIC_AUTH_USER:-admin}"
+
+if kubectl get secret "${BASIC_AUTH_SECRET}" -n "${MONITORING_NS}" &>/dev/null; then
+  if [[ "${FORCE_RECREATE}" == "true" ]]; then
+    warn "FORCE_RECREATE=true — deleting ${BASIC_AUTH_SECRET}..."
+    kubectl delete secret "${BASIC_AUTH_SECRET}" -n "${MONITORING_NS}"
+  else
+    success "HAProxy basic auth secret already exists — skipping"
+    BASIC_AUTH_PASS=$(kubectl get secret "${BASIC_AUTH_SECRET}" \
+      -n "${MONITORING_NS}" -o jsonpath='{.data.password}' | base64 -d)
+    export BASIC_AUTH_USER BASIC_AUTH_PASS
+    success "install_secrets.sh complete"
+    exit 0
+  fi
+fi
+
+BASIC_AUTH_PASS="${BASIC_AUTH_PASS:-$(openssl rand -hex 16)}"
 info "Creating HAProxy basic auth secret..."
 
-HTPASSWD=$(htpasswd -nbm "${BASIC_AUTH_USER}" "${BASIC_AUTH_PASS}")
-printf '%s' "${HTPASSWD}" >/tmp/_basic_auth
+# ------------------------------------------------------------------------------
+# FIX: Use openssl to generate Standard MD5 ($1$) instead of Apache MD5 ($apr1$)
+# HAProxy containers (often Alpine/musl) cannot always verify $apr1$ hashes.
+# ------------------------------------------------------------------------------
+HASH=$(openssl passwd -1 "${BASIC_AUTH_PASS}")
+echo "${BASIC_AUTH_USER}:${HASH}" >/tmp/_lgtm_auth
 
-kubectl delete secret lgtm-basic-auth -n "${MONITORING_NS}" 2>/dev/null || true
-
-kubectl create secret generic lgtm-basic-auth \
+# Create secret with ONLY the auth key (HAProxy reads only this key)
+kubectl create secret generic "${BASIC_AUTH_SECRET}" \
   --namespace "${MONITORING_NS}" \
-  --from-file=auth=/tmp/_basic_auth \
+  --from-file=auth=/tmp/_lgtm_auth \
   --from-literal=username="${BASIC_AUTH_USER}" \
   --from-literal=password="${BASIC_AUTH_PASS}" \
   --dry-run=client -o yaml | kubectl apply -f -
-rm -f /tmp/_basic_auth
+
+rm -f /tmp/_lgtm_auth
 
 echo ""
-success "HAProxy basic auth secret created"
-echo "  User:     ${BASIC_AUTH_USER}"
-echo "  Password: ${BASIC_AUTH_PASS}"
+echo -e "${YELLOW}┌──────────────────────────────────────────────────────────┐${NC}"
+echo -e "${YELLOW}│  LGTM BASIC AUTH CREDENTIALS — save now, shown once only │${NC}"
+echo -e "${YELLOW}│                                                          │${NC}"
+echo -e "${YELLOW}│  User    : ${BASIC_AUTH_USER}                                        │${NC}"
+echo -e "${YELLOW}│  Password: ${BOLD}${BASIC_AUTH_PASS}${NC}${YELLOW}                        │${NC}"
+echo -e "${YELLOW}└──────────────────────────────────────────────────────────┘${NC}"
 echo ""
 
 export BASIC_AUTH_USER BASIC_AUTH_PASS
-
-if [[ -n "${S3_BUCKET:-}" ]]; then
-  S3_REGION="${S3_REGION:-us-east-1}"
-  configure_s3_buckets "${S3_BUCKET}" "${S3_REGION}"
-  print_s3_config
-fi
-
-echo ""
 success "install_secrets.sh complete"

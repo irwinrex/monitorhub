@@ -10,8 +10,7 @@
 export K0S_VERSION="v1.34.3+k0s.0" # https://github.com/k0sproject/k0s/releases
 export HELM_VERSION="v3.17.1"      # https://github.com/helm/helm/releases
 
-export HAPROXY_CHART_VERSION="1.48.0"   # https://artifacthub.io/packages/helm/haproxy-ingress/haproxy-ingress
-export LINKERD_VERSION="stable-2.14.11" # https://github.com/linkerd/linkerd2/releases
+export HAPROXY_CHART_VERSION="1.48.0" # https://artifacthub.io/packages/helm/haproxy-ingress/haproxy-ingress
 
 # LGTM chart versions
 # Sources: artifacthub.io — stable releases only (no weekly/RC builds).

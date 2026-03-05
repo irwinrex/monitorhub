@@ -52,7 +52,7 @@ controller:
   stats:
     enabled: true
     port:    1024
-    secret:  "haproxy-stats"
+    auth:  "admin:admin"
 
   metrics:
     enabled: true
