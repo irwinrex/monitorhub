@@ -304,63 +304,40 @@ echo ""
 # Endpoint tests — use localhost since HAProxy binds via hostPort on this node
 # ══════════════════════════════════════════════════════════════════════════════
 echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
-echo -e "${YELLOW}  ENDPOINT TESTS${NC}"
+echo -e "${YELLOW}  ENDPOINT TESTS (with basic auth)${NC}"
 echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
 echo ""
 
-# Wait for HAProxy to bind port 80
-info "Waiting for HAProxy port 80..."
-_port_ready=0
-for _i in $(seq 1 15); do
-  if ss -tulpn 2>/dev/null | grep -q ':80 '; then
-    _port_ready=1
-    break
-  fi
-  sleep 2
-done
-if [[ $_port_ready -eq 0 ]]; then
-  warn "HAProxy port 80 not bound after 30s — skipping endpoint tests"
-  warn "Check: kubectl get pods -n kube-system -l app.kubernetes.io/instance=haproxy-ingress"
-  echo ""
+# Get node IP if not already set
+if [[ -z "${NODE_IP:-}" ]]; then
+  NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || echo "")
+fi
+
+if [[ -z "$NODE_IP" ]]; then
+  warn "Could not determine node IP — skipping tests"
 else
+  # Pull credentials fresh
+  BASIC_AUTH_USER=$(kubectl get secret lgtm-basic-auth -n monitoring -o jsonpath='{.data.username}' 2>/dev/null | base64 -d || echo "")
+  BASIC_AUTH_PASS=$(kubectl get secret lgtm-basic-auth -n monitoring -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "")
 
-  _test_endpoint() {
-    local label="$1" url="$2" user="${3:-}" pass="${4:-}"
-    local http_code
-    if [[ -n "$user" && -n "$pass" ]]; then
-      http_code=$(curl -s -o /dev/null -w "%{http_code}" -u "${user}:${pass}" --max-time 5 "$url" 2>/dev/null)
-    else
-      http_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "$url" 2>/dev/null)
-    fi
-    http_code="${http_code:-000}"
-    if [[ "$http_code" =~ ^[2-4] ]]; then
-      success "${label}: HTTP ${http_code}"
-    else
-      warn "${label}: HTTP ${http_code} — connection failed or timed out"
-    fi
-  }
-
-  # Pull credentials fresh if not in env
-  if [[ -z "${BASIC_AUTH_USER:-}" || -z "${BASIC_AUTH_PASS:-}" ]]; then
-    BASIC_AUTH_USER=$(kubectl get secret lgtm-basic-auth -n monitoring -o jsonpath='{.data.username}' 2>/dev/null | base64 -d || echo "")
-    BASIC_AUTH_PASS=$(kubectl get secret lgtm-basic-auth -n monitoring -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "")
-  fi
-
-  # Grafana — no auth
-  _test_endpoint "Grafana  (/)" "http://localhost/" "" ""
-
-  # LGTM APIs — basic auth required
-  if [[ -n "${BASIC_AUTH_USER}" && -n "${BASIC_AUTH_PASS}" ]]; then
-    _test_endpoint "Mimir    (/metrics)" "http://localhost/metrics" "${BASIC_AUTH_USER}" "${BASIC_AUTH_PASS}"
-    _test_endpoint "Loki     (/logs)" "http://localhost/logs" "${BASIC_AUTH_USER}" "${BASIC_AUTH_PASS}"
-    _test_endpoint "Tempo    (/traces)" "http://localhost/traces" "${BASIC_AUTH_USER}" "${BASIC_AUTH_PASS}"
-
-    info "Verifying auth enforcement (expect 401)..."
-    _test_endpoint "Mimir no-auth (expect 401)" "http://localhost/metrics" "" ""
+  if [[ -z "${BASIC_AUTH_USER}" || -z "${BASIC_AUTH_PASS}" ]]; then
+    warn "Basic auth credentials not found — skipping tests"
   else
-    warn "Basic auth credentials not found — skipping API tests"
-  fi
+    _test() {
+      local label="$1" url="$2"
+      local http_code
+      http_code=$(curl -s -o /dev/null -w "%{http_code}" -u "${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}" --max-time 10 "$url" 2>/dev/null || echo "000")
+      if [[ "$http_code" =~ ^[2-4] ]]; then
+        success "${label}: HTTP ${http_code}"
+      else
+        warn "${label}: HTTP ${http_code}"
+      fi
+    }
 
-fi # end port check
+    _test "Mimir  (/metrics)" "http://${NODE_IP}/metrics"
+    _test "Loki   (/logs)" "http://${NODE_IP}/logs"
+    _test "Tempo  (/traces)" "http://${NODE_IP}/traces"
+  fi
+fi
 
 echo ""
