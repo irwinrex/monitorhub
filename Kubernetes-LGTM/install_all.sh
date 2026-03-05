@@ -111,6 +111,9 @@ _run_phase() {
   S3_BUCKET="${S3_BUCKET}" \
     S3_REGION="${S3_REGION}" \
     YES="${YES}" \
+    GRAFANA_ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD}" \
+    BASIC_AUTH_USER="${BASIC_AUTH_USER:-admin}" \
+    BASIC_AUTH_PASS="${BASIC_AUTH_PASS}" \
     bash "${script}"
   echo -e "${GREEN}  ✓  Phase ${num} complete in $((SECONDS - t))s${NC}"
 }
@@ -169,6 +172,24 @@ if [[ -z "${S3_REGION}" ]]; then
   read -r -p "S3 region [default: us-east-1]: " S3_REGION
   S3_REGION="${S3_REGION:-us-east-1}"
 fi
+
+# ── Prompt for credentials ─────────────────────────────────────────────────────
+echo ""
+echo -e "${CYAN}━━━ Credentials ━━━${NC}"
+echo ""
+
+if [[ -z "${GRAFANA_ADMIN_PASSWORD:-}" ]]; then
+  read -r -p "Grafana admin password: " GRAFANA_ADMIN_PASSWORD
+fi
+GRAFANA_ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD:-admin}"
+export GRAFANA_ADMIN_PASSWORD
+
+if [[ -z "${BASIC_AUTH_PASS:-}" ]]; then
+  read -r -s -p "HAProxy basic auth password: " BASIC_AUTH_PASS
+  echo ""
+fi
+BASIC_AUTH_PASS="${BASIC_AUTH_PASS:-admin}"
+export BASIC_AUTH_USER BASIC_AUTH_PASS
 
 configure_s3_buckets "${S3_BUCKET}" "${S3_REGION}"
 
