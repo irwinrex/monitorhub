@@ -77,7 +77,7 @@ BASIC_AUTH_PASS="${BASIC_AUTH_PASS:-$(openssl rand -hex 16)}"
 
 info "Creating HAproxy basic auth secret for API endpoints (LGTM)..."
 if command -v htpasswd &>/dev/null; then
-  HTPASSWD=$(htpasswd -nbm "${BASIC_AUTH_USER}" "${BASIC_AUTH_PASS}" 2>/dev/null || die "htpasswd failed")
+  HTPASSWD=$(htpasswd -nbm "${BASIC_AUTH_USER}" "${BASIC_AUTH_PASS}" 2>/dev/null || die "htpasswd failed"
 else
   info "htpasswd not available - using openssl for basic auth"
   HTPASSWD=$(openssl passwd -apr1 "${BASIC_AUTH_PASS}" 2>/dev/null | head -1)
@@ -87,6 +87,9 @@ fi
 kubectl create secret generic "${BASIC_AUTH_SECRET}" \
   --namespace "${MONITORING_NS}" \
   --from-literal=auth="${HTPASSWD}" \
+  --from-literal=username="${BASIC_AUTH_USER}" \
+  --from-literal=password="${BASIC_AUTH_PASS}" \
+  --dry-run=client -o yaml | kubectl apply -f -
   --dry-run=client -o yaml | kubectl apply -f -
 
 export BASIC_AUTH_USER BASIC_AUTH_PASS

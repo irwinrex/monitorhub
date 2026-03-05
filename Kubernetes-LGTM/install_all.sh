@@ -254,16 +254,9 @@ else
   GRAFANA_PASS="check secret"
 fi
 
-# Extract basic auth credentials from the secret
-BASIC_AUTH_RAW=$(kubectl get secret grafana-basic-auth -n monitoring -o jsonpath='{.data.auth}' 2>/dev/null || echo "")
-if [[ -n "$BASIC_AUTH_RAW" ]]; then
-  BASIC_AUTH_DECODED=$(echo "$BASIC_AUTH_RAW" | base64 -d 2>/dev/null || echo "")
-  BASIC_AUTH_USER=$(echo "$BASIC_AUTH_DECODED" | cut -d':' -f1)
-  BASIC_AUTH_PASS=$(echo "$BASIC_AUTH_DECODED" | cut -d':' -f2-)
-else
-  BASIC_AUTH_USER="admin"
-  BASIC_AUTH_PASS="check secret"
-fi
+# Get basic auth credentials (plain password)
+BASIC_AUTH_USER=$(kubectl get secret grafana-basic-auth -n monitoring -o jsonpath='{.data.username}' 2>/dev/null | base64 -d || echo "admin")
+BASIC_AUTH_PASS=$(kubectl get secret grafana-basic-auth -n monitoring -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "check secret")
 
 echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
 echo -e "${YELLOW}  ACCESS CREDENTIALS${NC}"
