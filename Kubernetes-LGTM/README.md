@@ -88,18 +88,28 @@ sudo bash install_all.sh -b lgtm-observability -r us-east-1 -y
 # With environment variables
 S3_BUCKET=lgtm-observability S3_REGION=us-east-1 sudo -E bash install_all.sh -y
 
-# Custom Grafana password
-GRAFANA_ADMIN_PASSWORD="strong-password" sudo bash install_all.sh -y
+# Force recreate secrets (new passwords)
+sudo bash install_all.sh -y -f
 ```
 
 ### 4 — Skip phases
 ```bash
 # Only deploy HAProxy
-SKIP_K0S=true SKIP_SECRETS=true SKIP_LGTM=true SKIP_BACKUP=true sudo bash install_all.sh
+SKIP_K0S=true SKIP_SECRETS=true SKIP_LGTM=true sudo bash install_all.sh
 
 # Redeploy LGTM only
-SKIP_K0S=true SKIP_HAPROXY=true SKIP_SECRETS=true SKIP_BACKUP=true sudo bash install_all.sh
+SKIP_K0S=true SKIP_HAPROXY=true SKIP_SECRETS=true sudo bash install_all.sh
 ```
+
+### Command-line Options
+
+| Option | Description |
+|---|---|
+| `-b, --bucket-name` | S3 base bucket name |
+| `-r, --region` | S3 region (e.g., us-west-2) |
+| `-y, --yes` | Non-interactive mode |
+| `-f, --force` | Force recreate secrets |
+| `-h, --help` | Show help |
 
 ---
 
@@ -107,12 +117,12 @@ SKIP_K0S=true SKIP_HAPROXY=true SKIP_SECRETS=true SKIP_BACKUP=true sudo bash ins
 
 After deployment:
 
-| Service | URL |
-|---|---|
-| Grafana | http://<NODE_IP>/ |
-| Mimir (metrics) | http://<NODE_IP>/metrics |
-| Loki (logs) | http://<NODE_IP>/logs |
-| Tempo (traces) | http://<NODE_IP>/traces |
+| Service | URL | Auth |
+|---|---|---|
+| Grafana | http://<NODE_IP>/ | admin / (check secret) |
+| Mimir (metrics) | http://<NODE_IP>/metrics | admin / (check secret) |
+| Loki (logs) | http://<NODE_IP>/logs | admin / (check secret) |
+| Tempo (traces) | http://<NODE_IP>/traces | admin / (check secret) |
 
 **HAProxy Stats:** http://<NODE_IP>:1024 (admin/admin)
 
@@ -124,11 +134,8 @@ The Grafana admin password is stored in a Kubernetes secret.
 
 ### Get password:
 ```bash
-# Method 1: From secret
+# From secret
 kubectl get secret grafana-admin -n monitoring -o jsonpath='{.data.admin-password}' | base64 -d
-
-# Method 2: From secret (one-liner)
-kubectl get secret grafana-admin -n monitoring -o jsonpath='{.data.admin-password}' | base64 -d && echo
 
 # Default username: admin
 ```
@@ -144,6 +151,27 @@ kubectl create secret generic grafana-admin \
   --from-literal=admin-user=admin \
   --from-literal=admin-password=your-password \
   -o yaml --dry-run=client | kubectl apply -f -
+```
+
+---
+
+## Basic Auth Credentials (HAProxy)
+
+The HAProxy basic auth is required for Mimir, Loki, and Tempo endpoints.
+
+### Default credentials:
+- **Username:** admin
+- **Password:** (auto-generated, displayed at end of install)
+
+### Get password:
+```bash
+kubectl get secret lgtm-basic-auth -n monitoring -o jsonpath='{.data.password}' | base64 -d
+```
+
+### Recreate with custom password:
+```bash
+# Force recreate secrets
+sudo bash install_all.sh -y -f
 ```
 
 ---

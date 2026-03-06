@@ -80,18 +80,14 @@ info "Creating HAProxy basic auth secret..."
 # Format: username:hashed_password
 # ------------------------------------------------------------------------------
 HASH=$(openssl passwd -1 "${BASIC_AUTH_PASS}")
-echo "${BASIC_AUTH_USER}:${HASH}" >/tmp/_lgtm_auth
 
-# Create secret with the auth file + raw credentials for reference
-# The key 'auth' contains the htpasswd-style format that HAProxy expects
+# Create secret with admin as key (HAProxy expects this format)
 kubectl create secret generic "${BASIC_AUTH_SECRET}" \
   --namespace "${MONITORING_NS}" \
-  --from-file=auth=/tmp/_lgtm_auth \
+  --from-literal=admin="${HASH}" \
   --from-literal=username="${BASIC_AUTH_USER}" \
   --from-literal=password="${BASIC_AUTH_PASS}" \
   --dry-run=client -o yaml | kubectl apply -f -
-
-rm -f /tmp/_lgtm_auth
 
 echo ""
 echo -e "${YELLOW}┌──────────────────────────────────────────────────────────────────────────────────────────────────┐${NC}"
