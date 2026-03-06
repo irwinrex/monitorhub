@@ -52,12 +52,12 @@ while [[ $# -gt 0 ]]; do
   -h | --help)
     echo "Usage: bash install_all.sh [OPTIONS]"
     echo ""
-    echo "Options:"
-    echo "  -b, --bucket-name    S3 base bucket name"
-    echo "  -r, --region         S3 region (e.g., us-east-1)"
-    echo "  -y, --yes            Non-interactive mode"
-    echo "  -f, --force          Force recreate secrets"
-    echo "  -h, --help           Show this help"
+  echo "Options:"
+  echo "  -b, --bucket-name    S3 base bucket name"
+  echo "  -r, --region         S3 region (e.g., us-west-2)"
+  echo "  -y, --yes            Non-interactive mode"
+  echo "  -f, --force          Force recreate secrets"
+  echo "  -h, --help           Show this help"
     exit 0
     ;;
   *)
