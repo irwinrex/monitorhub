@@ -273,26 +273,35 @@ echo ""
 if [[ "${BASIC_AUTH_USER}" == "<unknown>" ]]; then
   warn "Skipping tests (Credentials not found in secrets)"
 else
-  # Using localhost for tests avoids NAT hairpining issues on some clouds
-  TEST_HOST="${PRIVATE_IP:-localhost}"
+  # Use node IP with hostPort 80
+  TEST_HOST="${PRIVATE_IP:-127.0.0.1}"
   
   _test() {
     local label="$1" url="$2"
     local http_code
-    # Capture HTTP Code. Timeout 5s.
-    http_code=$(curl -s -o /dev/null -w "%{http_code}" -u "${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}" --max-time 5 "$url" 2>/dev/null || echo "000")
+    # Add -f flag to fail on HTTP errors, longer timeout
+    http_code=$(curl -sf -o /dev/null -w "%{http_code}" \
+      -u "${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}" \
+      --connect-timeout 10 --max-time 15 \
+      "$url" 2>/dev/null || echo "000")
     
-    # Accept 2xx, 3xx, 4xx (reachable), reject 000, 5xx
-    if [[ "$http_code" =~ ^(2|3|4) ]]; then
+    # Accept 200, 401 (auth working), 404 (path exists but not found)
+    if [[ "$http_code" =~ ^(200|401|404) ]]; then
+      success "${label}: HTTP ${http_code} (OK)"
+    elif [[ "$http_code" =~ ^[2-4] ]]; then
       success "${label}: HTTP ${http_code} (Reachable)"
     else
       warn "${label}: HTTP ${http_code} (Check logs)"
     fi
   }
 
-  _test "Mimir  (/metrics)" "http://${TEST_HOST}/metrics"
-  _test "Loki   (/logs)"    "http://${TEST_HOST}/logs"
-  _test "Tempo  (/traces)"  "http://${TEST_HOST}/traces"
+  # Test HAProxy health first
+  _test "HAProxy (health)" "http://${TEST_HOST}:80/"
+
+  # Test endpoints with basic auth
+  _test "Mimir  (/metrics)" "http://${TEST_HOST}:80/metrics"
+  _test "Loki   (/logs)"    "http://${TEST_HOST}:80/logs"
+  _test "Tempo  (/traces)"  "http://${TEST_HOST}:80/traces"
 fi
 
 echo ""
