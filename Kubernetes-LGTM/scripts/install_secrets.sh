@@ -18,10 +18,21 @@ if ! kubectl get namespace "${MONITORING_NS}" &>/dev/null; then
   die "Namespace '${MONITORING_NS}' does not exist. Run install_k0s.sh first."
 fi
 
-# Ensure openssl is available (standard on almost all linux)
-if ! command -v openssl &>/dev/null; then
-  die "openssl is required but not found."
+# Ensure mkpasswd is available (from whois package)
+if ! command -v mkpasswd &>/dev/null; then
+  info "Installing whois package (provides mkpasswd)..."
+  if command -v apt-get &>/dev/null; then
+    apt-get update -qq && apt-get install -y -qq whois >/dev/null 2>&1
+  elif command -v yum &>/dev/null; then
+    yum install -y whois >/dev/null 2>&1
+  elif command -v apk &>/dev/null; then
+    apk add --no-cache whois >/dev/null 2>&1
+  elif command -v dnf &>/dev/null; then
+    dnf install -y whois >/dev/null 2>&1
+  fi
 fi
+
+command -v mkpasswd &>/dev/null || die "mkpasswd is required. Install whois package."
 
 # ── Grafana Admin Secret ───────────────────────────────────────────────────────
 SECRET_NAME="grafana-admin"
@@ -76,10 +87,10 @@ BASIC_AUTH_PASS="${BASIC_AUTH_PASS:-$(openssl rand -hex 16)}"
 info "Creating HAProxy basic auth secret..."
 
 # ------------------------------------------------------------------------------
-# HAProxy uses crypt() which supports standard MD5 ($1$), SHA-256/512 on all platforms
-# Using -1 for standard MD5 (not -apr1 which is Apache variant)
+# HAProxy uses crypt() - SHA-256 as recommended by official docs
+# Using mkpasswd -m sha-256 (from whois package)
 # ------------------------------------------------------------------------------
-HASH=$(openssl passwd -1 "${BASIC_AUTH_PASS}")
+HASH=$(mkpasswd -m sha-256 "${BASIC_AUTH_PASS}")
 echo "${BASIC_AUTH_USER}:${HASH}" >/tmp/_lgtm_auth
 
 # Create secret with ONLY the auth key (HAProxy reads only this key)
