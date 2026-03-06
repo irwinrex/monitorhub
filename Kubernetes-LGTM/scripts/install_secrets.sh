@@ -18,30 +18,10 @@ if ! kubectl get namespace "${MONITORING_NS}" &>/dev/null; then
   die "Namespace '${MONITORING_NS}' does not exist. Run install_k0s.sh first."
 fi
 
-# ------------------------------------------------------------------------------
-# FIX 1: Install htpasswd (apache2-utils) instead of mkpasswd (whois)
-# htpasswd is the industry standard for Ingress Basic Auth.
-# ------------------------------------------------------------------------------
-if ! command -v htpasswd &>/dev/null; then
-  info "Installing apache2-utils (provides htpasswd)..."
-  if command -v apt-get &>/dev/null; then
-    apt-get update -qq && apt-get install -y -qq apache2-utils >/dev/null 2>&1
-  elif command -v apk &>/dev/null; then
-    apk add --no-cache apache2-utils >/dev/null 2>&1
-  elif command -v yum &>/dev/null; then
-    yum install -y httpd-tools >/dev/null 2>&1
-  elif command -v dnf &>/dev/null; then
-    dnf install -y httpd-tools >/dev/null 2>&1
-  elif [[ "$OSTYPE" == "darwin"* ]]; then
-    if command -v brew &>/dev/null; then
-       brew install httpd >/dev/null 2>&1 || true
-    else
-       warn "macOS detected but Homebrew not found. Ensure 'htpasswd' is in your PATH."
-    fi
-  fi
+# Ensure openssl is available
+if ! command -v openssl &>/dev/null; then
+  die "openssl is required but not found."
 fi
-
-command -v htpasswd &>/dev/null || die "htpasswd is required. Install apache2-utils or httpd-tools."
 
 # ── Grafana Admin Secret ───────────────────────────────────────────────────────
 SECRET_NAME="grafana-admin"
@@ -96,15 +76,14 @@ BASIC_AUTH_PASS="${BASIC_AUTH_PASS:-$(openssl rand -hex 16)}"
 info "Creating HAProxy basic auth secret..."
 
 # ------------------------------------------------------------------------------
-# FIX 2: Generate Auth File using htpasswd -B (Bcrypt)
-# -c: create new file
-# -B: force Bcrypt encryption (Secure & Standard for HAProxy Ingress)
-# -b: read password from command line argument (batch mode)
+# Generate password hash using openssl (standard MD5)
+# Format: username:hashed_password
 # ------------------------------------------------------------------------------
-htpasswd -cB -b /tmp/_lgtm_auth "${BASIC_AUTH_USER}" "${BASIC_AUTH_PASS}" 2>/dev/null
+HASH=$(openssl passwd -1 "${BASIC_AUTH_PASS}")
+echo "${BASIC_AUTH_USER}:${HASH}" >/tmp/_lgtm_auth
 
 # Create secret with the auth file + raw credentials for reference
-# The key 'auth' corresponds to the file content expected by HAProxy Ingress
+# The key 'auth' contains the htpasswd-style format that HAProxy expects
 kubectl create secret generic "${BASIC_AUTH_SECRET}" \
   --namespace "${MONITORING_NS}" \
   --from-file=auth=/tmp/_lgtm_auth \
