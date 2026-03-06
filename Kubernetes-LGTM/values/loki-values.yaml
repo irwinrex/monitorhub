@@ -5,6 +5,9 @@
 # =============================================================================
 
 loki:
+  # Disable authentication - HAProxy handles auth
+  auth_enabled: false
+
   # Basic configuration for single-node setup
   commonConfig:
     replication_factor: 1  # Single node = 1 replica

@@ -47,7 +47,6 @@ datasources:
         type: loki
         uid: loki
         url: http://loki.monitoring.svc.cluster.local:3100
-        orgId: 1
         jsonData:
           maxLines: 1000          # cap log lines returned per query for low-resource node
       # Tempo — distributed tracing
