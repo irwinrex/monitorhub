@@ -64,7 +64,7 @@ metadata:
   namespace: monitoring
   annotations:
     # Path rewrite: /metrics/api/v1/push → /api/v1/push
-    haproxy.org/path-rewrite: "/mimir"
+    haproxy.org/path-rewrite: "/metrics"
     # Basic auth
     haproxy.org/auth-type:   "basic-auth"
     haproxy.org/auth-secret: "lgtm-basic-auth"
@@ -108,7 +108,7 @@ metadata:
   namespace: monitoring
   annotations:
     # Path rewrite: /logs/loki/api/v1/push → /loki/api/v1/push
-    haproxy.org/path-rewrite: "/loki"
+    haproxy.org/path-rewrite: "/logs"
     # Basic auth
     haproxy.org/auth-type:   "basic-auth"
     haproxy.org/auth-secret: "lgtm-basic-auth"
@@ -152,7 +152,7 @@ metadata:
   namespace: monitoring
   annotations:
     # Path rewrite: /traces/... → /...
-    haproxy.org/path-rewrite: "/tempo"
+    haproxy.org/path-rewrite: "/traces"
     # Basic auth
     haproxy.org/auth-type:   "basic-auth"
     haproxy.org/auth-secret: "lgtm-basic-auth"
