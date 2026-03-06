@@ -61,14 +61,19 @@ while [[ $# -gt 0 ]]; do
     YES="true"
     shift
     ;;
+  -f | --force)
+    FORCE_RECREATE="true"
+    shift
+    ;;
   -h | --help)
     echo "Usage: bash install_all.sh [OPTIONS]"
     echo ""
-    echo "Options:"
-    echo "  -b, --bucket-name    S3 base bucket name"
-    echo "  -r, --region         S3 region (e.g., us-east-1)"
-    echo "  -y, --yes            Non-interactive mode"
-    echo "  -h, --help           Show this help"
+  echo "Options:"
+  echo "  -b, --bucket-name    S3 base bucket name"
+  echo "  -r, --region         S3 region (e.g., us-east-1)"
+  echo "  -y, --yes            Non-interactive mode"
+  echo "  -f, --force          Force recreate secrets"
+  echo "  -h, --help           Show this help"
     echo ""
     echo "Examples:"
     echo "  bash install_all.sh -b my-bucket -r us-east-1 -y"
@@ -111,6 +116,7 @@ _run_phase() {
   S3_BUCKET="${S3_BUCKET}" \
     S3_REGION="${S3_REGION}" \
     YES="${YES}" \
+    FORCE_RECREATE="${FORCE_RECREATE}" \
     BASIC_AUTH_USER="${BASIC_AUTH_USER:-admin}" \
     bash "${script}"
   echo -e "${GREEN}  ✓  Phase ${num} complete in $((SECONDS - t))s${NC}"
