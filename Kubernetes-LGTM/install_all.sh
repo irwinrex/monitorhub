@@ -112,7 +112,6 @@ _run_phase() {
     S3_REGION="${S3_REGION}" \
     YES="${YES}" \
     BASIC_AUTH_USER="${BASIC_AUTH_USER:-admin}" \
-    BASIC_AUTH_PASS="${BASIC_AUTH_PASS}" \
     bash "${script}"
   echo -e "${GREEN}  ✓  Phase ${num} complete in $((SECONDS - t))s${NC}"
 }
