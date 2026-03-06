@@ -76,7 +76,8 @@ BASIC_AUTH_PASS="${BASIC_AUTH_PASS:-$(openssl rand -hex 16)}"
 info "Creating HAProxy basic auth secret..."
 
 # ------------------------------------------------------------------------------
-# HAProxy containers (often Alpine/musl) cannot always verify $apr1$ hashes.
+# HAProxy uses crypt() which supports standard MD5 ($1$), SHA-256/512 on all platforms
+# Using -1 for standard MD5 (not -apr1 which is Apache variant)
 # ------------------------------------------------------------------------------
 HASH=$(openssl passwd -1 "${BASIC_AUTH_PASS}")
 echo "${BASIC_AUTH_USER}:${HASH}" >/tmp/_lgtm_auth
