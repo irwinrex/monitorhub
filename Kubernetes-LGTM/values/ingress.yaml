@@ -91,7 +91,7 @@ spec:
   rules:
     - http:
         paths:
-          - path: /metrics
+          - path: /
             pathType: Prefix
             backend:
               service:
@@ -135,7 +135,7 @@ spec:
   rules:
     - http:
         paths:
-          - path: /logs
+          - path: /
             pathType: Prefix
             backend:
               service:
@@ -179,7 +179,7 @@ spec:
   rules:
     - http:
         paths:
-          - path: /traces
+          - path: /
             pathType: Prefix
             backend:
               service:
