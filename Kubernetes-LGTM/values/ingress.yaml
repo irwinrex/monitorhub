@@ -1,46 +1,49 @@
 # =============================================================================
-# Ingress Configuration for HAProxy
-#
+# LGTM Stack Ingress - HAProxy
 # Architecture:
-#   - Grafana  → /              (public, security headers + gzip)
-#   - Mimir    → /metrics/...  → mimir-gateway:80   (auth + rate limit)
-#   - Loki     → /logs/...     → loki:3100           (auth + rate limit)
-#   - Tempo    → /traces/...   → tempo:4318          (auth + rate limit)
+#   - Grafana  → /              (Port 80)
+#   - Mimir    → /metrics       (Port 80)   - Rewrites to /
+#   - Loki     → /logs          (Port 3100) - Rewrites to /
+#   - Tempo    → /traces        (Port 4318) - Rewrites to /
 #
 # Auth secret must exist before applying:
-#   htpasswd -c auth <username>
 #   kubectl create secret generic lgtm-basic-auth \
-#     --from-file=auth -n monitoring
+#     --from-literal=<user>=$(openssl passwd -1 <password>) \
+#     -n monitoring
 # =============================================================================
----
-# Grafana — browser UI
-# No auth (Grafana handles its own login)
-# Full security headers + gzip + conservative rate limit
+
+# -----------------------------------------------------------------------------
+# 1. Grafana (UI)
+# -----------------------------------------------------------------------------
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: grafana-ingress
   namespace: monitoring
   annotations:
-    # Gzip compression for browser assets
-    haproxy.org/compression-algo:   "gzip"
-    haproxy.org/compression-type:   "text/html text/plain text/css text/javascript application/javascript application/json application/xml"
-    # Security headers
+    # Compression — must use backend-config-snippet, no native compression annotations
+    haproxy.org/backend-config-snippet: |
+      filter compression
+      compression algo gzip
+      compression type text/html text/plain text/css text/javascript application/javascript application/json application/xml
+
+    # Security Headers
     haproxy.org/response-set-header: |
       X-Frame-Options "SAMEORIGIN"
       X-Content-Type-Options "nosniff"
-      X-XSS-Protection "1; mode=block"
       Referrer-Policy "strict-origin-when-cross-origin"
-      Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"
-      Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'self'"
-      Cross-Origin-Opener-Policy "same-origin"
+      Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
+      Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: wss:; frame-ancestors 'self'"
+      Cross-Origin-Opener-Policy "same-origin-allow-popups"
       Cross-Origin-Resource-Policy "same-origin"
-      Cross-Origin-Embedder-Policy "require-corp"
-    # Rate limit — browser UI, 60 req/10s per IP
+      Cross-Origin-Embedder-Policy "unsafe-none"
+
+    # Rate Limit
     haproxy.org/rate-limit-requests:    "500"
     haproxy.org/rate-limit-period:      "10s"
     haproxy.org/rate-limit-size:        "100k"
     haproxy.org/rate-limit-status-code: "429"
+
 spec:
   ingressClassName: haproxy
   rules:
@@ -53,133 +56,149 @@ spec:
                 name: grafana
                 port:
                   number: 80
+
 ---
-# Mimir — metrics ingestion/query
-# Rate limit sized for Alloy remote_write + cAdvisor scrapes
-# 25-30 agents * ~5 req/s burst = 150 req/10s headroom
+# -----------------------------------------------------------------------------
+# 2. Mimir (Metrics Ingestion/Query)
+# -----------------------------------------------------------------------------
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: mimir-ingress
   namespace: monitoring
   annotations:
-    # Path rewrite: /metrics/api/v1/push → /api/v1/push
-    haproxy.org/path-rewrite: "/metrics"
-    # Basic auth
+    # Path rewrite: /metrics/api/v1/push -> /api/v1/push
+    haproxy.org/path-rewrite: "/metrics/(.*) /\\1"
+
+    # Auth
     haproxy.org/auth-type:   "basic-auth"
-    haproxy.org/auth-secret: "lgtm-basic-auth"
-    # Gzip for query responses
-    haproxy.org/compression-algo: "gzip"
-    haproxy.org/compression-type: "application/json application/x-protobuf"
-    # Security headers — API endpoint, strict policy
+    haproxy.org/auth-secret: "monitoring/lgtm-basic-auth"
+
+    # Backend Config
+    haproxy.org/backend-config-snippet: |
+      filter compression
+      compression algo gzip
+      compression type application/json application/x-protobuf
+      timeout server 60s
+
+    # Security Headers
     haproxy.org/response-set-header: |
-      X-Content-Type-Options "nosniff"
       X-Frame-Options "DENY"
-      Referrer-Policy "no-referrer"
-      Content-Security-Policy "default-src 'none'"
-      Cross-Origin-Opener-Policy "same-origin"
-      Cross-Origin-Resource-Policy "same-origin"
+      X-Content-Type-Options "nosniff"
       Cache-Control "no-store"
-      Pragma "no-cache"
-    # Rate limit — 25-30 agents pushing metrics + cAdvisor
+
+    # Rate Limit
+    # Use rate-limit-whitelist to exempt known agent CIDRs entirely instead of
+    # inflating the limit to 2000 which provides no real DoS protection.
+    # Replace 10.0.0.0/8 with your actual agent network CIDR.
     haproxy.org/rate-limit-requests:    "200"
     haproxy.org/rate-limit-period:      "10s"
     haproxy.org/rate-limit-size:        "200k"
     haproxy.org/rate-limit-status-code: "429"
+    # haproxy.org/rate-limit-whitelist:   "10.0.0.0/8"  # <--- CHANGE to your agent CIDR
+
 spec:
   ingressClassName: haproxy
   rules:
     - http:
         paths:
-          - path: /
+          - path: /metrics
             pathType: Prefix
             backend:
               service:
                 name: mimir-gateway
                 port:
                   number: 80
+
 ---
-# Loki — log ingestion/query
-# Rate limit sized for Alloy log shipping from 25-30 sources
+# -----------------------------------------------------------------------------
+# 3. Loki (Log Ingestion/Query)
+# -----------------------------------------------------------------------------
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: loki-ingress
   namespace: monitoring
   annotations:
-    # Path rewrite: /logs/loki/api/v1/push → /loki/api/v1/push
-    haproxy.org/path-rewrite: "/logs"
-    # Basic auth
+    # Path rewrite: /logs/loki/api/v1/push -> /loki/api/v1/push
+    haproxy.org/path-rewrite: "/logs/(.*) /\\1"
+
     haproxy.org/auth-type:   "basic-auth"
-    haproxy.org/auth-secret: "lgtm-basic-auth"
-    # Gzip for query responses
-    haproxy.org/compression-algo: "gzip"
-    haproxy.org/compression-type: "application/json application/x-protobuf"
-    # Security headers — API endpoint, strict policy
+    haproxy.org/auth-secret: "monitoring/lgtm-basic-auth"
+
+    haproxy.org/backend-config-snippet: |
+      filter compression
+      compression algo gzip
+      compression type application/json application/x-protobuf
+      # Loki Live Tail uses WebSockets — tunnel timeout must be high
+      timeout tunnel 3600s
+
     haproxy.org/response-set-header: |
-      X-Content-Type-Options "nosniff"
       X-Frame-Options "DENY"
-      Referrer-Policy "no-referrer"
-      Content-Security-Policy "default-src 'none'"
-      Cross-Origin-Opener-Policy "same-origin"
-      Cross-Origin-Resource-Policy "same-origin"
+      X-Content-Type-Options "nosniff"
       Cache-Control "no-store"
-      Pragma "no-cache"
-    # Rate limit — 25-30 agents shipping logs
-    haproxy.org/rate-limit-requests:    "500"
+
+    # Rate Limit
+    haproxy.org/rate-limit-requests:    "200"
     haproxy.org/rate-limit-period:      "10s"
     haproxy.org/rate-limit-size:        "200k"
     haproxy.org/rate-limit-status-code: "429"
+    # haproxy.org/rate-limit-whitelist:   "10.0.0.0/8"  # <--- CHANGE to your agent CIDR
+
 spec:
   ingressClassName: haproxy
   rules:
     - http:
         paths:
-          - path: /
+          - path: /logs
             pathType: Prefix
             backend:
               service:
                 name: loki
                 port:
                   number: 3100
+
 ---
-# Tempo — trace ingestion
-# OTLP HTTP on port 4318
+# -----------------------------------------------------------------------------
+# 4. Tempo (Trace Ingestion)
+# -----------------------------------------------------------------------------
+# Note: OTLP/HTTP pushes to /v1/traces
+# Configure your collector endpoint as: http://<ingress-ip>/traces
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: tempo-ingress
   namespace: monitoring
   annotations:
-    # Path rewrite: /traces/... → /...
-    haproxy.org/path-rewrite: "/traces"
-    # Basic auth
+    # Path rewrite: /traces/v1/traces -> /v1/traces
+    haproxy.org/path-rewrite: "/traces/(.*) /\\1"
+
     haproxy.org/auth-type:   "basic-auth"
-    haproxy.org/auth-secret: "lgtm-basic-auth"
-    # Gzip for query responses
-    haproxy.org/compression-algo: "gzip"
-    haproxy.org/compression-type: "application/json application/x-protobuf"
-    # Security headers — API endpoint, strict policy
+    haproxy.org/auth-secret: "monitoring/lgtm-basic-auth"
+
+    haproxy.org/backend-config-snippet: |
+      filter compression
+      compression algo gzip
+      compression type application/json application/x-protobuf
+
     haproxy.org/response-set-header: |
-      X-Content-Type-Options "nosniff"
       X-Frame-Options "DENY"
-      Referrer-Policy "no-referrer"
-      Content-Security-Policy "default-src 'none'"
-      Cross-Origin-Opener-Policy "same-origin"
-      Cross-Origin-Resource-Policy "same-origin"
+      X-Content-Type-Options "nosniff"
       Cache-Control "no-store"
-      Pragma "no-cache"
-    # Rate limit — traces are low volume, 25-30 agents
+
+    # Rate Limit
     haproxy.org/rate-limit-requests:    "200"
     haproxy.org/rate-limit-period:      "10s"
     haproxy.org/rate-limit-size:        "200k"
     haproxy.org/rate-limit-status-code: "429"
+    # haproxy.org/rate-limit-whitelist:   "10.0.0.0/8"  # <--- CHANGE to your agent CIDR
+
 spec:
   ingressClassName: haproxy
   rules:
     - http:
         paths:
-          - path: /
+          - path: /traces
             pathType: Prefix
             backend:
               service:
