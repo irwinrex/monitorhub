@@ -81,12 +81,10 @@ info "Creating HAProxy basic auth secret..."
 # ------------------------------------------------------------------------------
 HASH=$(openssl passwd -1 "${BASIC_AUTH_PASS}")
 
-# Create secret with admin as key (HAProxy expects this format)
+# Create secret with 'auth' key (HAProxy expects this format: username:hashed_password)
 kubectl create secret generic "${BASIC_AUTH_SECRET}" \
   --namespace "${MONITORING_NS}" \
-  --from-literal=admin="${HASH}" \
-  --from-literal=username="${BASIC_AUTH_USER}" \
-  --from-literal=password="${BASIC_AUTH_PASS}" \
+  --from-literal=auth="${BASIC_AUTH_USER}:${HASH}" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 echo ""
