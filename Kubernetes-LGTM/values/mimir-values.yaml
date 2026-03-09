@@ -6,21 +6,19 @@ fullnameOverride: mimir
 
 minio:
   enabled: false
+
 kafka:
   enabled: false
+
 rollout_operator:
   enabled: false
 
 mimir:
   structuredConfig:
-    ingest_storage:
-      enabled: false
-      kafka:
-        address: ""
-
     usage_stats:
       enabled: false
-
+    ingest_storage:
+      enabled: false
     common:
       storage:
         backend: s3
@@ -28,21 +26,18 @@ mimir:
           endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
           region: ${S3_REGION}
           bucket_name: ${S3_BUCKET_MIMIR}
-
     blocks_storage:
       backend: s3
       s3:
         endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
         region: ${S3_REGION}
         bucket_name: ${S3_BUCKET_MIMIR}
-
     alertmanager_storage:
       backend: s3
       s3:
         endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
         region: ${S3_REGION}
         bucket_name: ${S3_BUCKET_MIMIR_ALERTMANAGER}
-
     ruler_storage:
       backend: s3
       s3:
@@ -50,27 +45,39 @@ mimir:
         region: ${S3_REGION}
         bucket_name: ${S3_BUCKET_MIMIR_RULER}
 
+    # [FIX] Explicitly disable zone awareness and set replication to 1 for ALL rings
     ingester:
       ring:
         replication_factor: 1
+        zone_awareness_enabled: false # [FIX] Added to prevent internal scheduling blocks
       push_grpc_method_enabled: true
-
-    frontend:
-      scheduler_address: ""
-
-    frontend_worker:
-      scheduler_address: ""
+    store_gateway:
+      sharding_ring:
+        replication_factor: 1 # [FIX] Was missing, defaults to 3
+        zone_awareness_enabled: false # [FIX] Added
+    compactor:
+      compaction_interval: 30m
+      sharding_ring:
+        replication_factor: 1 # [FIX] Was missing, defaults to 3
+    alertmanager:
+      sharding_ring:
+        replication_factor: 1 # [FIX] Was missing, defaults to 3
+        zone_awareness_enabled: false # [FIX] Added
 
     querier:
       max_concurrent: 8
-
+    query_frontend:
+      parallelize_shardable_queries: true
+      max_outstanding_per_tenant: 256
     limits:
       ingestion_rate: 10000
       ingestion_burst_size: 20000
-      max_global_series_per_user: 100000
-      max_query_parallelism: 16
-      query_sharding_total_shards: 8
-      max_fetched_chunks_per_query: 2000000
+      max_global_series_per_user: 100000 
+      max_query_parallelism: 8
+      query_sharding_total_shards: 8 
+      max_fetched_chunks_per_query: 500000
+      max_fetched_series_per_query: 100000 
+      query_timeout: 2m
 
 ingester:
   replicas: 1
@@ -78,13 +85,52 @@ ingester:
     enabled: false
   persistentVolume:
     enabled: false
+  extraEnv:
+    - name: GOMEMLIMIT
+      value: "900MiB"
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 600m
+      memory: 1Gi
+
+distributor:
+  replicas: 1
   resources:
     requests:
       cpu: 100m
-      memory: 512Mi
+      memory: 128Mi
+    limits:
+      cpu: 400m
+      memory: 256Mi
+
+querier:
+  replicas: 1
+  extraEnv:
+    - name: GOMEMLIMIT
+      value: "900MiB"
+  resources:
+    requests:
+      cpu: 300m
+      memory: 256Mi
+    limits:
+      cpu: 1
+      memory: 1Gi
+
+query_frontend:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
     limits:
       cpu: 500m
-      memory: 1Gi
+      memory: 512Mi
+
+query_scheduler:
+  replicas: 1 # [FIX] Changed from 0 to 1 so queries don't hang
 
 store_gateway:
   replicas: 1
@@ -92,13 +138,16 @@ store_gateway:
     enabled: false
   persistentVolume:
     enabled: false
+  extraEnv:
+    - name: GOMEMLIMIT
+      value: "900MiB"
   resources:
     requests:
-      cpu: 50m
-      memory: 128Mi
+      cpu: 100m
+      memory: 256Mi
     limits:
-      cpu: 250m
-      memory: 512Mi
+      cpu: 500m
+      memory: 1Gi
 
 compactor:
   replicas: 1
@@ -106,44 +155,11 @@ compactor:
     enabled: false
   resources:
     requests:
-      cpu: 50m
-      memory: 128Mi
-    limits:
-      cpu: 250m
-      memory: 512Mi
-
-distributor:
-  replicas: 1
-  resources:
-    requests:
-      cpu: 50m
-      memory: 128Mi
-    limits:
-      cpu: 250m
+      cpu: 100m
       memory: 256Mi
-
-querier:
-  replicas: 1
-  resources:
-    requests:
-      cpu: 50m
-      memory: 128Mi
     limits:
       cpu: 500m
-      memory: 1Gi
-
-query_frontend:
-  replicas: 1
-  resources:
-    requests:
-      cpu: 50m
-      memory: 128Mi
-    limits:
-      cpu: 200m
       memory: 512Mi
-
-query_scheduler:
-  replicas: 0
 
 alertmanager:
   replicas: 1
@@ -151,11 +167,11 @@ alertmanager:
     enabled: false
   resources:
     requests:
-      cpu: 20m
-      memory: 64Mi
-    limits:
-      cpu: 100m
+      cpu: 50m
       memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
 
 ruler:
   replicas: 0
@@ -164,30 +180,41 @@ overrides_exporter:
   replicas: 1
   resources:
     requests:
-      cpu: 10m
-      memory: 32Mi
-    limits:
-      cpu: 50m
+      cpu: 20m
       memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
 
 gateway:
   replicas: 1
   resources:
     requests:
-      cpu: 20m
-      memory: 32Mi
-    limits:
-      cpu: 100m
+      cpu: 50m
       memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
 
 chunks-cache:
   enabled: false
+
 index-cache:
   enabled: false
+
 metadata-cache:
-  enabled: false
+  enabled: false 
+
 results-cache:
-  enabled: false
+  enabled: true 
+  default_validity: 10m 
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 256Mi
 
 metaMonitoring:
   serviceMonitor:
@@ -199,5 +226,3 @@ global:
   extraEnv:
     - name: GOMAXPROCS
       value: "2"
-    - name: GOMEMLIMIT
-      value: "900MiB"
