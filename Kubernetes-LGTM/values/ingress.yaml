@@ -76,14 +76,14 @@ metadata:
       Cache-Control "no-store"
       X-Robots-Tag "noindex"
 
-    haproxy.org/path-rewrite: "^/prometheus/(.*) /\\1"
+    haproxy.org/path-rewrite: "^/prom_metrics/(.*) /\\1"
 
 spec:
   ingressClassName: haproxy
   rules:
   - http:
       paths:
-      - path: /prometheus
+      - path: /prom_metrics
         pathType: Prefix
         backend:
           service:
@@ -122,14 +122,14 @@ metadata:
       Cache-Control "no-store"
       X-Robots-Tag "noindex"
 
-    haproxy.org/path-rewrite: "^/logs/(.*) /\\1"
+    haproxy.org/path-rewrite: "^/loki_logs/(.*) /\\1"
 
 spec:
   ingressClassName: haproxy
   rules:
   - http:
       paths:
-      - path: /logs
+      - path: /loki_logs
         pathType: Prefix
         backend:
           service:
@@ -165,14 +165,14 @@ metadata:
       Cache-Control "no-store"
       X-Robots-Tag "noindex"
 
-    haproxy.org/path-rewrite: "^/tempo/(.*) /\\1"
+    haproxy.org/path-rewrite: "^/tempo_traces/(.*) /\\1"
 
 spec:
   ingressClassName: haproxy
   rules:
   - http:
       paths:
-      - path: /tempo
+      - path: /tempo_traces
         pathType: Prefix
         backend:
           service:

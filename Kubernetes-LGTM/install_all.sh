@@ -221,8 +221,10 @@ PUBLIC_IP=$(curl -sf --max-time 2 http://169.254.169.254/latest/meta-data/public
 DISPLAY_IP="${PUBLIC_IP:-${PRIVATE_IP:-localhost}}"
 
 # 2. Retrieve Credentials from K8s Secrets (safe decode)
+GRAFANA_ADMIN_USER="admin"
 GRAFANA_PASS="<unknown>"
 if kubectl get secret grafana-admin -n "${MONITORING_NS}" &>/dev/null; then
+  GRAFANA_ADMIN_USER=$(kubectl get secret grafana-admin -n "${MONITORING_NS}" -o jsonpath='{.data.admin-user}' | base64 -d 2>/dev/null || echo "admin")
   GRAFANA_PASS=$(kubectl get secret grafana-admin -n "${MONITORING_NS}" -o jsonpath='{.data.admin-password}' | base64 -d)
 fi
 
@@ -251,11 +253,11 @@ echo "  Password: ${GRAFANA_PASS}"
 echo ""
 
 echo -e "${CYAN}Ingress Endpoints (Basic Auth Required):${NC}"
-echo "  Prometheus:    http://${DISPLAY_IP}/prometheus"
-echo "  Loki:     http://${DISPLAY_IP}/logs"
-echo "  Tempo:    http://${DISPLAY_IP}/traces"
-echo "  User:     ${BASIC_AUTH_USER}"
-echo "  Password: ${BASIC_AUTH_PASS}"
+echo "  Prometheus: http://${DISPLAY_IP}/prom_metrics"
+echo "  Loki:       http://${DISPLAY_IP}/loki_logs"
+echo "  Tempo:      http://${DISPLAY_IP}/tempo_traces"
+echo "  User:       ${BASIC_AUTH_USER}"
+echo "  Password:   ${BASIC_AUTH_PASS}"
 echo ""
 
 echo -e "${CYAN}HAProxy Stats:${NC}"
@@ -277,32 +279,101 @@ else
   TEST_HOST="${PRIVATE_IP:-127.0.0.1}"
   
   _test() {
-    local label="$1" url="$2"
+    local label="$1" url="$2" auth="${3:-true}"
     local http_code
-    # Add -f flag to fail on HTTP errors, longer timeout
-    http_code=$(curl -sf -o /dev/null -w "%{http_code}" \
-      -u "${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}" \
-      --connect-timeout 10 --max-time 15 \
-      "$url" 2>/dev/null || echo "000")
+    
+    if [[ "$auth" == "true" ]]; then
+      http_code=$(curl -sf -o /dev/null -w "%{http_code}" \
+        -u "${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}" \
+        --connect-timeout 10 --max-time 15 \
+        "$url" 2>/dev/null || echo "000")
+    else
+      http_code=$(curl -sf -o /dev/null -w "%{http_code}" \
+        --connect-timeout 10 --max-time 15 \
+        "$url" 2>/dev/null || echo "000")
+    fi
     
     # Accept 200, 401 (auth working), 404 (path exists but not found)
     if [[ "$http_code" =~ ^(200|401|404) ]]; then
-      success "${label}: HTTP ${http_code} (OK)"
+      echo -e "${GREEN}[PASS]${NC} ${label}: HTTP ${http_code}"
     elif [[ "$http_code" =~ ^[2-4] ]]; then
-      success "${label}: HTTP ${http_code} (Reachable)"
+      echo -e "${GREEN}[PASS]${NC} ${label}: HTTP ${http_code} (Reachable)"
     else
-      warn "${label}: HTTP ${http_code} (Check logs)"
+      echo -e "${RED}[FAIL]${NC} ${label}: HTTP ${http_code}"
     fi
   }
 
   # Test HAProxy health first
-  _test "HAProxy (health)" "http://${TEST_HOST}:80/"
+  _test "HAProxy health" "http://${TEST_HOST}:80/" "false"
 
   # Test endpoints with basic auth
-  _test "Prometheus  (/prometheus)" "http://${TEST_HOST}:80/prometheus"
-  _test "Loki   (/logs)"    "http://${TEST_HOST}:80/logs"
-  _test "Tempo  (/traces)"  "http://${TEST_HOST}:80/traces"
+  _test "Prometheus" "/prom_metrics" "true"
+  _test "Loki"      "/loki_logs" "true"
+  _test "Tempo"     "/tempo_traces" "true"
+
+  # Test Grafana login via API (no auth at ingress, uses Grafana's own auth)
+  echo ""
+  echo -e "${YELLOW}Testing Grafana Login:${NC}"
+  
+  # Try to login to Grafana API
+  GRAFANA_LOGIN_RESPONSE=$(curl -sf -X POST \
+    "http://${TEST_HOST}:80/api/login" \
+    -H "Content-Type: application/json" \
+    -d "{\"user\":\"${GRAFANA_ADMIN_USER:-admin}\",\"password\":\"${GRAFANA_PASS}\"}" \
+    --connect-timeout 10 --max-time 15 2>/dev/null || echo "FAILED")
+  
+  if [[ "$GRAFANA_LOGIN_RESPONSE" == *"ok"* ]] || [[ "$GRAFANA_LOGIN_RESPONSE" == *"token"* ]]; then
+    echo -e "${GREEN}[PASS]${NC} Grafana login: Success"
+  elif [[ "$GRAFANA_LOGIN_RESPONSE" == *"FAILED"* ]]; then
+    echo -e "${RED}[FAIL]${NC} Grafana login: Connection failed"
+  else
+    echo -e "${RED}[FAIL]${NC} Grafana login: Invalid credentials (response: ${GRAFANA_LOGIN_RESPONSE:0:100})"
+  fi
 fi
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Pod Status Check
+# ══════════════════════════════════════════════════════════════════════════════
+echo ""
+echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
+echo -e "${YELLOW}  POD STATUS CHECK${NC}"
+echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
+echo ""
+
+# Check all pods in monitoring namespace
+PODS=$(kubectl get pods -n monitoring -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
+if [[ -n "$PODS" ]]; then
+  for POD in $PODS; do
+    STATUS=$(kubectl get pod "$POD" -n monitoring -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+    READY=$(kubectl get pod "$POD" -n monitoring -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null || echo "false")
+    if [[ "$STATUS" == "Running" && "$READY" == "true" ]]; then
+      success "Pod: $POD - Running"
+    else
+      warn "Pod: $POD - $STATUS"
+    fi
+  done
+else
+  warn "No pods found in monitoring namespace"
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Service & Endpoint Check
+# ══════════════════════════════════════════════════════════════════════════════
+echo ""
+echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
+echo -e "${YELLOW}  SERVICE ENDPOINT CHECK${NC}"
+echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
+echo ""
+
+# Check critical services have endpoints
+for SVC in grafana loki tempo prometheus-kube-prometheus-prometheus prometheus-kube-prometheus-alertmanager; do
+  EP=$(kubectl get endpoints "$SVC" -n monitoring -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null || echo "")
+  if [[ -n "$EP" ]]; then
+    success "Service: $SVC - Has endpoints"
+  else
+    warn "Service: $SVC - No endpoints"
+  fi
+done
 
 echo ""
 info "Installation Complete."

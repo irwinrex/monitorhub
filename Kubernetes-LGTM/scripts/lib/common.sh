@@ -10,7 +10,7 @@
 export K0S_VERSION="v1.34.3+k0s.0" # https://github.com/k0sproject/k0s/releases
 export HELM_VERSION="v3.17.1"      # https://github.com/helm/helm/releases
 
-export HAPROXY_CHART_VERSION="1.48.0" # https://artifacthub.io/packages/helm/haproxy-ingress/haproxy-ingress
+export HAPROXY_CHART_VERSION="1.49.0" # https://artifacthub.io/packages/helm/haproxy-ingress/haproxy-ingress
 
 # LGTM chart versions
 # Sources: artifacthub.io — stable releases only (no weekly/RC builds).
@@ -19,10 +19,10 @@ export HAPROXY_CHART_VERSION="1.48.0" # https://artifacthub.io/packages/helm/hap
 #   Tempo  → grafana-community (migrated 2026-01-30)
 #   Loki   → grafana-community (migrating 2026-03-16)
 #   Both repos are registered in install_LGTM.sh.
-export LOKI_CHART_VERSION="6.53.0"     # grafana-community/loki
-export TEMPO_CHART_VERSION="1.24.4"    # grafana-community/tempo (single binary)
+export LOKI_CHART_VERSION="6.53.0"       # grafana-community/loki
+export TEMPO_CHART_VERSION="1.24.4"      # grafana-community/tempo (single binary)
 export PROMETHEUS_CHART_VERSION="58.0.0" # prometheus-community/kube-prometheus-stack
-export GRAFANA_CHART_VERSION="10.5.15"    # grafana/grafana
+export GRAFANA_CHART_VERSION="10.5.15"   # grafana/grafana
 
 # ── Namespaces ────────────────────────────────────────────────────────────────
 export MONITORING_NS="monitoring"
