@@ -1,25 +1,51 @@
 # =============================================================================
 # mimir-values.yaml — grafana/mimir-distributed chart 6.0.5
-# Single-node lab deployment with S3 storage
+# S3 credentials injected via Kubernetes Secret (see deploy instructions).
 # =============================================================================
 
 fullnameOverride: mimir
 
-minio:
-  enabled: false
+# --- Disable non-essential dependencies ---
+minio:            { enabled: false }
+kafka:            { enabled: false }
+rollout_operator: { enabled: false }
 
-kafka:
-  enabled: false
+# --- Scheduler disabled: frontend_worker routes directly to query-frontend ---
+query_scheduler:  { replicas: 0 }
 
-rollout_operator:
-  enabled: false
+# --- Keep overrides_exporter at 1: chart may fail to render ServiceMonitors
+overrides_exporter:
+  replicas: 1
+  resources:
+    requests: { cpu: 10m, memory: 32Mi }
+    limits:   { cpu: 50m,  memory: 64Mi }
 
+# --- Disable all caches to minimise memory footprint ---
+chunks-cache:   { enabled: false }
+index-cache:    { enabled: false }
+metadata-cache: { enabled: false }
+results-cache:  { enabled: false }
+
+# --- Disable persistent volumes ---
+ingester:      { persistentVolume: { enabled: false } }
+store_gateway: { persistentVolume: { enabled: false } }
+compactor:     { persistentVolume: { enabled: false } }
+alertmanager:  { persistentVolume: { enabled: false } }
+
+# --- Disable meta-monitoring ---
+metaMonitoring:
+  serviceMonitor: { enabled: false }
+  grafanaAgent:   { enabled: false }
+
+
+# =============================================================================
+# Mimir Structured Configuration
+# =============================================================================
 
 mimir:
   structuredConfig:
 
-    usage_stats:
-      enabled: false
+    usage_stats: { enabled: false }
 
     ingest_storage:
       enabled: false
@@ -27,59 +53,42 @@ mimir:
     # -------------------------------------------------------------------------
     # Object Storage (S3)
     # -------------------------------------------------------------------------
-
     common:
       storage:
         backend: s3
         s3:
           endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
           region: ${S3_REGION}
-          bucket_name: ${S3_BUCKET_MIMIR}
 
     blocks_storage:
-      backend: s3
-      s3:
-        endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
-        region: ${S3_REGION}
-        bucket_name: ${S3_BUCKET_MIMIR}
+      s3: { bucket_name: "${S3_BUCKET_MIMIR}" }
 
     alertmanager_storage:
-      backend: s3
-      s3:
-        endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
-        region: ${S3_REGION}
-        bucket_name: ${S3_BUCKET_MIMIR_ALERTMANAGER}
+      s3: { bucket_name: "${S3_BUCKET_MIMIR_ALERTMANAGER}" }
 
     ruler_storage:
-      backend: s3
-      s3:
-        endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
-        region: ${S3_REGION}
-        bucket_name: ${S3_BUCKET_MIMIR_RULER}
+      s3: { bucket_name: "${S3_BUCKET_MIMIR_RULER}" }
 
     # -------------------------------------------------------------------------
     # Ingestion
     # -------------------------------------------------------------------------
-
     ingester:
       ring:
         replication_factor: 1
       push_grpc_method_enabled: true
 
     # -------------------------------------------------------------------------
-    # Query configuration
-    # -------------------------------------------------------------------------
-
+    # the scheduler or the frontend directly (when scheduler is disabled).
     frontend_worker:
       scheduler_address: ""
       frontend_address: mimir-query-frontend-headless.monitoring.svc.cluster.local:9095
 
-    query_frontend:
-      parallelize_shardable_queries: true
+    # "frontend" is the correct internal Mimir config key.
+    frontend:
       scheduler_address: ""
+      # blocks the single querier for its full duration on a single-node setup
+      parallelize_shardable_queries: true
       max_outstanding_per_tenant: 256
-      results_cache_ttl: 10m
-      results_cache_ttl_for_out_of_order_time_window: 5m
 
     querier:
       max_concurrent: 8
@@ -87,214 +96,96 @@ mimir:
     # -------------------------------------------------------------------------
     # Limits
     # -------------------------------------------------------------------------
-
     limits:
       ingestion_rate: 10000
       ingestion_burst_size: 20000
-
       max_global_series_per_user: 100000
-
-      max_query_parallelism: 16
-      query_sharding_total_shards: 8
-
       max_fetched_chunks_per_query: 2000000
       max_fetched_series_per_query: 100000
-
-      query_timeout: 60s
+      # Must stay under HAProxy timeout-http-request (60s)
+      query_timeout: 55s
 
 
 # =============================================================================
-# Component Scaling
+# Component Resource Allocation
+# Total requests: ~930m CPU, ~1.9GB RAM
 # =============================================================================
 
 ingester:
   replicas: 1
-
-  zoneAwareReplication:
-    enabled: false
-
-  persistentVolume:
-    enabled: false
-
   extraEnv:
     - name: GOMEMLIMIT
-      value: "900MiB"   # 90% of 1Gi limit
-
+      value: "460MiB"   # ~90% of 512Mi limit
   resources:
-    requests:
-      cpu: 200m
-      memory: 512Mi
-    limits:
-      cpu: 600m
-      memory: 1Gi
-
+    requests: { cpu: 200m, memory: 256Mi }
+    limits:   { cpu: 400m, memory: 512Mi }
 
 distributor:
   replicas: 1
-
   resources:
-    requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      cpu: 400m
-      memory: 256Mi
-
+    requests: { cpu: 50m,  memory: 64Mi }
+    limits:   { cpu: 150m, memory: 128Mi }
 
 querier:
   replicas: 1
-
   extraEnv:
     - name: GOMEMLIMIT
-      value: "900MiB"   # 90% of 1Gi limit
-
+      value: "460MiB"   # ~90% of 512Mi limit
   resources:
-    requests:
-      cpu: 300m
-      memory: 256Mi
-    limits:
-      cpu: 1
-      memory: 1Gi
-
+    requests: { cpu: 150m, memory: 256Mi }
+    limits:   { cpu: 400m, memory: 512Mi }
 
 query_frontend:
   replicas: 1
-
   resources:
-    requests:
-      cpu: 200m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-
-
-query_scheduler:
-  replicas: 0
-
+    requests: { cpu: 50m,  memory: 128Mi }
+    limits:   { cpu: 150m, memory: 256Mi }
 
 store_gateway:
   replicas: 1
-
-  zoneAwareReplication:
-    enabled: false
-
-  persistentVolume:
-    enabled: false
-
   extraEnv:
     - name: GOMEMLIMIT
-      value: "900MiB"   # 90% of 1Gi limit
-
+      value: "460MiB"   # ~90% of 512Mi limit
   resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 1Gi
-
+    requests: { cpu: 150m, memory: 256Mi }
+    limits:   { cpu: 400m, memory: 512Mi }
 
 compactor:
   replicas: 1
-
-  persistentVolume:
-    enabled: false
-
+  extraEnv:
+    - name: GOMEMLIMIT
+      value: "460MiB"   # ~90% of 512Mi limit
   resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { cpu: 200m, memory: 512Mi }
 
 alertmanager:
   replicas: 1
-
-  persistentVolume:
-    enabled: false
-
   resources:
-    requests:
-      cpu: 50m
-      memory: 128Mi
-    limits:
-      cpu: 200m
-      memory: 256Mi
-
+    requests: { cpu: 50m,  memory: 128Mi }
+    limits:   { cpu: 100m, memory: 256Mi }
 
 ruler:
-  replicas: 0
-
-
-overrides_exporter:
   replicas: 1
-
   resources:
-    requests:
-      cpu: 20m
-      memory: 64Mi
-    limits:
-      cpu: 100m
-      memory: 128Mi
-
+    requests: { cpu: 50m,  memory: 128Mi }
+    limits:   { cpu: 150m, memory: 256Mi }
 
 gateway:
   replicas: 1
-
   resources:
-    requests:
-      cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 200m
-      memory: 128Mi
-
-
-# =============================================================================
-# Cache configuration
-# =============================================================================
-
-chunks-cache:
-  enabled: false
-
-index-cache:
-  enabled: false
-
-metadata-cache:
-  enabled: false
-
-results-cache:
-  enabled: true
-  resources:
-    requests:
-      cpu: 20m
-      memory: 64Mi
-    limits:
-      cpu: 100m
-      memory: 256Mi
-
-
-# =============================================================================
-# Meta monitoring
-# =============================================================================
-
-metaMonitoring:
-  serviceMonitor:
-    enabled: false
-  grafanaAgent:
-    enabled: false
+    requests: { cpu: 70m,  memory: 64Mi }
+    limits:   { cpu: 150m, memory: 128Mi }
 
 
 # =============================================================================
 # Go runtime
-# GOMAXPROCS: safe globally (caps OS threads, no memory impact)
-# GOMEMLIMIT: intentionally absent here — set per-component above
+# GOMAXPROCS: safe globally
+# GOMEMLIMIT: per-component only — global value would OOMKill small components
 # =============================================================================
 
 global:
   extraEnv:
     - name: GOMAXPROCS
       value: "2"
+
