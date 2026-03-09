@@ -1,10 +1,10 @@
 # =============================================================================
 # LGTM Stack Ingress - HAProxy
 # Architecture:
-#   - Grafana  → /              (Port 80)
-#   - Prometheus    → /metrics       (Port 80)   - Rewrites to /
-#   - Loki     → /logs          (Port 3100) - Rewrites to /
-#   - Tempo    → /traces        (Port 4318) - Rewrites to /
+#   - Grafana    → /              (Port 80)
+#   - Prometheus → /prometheus    (Port 9090) - Rewrites to /
+#   - Loki      → /logs          (Port 3100) - Rewrites to /
+#   - Tempo     → /tempo        (Port 3200) - Rewrites to /
 #
 # Auth secret must exist before applying:
 #   kubectl create secret generic lgtm-basic-auth \
@@ -13,7 +13,7 @@
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# 1. Grafana (UI)
+# 1. Grafana (UI) - with basic auth
 # -----------------------------------------------------------------------------
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -21,7 +21,11 @@ metadata:
   name: grafana-ingress
   namespace: monitoring
   annotations:
-    # Compression — must use backend-config-snippet, no native compression annotations
+    # Auth
+    haproxy.org/auth-type:   "basic-auth"
+    haproxy.org/auth-secret: "monitoring/lgtm-basic-auth"
+
+    # Compression
     haproxy.org/backend-config-snippet: |
       filter compression
       compression algo gzip
@@ -67,8 +71,8 @@ metadata:
   name: prometheus-ingress
   namespace: monitoring
   annotations:
-    # Path rewrite: /metrics/api/v1/push -> /api/v1/push
-    haproxy.org/path-rewrite: "/metrics/(.*) /\\1"
+    # Path rewrite: /prometheus/api/v1/push -> /api/v1/push
+    haproxy.org/path-rewrite: "/prometheus/(.*) /\\1"
 
     # Auth
     haproxy.org/auth-type:   "basic-auth"
@@ -88,25 +92,21 @@ metadata:
       Cache-Control "no-store"
 
     # Rate Limit
-    # Use rate-limit-whitelist to exempt known agent CIDRs entirely instead of
-    # inflating the limit to 2000 which provides no real DoS protection.
-    # Replace 10.0.0.0/8 with your actual agent network CIDR.
     haproxy.org/rate-limit-requests:    "200"
     haproxy.org/rate-limit-period:      "10s"
     haproxy.org/rate-limit-size:        "200k"
     haproxy.org/rate-limit-status-code: "429"
-    # haproxy.org/rate-limit-whitelist:   "10.0.0.0/8"  # <--- CHANGE to your agent CIDR
 
 spec:
   ingressClassName: haproxy
   rules:
     - http:
         paths:
-          - path: /metrics
+          - path: /prometheus
             pathType: Prefix
             backend:
               service:
-                name: prometheus-kube-prometheus-stack
+                name: prometheus-kube-prometheus-prometheus
                 port:
                   number: 9090
 
@@ -162,16 +162,14 @@ spec:
 # -----------------------------------------------------------------------------
 # 4. Tempo (Trace Ingestion)
 # -----------------------------------------------------------------------------
-# Note: OTLP/HTTP pushes to /v1/traces
-# Configure your collector endpoint as: http://<ingress-ip>/traces
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: tempo-ingress
   namespace: monitoring
   annotations:
-    # Path rewrite: /traces/v1/traces -> /v1/traces
-    haproxy.org/path-rewrite: "/traces/(.*) /\\1"
+    # Path rewrite: /tempo/v1/traces -> /v1/traces
+    haproxy.org/path-rewrite: "/tempo/(.*) /\\1"
 
     haproxy.org/auth-type:   "basic-auth"
     haproxy.org/auth-secret: "monitoring/lgtm-basic-auth"
@@ -191,14 +189,13 @@ metadata:
     haproxy.org/rate-limit-period:      "10s"
     haproxy.org/rate-limit-size:        "200k"
     haproxy.org/rate-limit-status-code: "429"
-    # haproxy.org/rate-limit-whitelist:   "10.0.0.0/8"  # <--- CHANGE to your agent CIDR
 
 spec:
   ingressClassName: haproxy
   rules:
     - http:
         paths:
-          - path: /traces
+          - path: /tempo
             pathType: Prefix
             backend:
               service:

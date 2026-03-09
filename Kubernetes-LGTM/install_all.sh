@@ -251,7 +251,7 @@ echo "  Password: ${GRAFANA_PASS}"
 echo ""
 
 echo -e "${CYAN}Ingress Endpoints (Basic Auth Required):${NC}"
-echo "  Prometheus:    http://${DISPLAY_IP}/metrics"
+echo "  Prometheus:    http://${DISPLAY_IP}/prometheus"
 echo "  Loki:     http://${DISPLAY_IP}/logs"
 echo "  Tempo:    http://${DISPLAY_IP}/traces"
 echo "  User:     ${BASIC_AUTH_USER}"
@@ -299,7 +299,7 @@ else
   _test "HAProxy (health)" "http://${TEST_HOST}:80/"
 
   # Test endpoints with basic auth
-  _test "Prometheus  (/metrics)" "http://${TEST_HOST}:80/metrics"
+  _test "Prometheus  (/prometheus)" "http://${TEST_HOST}:80/prometheus"
   _test "Loki   (/logs)"    "http://${TEST_HOST}:80/logs"
   _test "Tempo  (/traces)"  "http://${TEST_HOST}:80/traces"
 fi
