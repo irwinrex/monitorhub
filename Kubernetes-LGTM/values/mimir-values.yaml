@@ -1,6 +1,20 @@
 # =============================================================================
 # mimir-values.yaml — grafana/mimir-distributed chart 6.0.5
-# S3 credentials injected via Kubernetes Secret (see deploy instructions).
+# Tuned for a SINGLE NODE (~1 vCPU, 4 GB RAM) with Ruler and Alertmanager.
+# S3 auth via EC2 IAM instance role — no credentials in config.
+# S3 bucket/region vars expanded at deploy time via envsubst.
+#
+# Required env vars before deploy:
+#   export S3_REGION="us-east-1"
+#   export S3_BUCKET="my-bucket-prefix"
+#   export S3_BUCKET_MIMIR="${S3_BUCKET}-mimir-data"
+#   export S3_BUCKET_MIMIR_ALERTMANAGER="${S3_BUCKET}-mimir-alertmanager-data"
+#   export S3_BUCKET_MIMIR_RULER="${S3_BUCKET}-mimir-ruler-data"
+#
+# Deploy:
+#   envsubst < mimir-values.yaml | helm upgrade --install mimir \
+#     grafana/mimir-distributed --version 6.0.5 \
+#     --namespace monitoring --create-namespace -f -
 # =============================================================================
 
 fullnameOverride: mimir
@@ -13,7 +27,7 @@ rollout_operator: { enabled: false }
 # --- Scheduler disabled: frontend_worker routes directly to query-frontend ---
 query_scheduler:  { replicas: 0 }
 
-# --- Keep overrides_exporter at 1: chart may fail to render ServiceMonitors
+# --- Keep overrides_exporter: chart may fail ServiceMonitor rendering at 0 ---
 overrides_exporter:
   replicas: 1
   resources:
@@ -52,6 +66,8 @@ mimir:
 
     # -------------------------------------------------------------------------
     # Object Storage (S3)
+    # Auth via EC2 IAM instance role — no access_key/secret_key needed.
+    # Vars below are substituted by envsubst at deploy time.
     # -------------------------------------------------------------------------
     common:
       storage:
@@ -78,15 +94,16 @@ mimir:
       push_grpc_method_enabled: true
 
     # -------------------------------------------------------------------------
-    # the scheduler or the frontend directly (when scheduler is disabled).
+    # Query path
+    # -------------------------------------------------------------------------
+
+    # Routes querier workers directly to query-frontend (scheduler disabled)
     frontend_worker:
       scheduler_address: ""
       frontend_address: mimir-query-frontend-headless.monitoring.svc.cluster.local:9095
 
-    # "frontend" is the correct internal Mimir config key.
     frontend:
       scheduler_address: ""
-      # blocks the single querier for its full duration on a single-node setup
       parallelize_shardable_queries: true
       max_outstanding_per_tenant: 256
 
@@ -102,20 +119,19 @@ mimir:
       max_global_series_per_user: 100000
       max_fetched_chunks_per_query: 2000000
       max_fetched_series_per_query: 100000
-      # Must stay under HAProxy timeout-http-request (60s)
+      max_query_parallelism: 16
       query_timeout: 55s
 
 
 # =============================================================================
 # Component Resource Allocation
-# Total requests: ~930m CPU, ~1.9GB RAM
 # =============================================================================
 
 ingester:
   replicas: 1
   extraEnv:
     - name: GOMEMLIMIT
-      value: "460MiB"   # ~90% of 512Mi limit
+      value: "460MiB"
   resources:
     requests: { cpu: 200m, memory: 256Mi }
     limits:   { cpu: 400m, memory: 512Mi }
@@ -130,7 +146,7 @@ querier:
   replicas: 1
   extraEnv:
     - name: GOMEMLIMIT
-      value: "460MiB"   # ~90% of 512Mi limit
+      value: "460MiB"
   resources:
     requests: { cpu: 150m, memory: 256Mi }
     limits:   { cpu: 400m, memory: 512Mi }
@@ -145,7 +161,7 @@ store_gateway:
   replicas: 1
   extraEnv:
     - name: GOMEMLIMIT
-      value: "460MiB"   # ~90% of 512Mi limit
+      value: "460MiB"
   resources:
     requests: { cpu: 150m, memory: 256Mi }
     limits:   { cpu: 400m, memory: 512Mi }
@@ -154,7 +170,7 @@ compactor:
   replicas: 1
   extraEnv:
     - name: GOMEMLIMIT
-      value: "460MiB"   # ~90% of 512Mi limit
+      value: "460MiB"
   resources:
     requests: { cpu: 100m, memory: 256Mi }
     limits:   { cpu: 200m, memory: 512Mi }
@@ -180,12 +196,9 @@ gateway:
 
 # =============================================================================
 # Go runtime
-# GOMAXPROCS: safe globally
-# GOMEMLIMIT: per-component only — global value would OOMKill small components
 # =============================================================================
 
 global:
   extraEnv:
     - name: GOMAXPROCS
       value: "2"
-
