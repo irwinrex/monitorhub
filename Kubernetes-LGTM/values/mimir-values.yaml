@@ -2,7 +2,6 @@
 # mimir-values.yaml — grafana/mimir-distributed chart 6.0.5
 # Single-node lab deployment with S3 storage
 # =============================================================================
-
 fullnameOverride: mimir
 
 minio:
@@ -14,7 +13,6 @@ rollout_operator:
 
 mimir:
   structuredConfig:
-
     ingest_storage:
       enabled: false
       kafka:
@@ -57,18 +55,22 @@ mimir:
         replication_factor: 1
       push_grpc_method_enabled: true
 
-    query_scheduler:
-      service_discovery_mode: dns
+    frontend:
+      scheduler_address: ""
+
+    frontend_worker:
+      scheduler_address: ""
 
     querier:
       max_concurrent: 8
 
     limits:
-      max_query_parallelism: 16
-      query_sharding_total_shards: 8
       ingestion_rate: 10000
       ingestion_burst_size: 20000
       max_global_series_per_user: 100000
+      max_query_parallelism: 16
+      query_sharding_total_shards: 8
+      max_fetched_chunks_per_query: 2000000
 
 ingester:
   replicas: 1
@@ -134,11 +136,11 @@ query_frontend:
   replicas: 1
   resources:
     requests:
-      cpu: 20m
-      memory: 64Mi
-    limits:
-      cpu: 100m
+      cpu: 50m
       memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 512Mi
 
 query_scheduler:
   replicas: 0
