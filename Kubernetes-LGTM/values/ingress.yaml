@@ -1,10 +1,10 @@
 # =============================================================================
-# LGTM Stack Ingress - HAProxy
+# LGTM Stack Ingress - HAProxy (Optimized)
 # Architecture:
 #   - Grafana    → /              (Port 80)
-#   - Prometheus → /prometheus    (Port 9090)
-#   - Loki       → /logs          (Port 3100)
-#   - Tempo      → /tempo         (Port 3200)
+#   - Prometheus → /prometheus/   (Port 9090)
+#   - Loki       → /logs/         (Port 3100)
+#   - Tempo      → /tempo/        (Port 3200)
 #
 # All services use HTTP via ingress
 # For internal cluster communication, use direct service URLs
@@ -23,7 +23,7 @@ metadata:
     haproxy.org/auth-type:   "basic-auth"
     haproxy.org/auth-secret: "monitoring/lgtm-basic-auth"
 
-    # Compression (Modern HAProxy 3.2 syntax)
+    # Compression
     haproxy.org/backend-config-snippet: |
       compression algo gzip
       compression type text/html text/plain text/css text/javascript application/javascript application/json application/xml
@@ -45,6 +45,7 @@ metadata:
     haproxy.org/rate-limit-period:      "10s"
     haproxy.org/rate-limit-size:        "100k"
     haproxy.org/rate-limit-status-code: "429"
+    haproxy.org/rate-limit-whitelist:   "172.31.0.0/16" # Synchronized with other services
 
 spec:
   ingressClassName: haproxy
@@ -62,8 +63,7 @@ spec:
 ---
 # -----------------------------------------------------------------------------
 # 2. Prometheus (Metrics Ingestion/Query)
-# Application-level configuration for Prometheus:
-#   Prometheus needs to be configured with --web.external-url=http://<your-domain>/prometheus and --web.route-prefix=/ to function correctly behind a subpath.
+# App Config: --web.external-url=http://<your-domain>/prometheus/ --web.route-prefix=/
 # -----------------------------------------------------------------------------
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -78,27 +78,31 @@ metadata:
     haproxy.org/auth-type:   "basic-auth"
     haproxy.org/auth-secret: "monitoring/lgtm-basic-auth"
 
-    # Backend Config (Modern Compression)
+    # Backend Config (Compression)
     haproxy.org/backend-config-snippet: |
       compression algo gzip
       compression type application/json application/x-protobuf
       compression minsize 256
 
-    # Dedicated Timeout Annotation (Modern Practice)
-    haproxy.org/timeout-server: "120s"
+    # Dedicated Timeout Annotation
+    haproxy.org/timeout-server: "300s" # Explicitly set for long queries
 
     # Security Headers
     haproxy.org/response-set-header: |
       X-Frame-Options "DENY"
       X-Content-Type-Options "nosniff"
       Cache-Control "no-store"
+      Referrer-Policy "no-referrer"
+      Cross-Origin-Opener-Policy "same-origin"
+      Cross-Origin-Resource-Policy "same-origin"
+      Cross-Origin-Embedder-Policy "require-corp"
 
     # Rate Limit
     haproxy.org/rate-limit-requests:    "200"
     haproxy.org/rate-limit-period:      "10s"
     haproxy.org/rate-limit-size:        "200k"
     haproxy.org/rate-limit-status-code: "429"
-    haproxy.org/rate-limit-whitelist: "172.31.0.0/16"
+    haproxy.org/rate-limit-whitelist:   "172.31.0.0/16"
 
 spec:
   ingressClassName: haproxy
@@ -112,14 +116,11 @@ spec:
                 name: prometheus-kube-prometheus-prometheus
                 port:
                   number: 9090
-            backendConfig:
-              haproxy.org/backend-protocol: "HTTP"
 
 ---
 # -----------------------------------------------------------------------------
 # 3. Loki (Log Ingestion/Query)
-# Application-level configuration for Loki:
-#   Loki needs to be configured with server.external_url: http://<your-domain>/logs to function correctly behind a subpath.
+# App Config: server.external_url: http://<your-domain>/logs/
 # -----------------------------------------------------------------------------
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -130,29 +131,35 @@ metadata:
     # Path rewrite: /logs/loki/api/v1/push -> /loki/api/v1/push
     haproxy.org/path-rewrite: "^/logs(/.*)? /\\1"
 
+    # Auth
     haproxy.org/auth-type:   "basic-auth"
     haproxy.org/auth-secret: "monitoring/lgtm-basic-auth"
 
+    # Backend Config (Compression)
     haproxy.org/backend-config-snippet: |
       compression algo gzip
       compression type application/json application/x-protobuf
       compression minsize 256
 
     # Loki Live Tail uses WebSockets — tunnel timeout must be high
-    # Moved from backend-config-snippet to native annotation
     haproxy.org/timeout-tunnel: "3600s"
 
+    # Security Headers
     haproxy.org/response-set-header: |
       X-Frame-Options "DENY"
       X-Content-Type-Options "nosniff"
       Cache-Control "no-store"
+      Referrer-Policy "no-referrer"
+      Cross-Origin-Opener-Policy "same-origin"
+      Cross-Origin-Resource-Policy "same-origin"
+      Cross-Origin-Embedder-Policy "require-corp"
 
     # Rate Limit
     haproxy.org/rate-limit-requests:    "200"
     haproxy.org/rate-limit-period:      "10s"
     haproxy.org/rate-limit-size:        "200k"
     haproxy.org/rate-limit-status-code: "429"
-    haproxy.org/rate-limit-whitelist: "172.31.0.0/16"
+    haproxy.org/rate-limit-whitelist:   "172.31.0.0/16" # Synchronized with other services
 
 spec:
   ingressClassName: haproxy
@@ -166,14 +173,11 @@ spec:
                 name: loki
                 port:
                   number: 3100
-            backendConfig:
-              haproxy.org/backend-protocol: "HTTP"
 
 ---
 # -----------------------------------------------------------------------------
 # 4. Tempo (Trace Ingestion)
-# Application-level configuration for Tempo:
-#   Tempo needs to be configured with server.external_url: http://<your-domain>/tempo to function correctly behind a subpath.
+# App Config: server.external_url: http://<your-domain>/tempo/
 # -----------------------------------------------------------------------------
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -184,25 +188,35 @@ metadata:
     # Path rewrite: /tempo/v1/traces -> /v1/traces
     haproxy.org/path-rewrite: "^/tempo(/.*)? /\\1"
 
+    # Auth
     haproxy.org/auth-type:   "basic-auth"
     haproxy.org/auth-secret: "monitoring/lgtm-basic-auth"
 
+    # Backend Config (Compression)
     haproxy.org/backend-config-snippet: |
       compression algo gzip
       compression type application/json application/x-protobuf
       compression minsize 256
 
+    # Dedicated Timeout Annotation
+    haproxy.org/timeout-server: "300s" # Explicitly set for trace lookups
+
+    # Security Headers
     haproxy.org/response-set-header: |
       X-Frame-Options "DENY"
       X-Content-Type-Options "nosniff"
       Cache-Control "no-store"
+      Referrer-Policy "no-referrer"
+      Cross-Origin-Opener-Policy "same-origin"
+      Cross-Origin-Resource-Policy "same-origin"
+      Cross-Origin-Embedder-Policy "require-corp"
 
     # Rate Limit
     haproxy.org/rate-limit-requests:    "200"
     haproxy.org/rate-limit-period:      "10s"
     haproxy.org/rate-limit-size:        "200k"
     haproxy.org/rate-limit-status-code: "429"
-    haproxy.org/rate-limit-whitelist: "172.31.0.0/16"
+    haproxy.org/rate-limit-whitelist:   "172.31.0.0/16" # Synchronized with other services
 
 spec:
   ingressClassName: haproxy
@@ -216,5 +230,3 @@ spec:
                 name: tempo
                 port:
                   number: 3200
-            backendConfig:
-              haproxy.org/backend-protocol: "HTTP"
