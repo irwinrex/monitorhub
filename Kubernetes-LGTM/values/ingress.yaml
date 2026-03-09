@@ -106,7 +106,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: prometheus-kube-prometheus-stack-0
+                name: prometheus-kube-prometheus-stack
                 port:
                   number: 9090
 
@@ -204,4 +204,4 @@ spec:
               service:
                 name: tempo
                 port:
-                  number: 4318
+                  number: 3200
