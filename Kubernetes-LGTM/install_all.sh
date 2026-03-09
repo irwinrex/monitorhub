@@ -228,11 +228,20 @@ if kubectl get secret grafana-admin -n "${MONITORING_NS}" &>/dev/null; then
   GRAFANA_PASS=$(kubectl get secret grafana-admin -n "${MONITORING_NS}" -o jsonpath='{.data.admin-password}' | base64 -d)
 fi
 
-BASIC_AUTH_USER="<unknown>"
-BASIC_AUTH_PASS="<unknown>"
+BASIC_AUTH_USER="admin"
+BASIC_AUTH_PASS=""
 if kubectl get secret lgtm-basic-auth -n "${MONITORING_NS}" &>/dev/null; then
-  BASIC_AUTH_USER=$(kubectl get secret lgtm-basic-auth -n "${MONITORING_NS}" -o jsonpath='{.data.username}' | base64 -d 2>/dev/null || echo "admin")
-  BASIC_AUTH_PASS=$(kubectl get secret lgtm-basic-auth -n "${MONITORING_NS}" -o jsonpath='{.data.password}' | base64 -d 2>/dev/null || echo "")
+  # Get username
+  USER_DATA=$(kubectl get secret lgtm-basic-auth -n "${MONITORING_NS}" -o jsonpath='{.data.username}' 2>/dev/null || echo "")
+  if [[ -n "$USER_DATA" ]]; then
+    BASIC_AUTH_USER=$(echo "$USER_DATA" | base64 -d 2>/dev/null || echo "admin")
+  fi
+  
+  # Get password
+  PASS_DATA=$(kubectl get secret lgtm-basic-auth -n "${MONITORING_NS}" -o jsonpath='{.data.password}' 2>/dev/null || echo "")
+  if [[ -n "$PASS_DATA" ]]; then
+    BASIC_AUTH_PASS=$(echo "$PASS_DATA" | base64 -d 2>/dev/null || echo "")
+  fi
 fi
 
 echo ""
