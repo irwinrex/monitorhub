@@ -1,6 +1,6 @@
 # =============================================================================
 # prometheus-values.yaml — prometheus-community/kube-prometheus-stack v58.0.0
-# Prometheus + Thanos Sidecar with S3 storage for 30-day retention
+# Prometheus with 90-day retention in local PVC
 # =============================================================================
 
 # --- Disable components we don't need ---
@@ -35,32 +35,13 @@ alertmanager:
 prometheus:
   enabled: true
   prometheusSpec:
-    replicas: 1
+    replicas: 2
 
     # --- Retention Configuration ---
-    # 90 days total queryable retention
-    # 30d in local PVC (fast queries), 60d in S3 (via Thanos)
+    # 90 days total queryable retention in local PVC
     retention: 90d
 
-    # --- Thanos Sidecar Configuration ---
-    # Uses IAM role attached to instance (no secret needed)
-    thanos:
-      image: thanosio/thanos:v0.36.1
-      version: v0.36.1
-      objectStorageConfig:
-        config:
-          type: S3
-          config:
-            bucket: ${S3_BUCKET_PROMETHEUS}
-            endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
-            region: ${S3_REGION}
-            insecure: false
-            signature_version2: false
-
-    # --- Local Storage (Cache) ---
-    # 30 days local storage - Thanos uploads older blocks to S3
-    # This balances query performance (local = fast) vs cost (S3 = cheap)
-    # Local storage is ~30d, S3 holds full 90d retention
+    # --- Local Storage ---
     storageSpec:
       volumeClaimTemplate:
         spec:
@@ -85,11 +66,15 @@ prometheus:
 # =============================================================================
 kube-state-metrics:
   enabled: true
+  replicas: 1
 
 prometheus-node-exporter:
   enabled: true
+  daemonset:
+    replicas: 1
 
 prometheusOperator:
+  replicas: 1
   resources:
     requests:
       cpu: 50m
