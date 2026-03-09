@@ -15,10 +15,13 @@ rollout_operator:
 
 mimir:
   structuredConfig:
+
     usage_stats:
       enabled: false
+
     ingest_storage:
       enabled: false
+
     common:
       storage:
         backend: s3
@@ -26,18 +29,21 @@ mimir:
           endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
           region: ${S3_REGION}
           bucket_name: ${S3_BUCKET_MIMIR}
+
     blocks_storage:
       backend: s3
       s3:
         endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
         region: ${S3_REGION}
         bucket_name: ${S3_BUCKET_MIMIR}
+
     alertmanager_storage:
       backend: s3
       s3:
         endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
         region: ${S3_REGION}
         bucket_name: ${S3_BUCKET_MIMIR_ALERTMANAGER}
+
     ruler_storage:
       backend: s3
       s3:
@@ -45,39 +51,38 @@ mimir:
         region: ${S3_REGION}
         bucket_name: ${S3_BUCKET_MIMIR_RULER}
 
-    # [FIX] Explicitly disable zone awareness and set replication to 1 for ALL rings
     ingester:
       ring:
         replication_factor: 1
-        zone_awareness_enabled: false # [FIX] Added to prevent internal scheduling blocks
+        zone_awareness_enabled: false
       push_grpc_method_enabled: true
+
     store_gateway:
       sharding_ring:
-        replication_factor: 1 # [FIX] Was missing, defaults to 3
-        zone_awareness_enabled: false # [FIX] Added
-    compactor:
-      compaction_interval: 30m
-      sharding_ring:
-        replication_factor: 1 # [FIX] Was missing, defaults to 3
+        zone_awareness_enabled: false
+
     alertmanager:
       sharding_ring:
-        replication_factor: 1 # [FIX] Was missing, defaults to 3
-        zone_awareness_enabled: false # [FIX] Added
+        zone_awareness_enabled: false
 
     querier:
       max_concurrent: 8
-    query_frontend:
+      query_timeout: 2m
+
+    frontend:
       parallelize_shardable_queries: true
       max_outstanding_per_tenant: 256
+
     limits:
       ingestion_rate: 10000
       ingestion_burst_size: 20000
-      max_global_series_per_user: 100000 
+      max_global_series_per_user: 100000
+
       max_query_parallelism: 8
-      query_sharding_total_shards: 8 
+      query_sharding_total_shards: 8
+
       max_fetched_chunks_per_query: 500000
-      max_fetched_series_per_query: 100000 
-      query_timeout: 2m
+      max_fetched_series_per_query: 100000
 
 ingester:
   replicas: 1
@@ -130,7 +135,7 @@ query_frontend:
       memory: 512Mi
 
 query_scheduler:
-  replicas: 1 # [FIX] Changed from 0 to 1 so queries don't hang
+  replicas: 1
 
 store_gateway:
   replicas: 1
@@ -203,11 +208,11 @@ index-cache:
   enabled: false
 
 metadata-cache:
-  enabled: false 
+  enabled: false
 
 results-cache:
-  enabled: true 
-  default_validity: 10m 
+  enabled: true
+  default_validity: 10m
   resources:
     requests:
       cpu: 20m
