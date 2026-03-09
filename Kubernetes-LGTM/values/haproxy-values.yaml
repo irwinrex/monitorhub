@@ -26,10 +26,10 @@ controller:
 
   config:
     timeout-connect:       "10s"
-    timeout-client:        "60s"
-    timeout-server:        "60s"
-    timeout-http-request:  "30s"
-    timeout-keep-alive:    "30s"
+    timeout-client:        "120s"
+    timeout-server:        "120s"
+    timeout-http-request:  "60s"
+    timeout-keep-alive:    "60s"
     timeout-tunnel:        "3600s"
     forwarded-for:         "true"
     ssl-redirect:          "false"

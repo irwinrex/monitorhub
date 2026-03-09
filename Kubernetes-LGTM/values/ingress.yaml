@@ -79,7 +79,7 @@ metadata:
       filter compression
       compression algo gzip
       compression type application/json application/x-protobuf
-      timeout server 60s
+      timeout server 120s
 
     # Security Headers
     haproxy.org/response-set-header: |

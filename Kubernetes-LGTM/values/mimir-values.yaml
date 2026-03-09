@@ -61,9 +61,11 @@ mimir:
       service_discovery_mode: dns
 
     querier:
-      max_concurrent: 2
+      max_concurrent: 8
 
     limits:
+      max_query_parallelism: 16
+      query_sharding_total_shards: 8
       ingestion_rate: 10000
       ingestion_burst_size: 20000
       max_global_series_per_user: 100000
@@ -125,8 +127,8 @@ querier:
       cpu: 50m
       memory: 128Mi
     limits:
-      cpu: 250m
-      memory: 512Mi
+      cpu: 500m
+      memory: 1Gi
 
 query_frontend:
   replicas: 1
@@ -156,7 +158,6 @@ alertmanager:
 ruler:
   replicas: 0
 
-# FIX: snake_case, explicitly defined to prevent uncontrolled replica count
 overrides_exporter:
   replicas: 1
   resources:
