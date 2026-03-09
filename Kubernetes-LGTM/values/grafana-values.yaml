@@ -1,87 +1,118 @@
 # =============================================================================
-# grafana-values.yaml — grafana/grafana chart
-# Connects to Mimir (metrics), Loki (logs), Tempo (traces), Alertmanager (alerts)
+# grafana-values.yaml
+# Helm chart: grafana/grafana 10.5.15
+# Optimized for LGTM stack (Mimir + Loki + Tempo)
+# Single-node Kubernetes cluster
 # =============================================================================
-
 replicas: 1
-
+# =============================================================================
+# Admin credentials
+# =============================================================================
 admin:
   existingSecret: grafana-admin
-
+# =============================================================================
+# Persistence
+# =============================================================================
 persistence:
   enabled: true
-  storageClassName: local-path   # already installed by install_k0s.sh Phase 1
-  size: 1Gi
+  type: pvc
+  storageClassName: local-path
   accessModes:
     - ReadWriteOnce
-
+  size: 1Gi
+# =============================================================================
+# Grafana core configuration
+# =============================================================================
 grafana.ini:
   analytics:
     reporting_enabled: false
+    check_for_updates: false
+    check_for_plugin_updates: false
+  news:
+    news_feed_enabled: false
+  feature_toggles:
+    disable_news_panel: true
   log:
     mode: console
   users:
     auto_assign_org: true
     auto_assign_org_role: Viewer
-  news:
-    news_enabled: false
-
+  security:
+    disable_gravatar: true
+    cookie_secure: false
+    cookie_samesite: lax
+  dashboards:
+    default_home_dashboard_path: ""
+  auth:
+    disable_login_form: false
+  server:
+    enable_gzip: true
 # =============================================================================
 # Datasources
 # =============================================================================
 datasources:
   datasources.yaml:
     apiVersion: 1
+
     datasources:
-      # Mimir — Prometheus-compatible metrics
+      # -------------------------------------------------------------------------
+      # Mimir (metrics)
+      # -------------------------------------------------------------------------
       - name: Mimir
         type: prometheus
         uid: mimir
+        access: proxy
         url: http://mimir-gateway.monitoring.svc.cluster.local:80/prometheus
         isDefault: true
         jsonData:
-          timeInterval: 60s       # scrape interval — match your Prometheus config
-          httpMethod: POST        # POST is more efficient for large label queries
-      # Loki — log aggregation
+          httpMethod: POST
+          timeInterval: 60s
+      # -------------------------------------------------------------------------
+      # Loki (logs)
+      # -------------------------------------------------------------------------
       - name: Loki
         type: loki
         uid: loki
+        access: proxy
         url: http://loki.monitoring.svc.cluster.local:3100
         jsonData:
-          maxLines: 1000          # cap log lines returned per query for low-resource node
-      # Tempo — distributed tracing
+          maxLines: 1000
+      # -------------------------------------------------------------------------
+      # Tempo (traces)
+      # -------------------------------------------------------------------------
       - name: Tempo
         type: tempo
         uid: tempo
+        access: proxy
         url: http://tempo.monitoring.svc.cluster.local:3200
         jsonData:
-          # Link Tempo traces to Loki logs via traceID
           tracesToLogsV2:
             datasourceUid: loki
             filterByTraceID: true
             filterBySpanID: false
-          # Link Tempo traces to Mimir metrics via exemplars
           tracesToMetrics:
             datasourceUid: mimir
-          # Enable service graph from Tempo metrics
           serviceMap:
             datasourceUid: mimir
-          # Enable node graph panel in trace view
           nodeGraph:
             enabled: true
-      # Alertmanager — alert routing and silences UI
-      # Points to Mimir's built-in alertmanager (compatible with Prometheus AM API)
+      # -------------------------------------------------------------------------
+      # Alertmanager (Mimir embedded)
+      # -------------------------------------------------------------------------
       - name: Alertmanager
         type: alertmanager
         uid: alertmanager
+        access: proxy
         url: http://mimir-gateway.monitoring.svc.cluster.local:80/alertmanager
         jsonData:
-          # Use Mimir-flavoured alertmanager API (not vanilla Prometheus)
           implementation: mimir
-          handleGrafanaManagedAlerts: false   # Mimir manages alerts, not Grafana
-
+          handleGrafanaManagedAlerts: false
 # =============================================================================
-# Resources
+# Plugins
+# =============================================================================
+plugins: []
+# =============================================================================
+# Resource limits (single node cluster)
 # =============================================================================
 resources:
   requests:
@@ -90,3 +121,22 @@ resources:
   limits:
     cpu: 250m
     memory: 512Mi
+# =============================================================================
+# Security context
+# =============================================================================
+securityContext:
+  runAsUser: 472
+  runAsGroup: 472
+  fsGroup: 472
+# =============================================================================
+# Service
+# =============================================================================
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+# =============================================================================
+# ServiceMonitor (disable unless using Prometheus Operator)
+# =============================================================================
+serviceMonitor:
+  enabled: false
