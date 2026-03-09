@@ -2,7 +2,7 @@
 # LGTM Stack Ingress - HAProxy
 # Architecture:
 #   - Grafana  → /              (Port 80)
-#   - Mimir    → /metrics       (Port 80)   - Rewrites to /
+#   - Prometheus    → /metrics       (Port 80)   - Rewrites to /
 #   - Loki     → /logs          (Port 3100) - Rewrites to /
 #   - Tempo    → /traces        (Port 4318) - Rewrites to /
 #
@@ -59,12 +59,12 @@ spec:
 
 ---
 # -----------------------------------------------------------------------------
-# 2. Mimir (Metrics Ingestion/Query)
+# 2. Prometheus (Metrics Ingestion/Query)
 # -----------------------------------------------------------------------------
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: mimir-ingress
+  name: prometheus-ingress
   namespace: monitoring
   annotations:
     # Path rewrite: /metrics/api/v1/push -> /api/v1/push
@@ -106,9 +106,9 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: mimir-gateway
+                name: prometheus-kube-prometheus-stack-0
                 port:
-                  number: 80
+                  number: 9090
 
 ---
 # -----------------------------------------------------------------------------

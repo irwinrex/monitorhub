@@ -21,9 +21,8 @@ export HAPROXY_CHART_VERSION="1.48.0" # https://artifacthub.io/packages/helm/hap
 #   Both repos are registered in install_LGTM.sh.
 export LOKI_CHART_VERSION="6.53.0"     # grafana-community/loki
 export TEMPO_CHART_VERSION="1.24.4"    # grafana-community/tempo (single binary)
-export MIMIR_CHART_VERSION="6.0.5"     # grafana/mimir-distributed
-export GRAFANA_CHART_VERSION="10.5.15" # grafana/grafana
-# Alertmanager is built into Mimir - no separate chart needed
+export PROMETHEUS_CHART_VERSION="58.0.0" # prometheus-community/kube-prometheus-stack
+export GRAFANA_CHART_VERSION="10.5.15"    # grafana/grafana
 
 # ── Namespaces ────────────────────────────────────────────────────────────────
 export MONITORING_NS="monitoring"
@@ -41,9 +40,7 @@ configure_s3_buckets() {
   # All derived from ${S3_BUCKET} base — NOT from each other
   export S3_BUCKET_LOKI="${S3_BUCKET}-loki-data"
   export S3_BUCKET_TEMPO="${S3_BUCKET}-tempo-data"
-  export S3_BUCKET_MIMIR="${S3_BUCKET}-mimir-data"
-  export S3_BUCKET_MIMIR_ALERTMANAGER="${S3_BUCKET}-mimir-alertmanager-data"
-  export S3_BUCKET_MIMIR_RULER="${S3_BUCKET}-mimir-ruler-data"
+  export S3_BUCKET_PROMETHEUS="${S3_BUCKET}-prometheus-data"
   export S3_BUCKET_GRAFANA="${S3_BUCKET}-grafana-data"
 }
 
@@ -51,9 +48,7 @@ print_s3_config() {
   echo "  Base Bucket:        ${S3_BUCKET}"
   echo "  Loki Bucket:        ${S3_BUCKET_LOKI}"
   echo "  Tempo Bucket:       ${S3_BUCKET_TEMPO}"
-  echo "  Mimir Bucket:       ${S3_BUCKET_MIMIR}"
-  echo "  Mimir Alertmanager: ${S3_BUCKET_MIMIR_ALERTMANAGER}"
-  echo "  Mimir Ruler:        ${S3_BUCKET_MIMIR_RULER}"
+  echo "  Prometheus Bucket:  ${S3_BUCKET_PROMETHEUS}"
   echo "  Grafana Bucket:     ${S3_BUCKET_GRAFANA}"
   echo "  Region:             ${S3_REGION}"
 }

@@ -14,15 +14,15 @@
 │   │   └── common.sh           ← Shared: versions, colours, helpers
 │   ├── install_k0s.sh          ← Phase 1: k0s + Helm
 │   ├── install_secrets.sh      ← Phase 2: Grafana admin secret
-│   ├── install_LGTM.sh         ← Phase 3: Loki + Tempo + Mimir + Grafana
+│   ├── install_LGTM.sh         ← Phase 3: Loki + Tempo + Prometheus + Grafana
 │   └── install_HAproxy.sh      ← Phase 4: HAProxy Ingress + Ingress routes
 │
 └── values/
     ├── haproxy-values.yaml     ← HAProxy DaemonSet configuration
-    ├── ingress.yaml            ← Ingress routes (Grafana, Mimir, Loki, Tempo)
+    ├── ingress.yaml            ← Ingress routes (Grafana, Prometheus, Loki, Tempo)
     ├── loki-values.yaml         ← Loki: S3 storage
     ├── tempo-values.yaml        ← Tempo: S3 storage
-    ├── mimir-values.yaml        ← Mimir: S3 storage
+    ├── mimir-values.yaml        ← Prometheus: S3 storage
     ├── grafana-values.yaml      ← Grafana: datasources
     └── alertmanager-values.yaml ← Alertmanager (optional)
 ```
@@ -41,9 +41,9 @@
 **S3 Buckets Created:**
 - `lgtm-observability-loki-data` - Loki logs
 - `lgtm-observability-tempo-data` - Tempo traces
-- `lgtm-observability-mimir-data` - Mimir metrics
-- `lgtm-observability-mimir-data-alertmanager` - Mimir alertmanager
-- `lgtm-observability-mimir-data-ruler` - Mimir ruler
+- `lgtm-observability-mimir-data` - Prometheus metrics
+- `lgtm-observability-mimir-data-alertmanager` - Prometheus alertmanager
+- `lgtm-observability-mimir-data-ruler` - Prometheus ruler
 - `lgtm-observability-grafana-data` - Grafana dashboards
 
 **IAM Policy:**
@@ -120,7 +120,7 @@ After deployment:
 | Service | URL | Auth |
 |---|---|---|
 | Grafana | http://<NODE_IP>/ | admin / (check secret) |
-| Mimir (metrics) | http://<NODE_IP>/metrics | admin / (check secret) |
+| Prometheus (metrics) | http://<NODE_IP>/metrics | admin / (check secret) |
 | Loki (logs) | http://<NODE_IP>/logs | admin / (check secret) |
 | Tempo (traces) | http://<NODE_IP>/traces | admin / (check secret) |
 
@@ -157,7 +157,7 @@ kubectl create secret generic grafana-admin \
 
 ## Basic Auth Credentials (HAProxy)
 
-The HAProxy basic auth is required for Mimir, Loki, and Tempo endpoints.
+The HAProxy basic auth is required for Prometheus, Loki, and Tempo endpoints.
 
 ### Default credentials:
 - **Username:** admin
@@ -182,7 +182,7 @@ sudo bash install_all.sh -y -f
 ┌─────────────────────────────────────────────────────────────┐
 │                     External                                 │
 │   http://<NODE_IP>/  → Grafana                             │
-│   http://<NODE_IP>/metrics → Mimir                         │
+│   http://<NODE_IP>/metrics → Prometheus                         │
 │   http://<NODE_IP>/logs    → Loki                          │
 │   http://<NODE_IP>/traces → Tempo                          │
 └──────────────────────────┬──────────────────────────────────┘
@@ -203,7 +203,7 @@ sudo bash install_all.sh -y -f
         └───────────────────┼──────────────────┘
                             ▼
                      ┌─────────────┐
-                     │   Mimir    │
+                     │   Prometheus    │
                      │  :80       │
                      └─────────────┘
 
@@ -221,7 +221,7 @@ Pre-configured:
 
 | Datasource | URL |
 |---|---|
-| Mimir | http://mimir-gateway.monitoring.svc.cluster.local:80/prometheus |
+| Prometheus | http://mimir-gateway.monitoring.svc.cluster.local:80/prometheus |
 | Loki | http://loki.monitoring.svc.cluster.local:3100 |
 | Tempo | http://tempo.monitoring.svc.cluster.local:4318 |
 | Alertmanager | http://mimir-gateway.monitoring.svc.cluster.local:80/alertmanager |
@@ -239,7 +239,7 @@ All versions in `scripts/lib/common.sh`:
 | HAProxy Ingress | 1.49.0 |
 | Loki | 6.53.0 |
 | Tempo | 1.24.4 |
-| Mimir | 6.0.5 |
+| Prometheus | 6.0.5 |
 | Grafana | 10.5.15 |
 
 ---

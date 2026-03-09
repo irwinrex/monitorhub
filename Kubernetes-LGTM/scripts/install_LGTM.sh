@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # scripts/install_LGTM.sh
-# Deploys Loki, Tempo, Mimir, Grafana via Helm.
+# Deploys Loki, Tempo, Prometheus, Grafana via Helm.
 # Uses separate values files with env substitution.
 # ==============================================================================
 set -euo pipefail
@@ -19,7 +19,7 @@ require_helm
 # Chart repository aliases
 LOKI_REPO="grafana"
 TEMPO_REPO="grafana"
-MIMIR_REPO="grafana"
+PROMETHEUS_REPO="prometheus-community"
 GRAFANA_REPO="grafana"
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -120,13 +120,14 @@ VALUES_DIR="$(resolve_values_dir)"
 # ── 4. Helm Repos ─────────────────────────────────────────────────────────────
 # grafana-community hosts Loki (from 2026-03-16) and Tempo (from 2026-01-30).
 helm repo add grafana https://grafana.github.io/helm-charts --force-update
-helm repo add grafana-community https://grafana-community.github.io/helm-charts --force-update
+helm repo add grafana-community https://prometheus-community.github.io/helm-charts --force-update
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts --force-update
 helm repo update >/dev/null
 
 info "Helm repos configured"
 info "  - ${LOKI_REPO}/loki:${LOKI_CHART_VERSION}"
 info "  - ${TEMPO_REPO}/tempo:${TEMPO_CHART_VERSION}"
-info "  - ${MIMIR_REPO}/mimir-distributed:${MIMIR_CHART_VERSION}"
+info "  - ${PROMETHEUS_REPO}/kube-prometheus-stack:${PROMETHEUS_CHART_VERSION}"
 info "  - ${GRAFANA_REPO}/grafana:${GRAFANA_CHART_VERSION}"
 
 # ── 5. Local Path Provisioner ─────────────────────────────────────────────────
@@ -174,18 +175,18 @@ else
   success "Tempo ${TEMPO_CHART_VERSION} already deployed — skipping"
 fi
 
-# Mimir
-if ! check_version_drift "mimir" "${MONITORING_NS}" "${MIMIR_CHART_VERSION}"; then
-  info "Installing/Upgrading Mimir ${MIMIR_CHART_VERSION}..."
-  apply_values "${VALUES_DIR}/mimir-values.yaml" /tmp/mimir-values.yaml
-  helm upgrade --install mimir "${MIMIR_REPO}/mimir-distributed" \
+# Prometheus
+if ! check_version_drift "prometheus" "${MONITORING_NS}" "${PROMETHEUS_CHART_VERSION}"; then
+  info "Installing/Upgrading Prometheus ${PROMETHEUS_CHART_VERSION}..."
+  apply_values "${VALUES_DIR}/prometheus-values.yaml" /tmp/prometheus-values.yaml
+  helm upgrade --install prometheus "${PROMETHEUS_REPO}/kube-prometheus-stack" \
     --namespace "${MONITORING_NS}" \
-    --version "${MIMIR_CHART_VERSION}" \
-    --values /tmp/mimir-values.yaml \
+    --version "${PROMETHEUS_CHART_VERSION}" \
+    --values /tmp/prometheus-values.yaml \
     --wait --timeout 10m
-  success "Mimir ${MIMIR_CHART_VERSION} deployed"
+  success "Prometheus ${PROMETHEUS_CHART_VERSION} deployed"
 else
-  success "Mimir ${MIMIR_CHART_VERSION} already deployed — skipping"
+  success "Prometheus ${PROMETHEUS_CHART_VERSION} already deployed — skipping"
 fi
 
 # Grafana
@@ -207,10 +208,10 @@ fi
 # Note: Ingress is now handled by HAProxy's extraBackends in haproxy-values.yaml
 # HAProxy is deployed AFTER LGTM in install_all.sh
 info "LGTM deployment complete - Ingress will be configured by HAProxy"
-info "Access Grafana:   http://<ip>/ (no auth)"
-info "Access Mimir:     http://<ip>/mimir (basic auth required)"
-info "Access Loki:      http://<ip>/loki (basic auth required)"
-info "Access Tempo:     http://<ip>/tempo (basic auth required)"
+info "Access Grafana:     http://<ip>/ (no auth)"
+info "Access Prometheus:  http://<ip>/prometheus (basic auth required)"
+info "Access Loki:        http://<ip>/loki (basic auth required)"
+info "Access Tempo:       http://<ip>/tempo (basic auth required)"
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo ""
@@ -218,9 +219,9 @@ kubectl get pods -n "${MONITORING_NS}" -o wide
 
 echo ""
 success "install_LGTM.sh complete"
-info "Access Grafana:   http://<ip>/ (no auth)"
-info "Access Mimir:     http://<ip>/mimir (basic auth required)"
-info "Access Loki:      http://<ip>/loki (basic auth required)"
-info "Access Tempo:     http://<ip>/tempo (basic auth required)"
-info "Login Grafana:    admin / (check secret)"
+info "Access Grafana:     http://<ip>/ (no auth)"
+info "Access Prometheus:  http://<ip>/prometheus (basic auth required)"
+info "Access Loki:        http://<ip>/loki (basic auth required)"
+info "Access Tempo:       http://<ip>/tempo (basic auth required)"
+info "Login Grafana:      admin / (check secret)"
 echo ""

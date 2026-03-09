@@ -66,7 +66,7 @@ loki:
     enabled: true
     enable_api: true
     enable_alertmanager_v2: true
-    alertmanager_url: http://mimir-gateway.monitoring.svc.cluster.local:80/alertmanager
+    alertmanager_url: http://prometheus-kube-prometheus-stack-0.monitoring.svc.cluster.local:9093
     ring:
       enabled: false
     storage:

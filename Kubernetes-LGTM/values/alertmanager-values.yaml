@@ -1,7 +1,9 @@
 # =============================================================================
 # Alertmanager Configuration
-# Alertmanager handles alerts from Mimir and routes them to receivers
+# Alertmanager handles alerts from Prometheus and routes them to receivers
 # Currently using basic webhook configuration
+# Note: Prometheus (kube-prometheus-stack) includes its own Alertmanager
+# This standalone alertmanager is optional and can be disabled
 # =============================================================================
 
 alertmanager:
@@ -60,6 +62,6 @@ config:
 ingress:
   enabled: false
 
-# Disable Prometheus - not needed, Mimir handles metrics
+# Disable Prometheus - not needed, Prometheus handles metrics
 prometheus:
   enabled: false

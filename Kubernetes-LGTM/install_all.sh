@@ -110,7 +110,7 @@ _run_phase() {
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}║  LGTM Full Stack Install                                 ║${NC}"
-echo -e "${BOLD}║  k0s · HAProxy · Loki · Tempo · Mimir · Grafana          ║${NC}"
+echo -e "${BOLD}║  k0s · HAProxy · Loki · Tempo · Prometheus · Grafana          ║${NC}"
 echo -e "${BOLD}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -134,7 +134,7 @@ done
 for vfile in \
   "${VALUES_DIR}/loki-values.yaml" \
   "${VALUES_DIR}/tempo-values.yaml" \
-  "${VALUES_DIR}/mimir-values.yaml" \
+  "${VALUES_DIR}/prometheus-values.yaml" \
   "${VALUES_DIR}/grafana-values.yaml" \
   "${VALUES_DIR}/haproxy-values.yaml" \
   "${VALUES_DIR}/ingress.yaml"; do
@@ -203,7 +203,7 @@ _run_phase 1 "k0s — System prep + Kubernetes + Helm" \
 _run_phase 2 "Secrets — Grafana admin + HAProxy basic auth" \
   "${SKIP_SECRETS}" "${SCRIPTS_DIR}/install_secrets.sh"
 
-_run_phase 3 "LGTM — Loki · Tempo · Mimir · Grafana" \
+_run_phase 3 "LGTM — Loki · Tempo · Prometheus · Grafana" \
   "${SKIP_LGTM}" "${SCRIPTS_DIR}/install_LGTM.sh"
 
 _run_phase 4 "HAProxy — Ingress Controller" \
@@ -251,7 +251,7 @@ echo "  Password: ${GRAFANA_PASS}"
 echo ""
 
 echo -e "${CYAN}Ingress Endpoints (Basic Auth Required):${NC}"
-echo "  Mimir:    http://${DISPLAY_IP}/metrics"
+echo "  Prometheus:    http://${DISPLAY_IP}/metrics"
 echo "  Loki:     http://${DISPLAY_IP}/logs"
 echo "  Tempo:    http://${DISPLAY_IP}/traces"
 echo "  User:     ${BASIC_AUTH_USER}"
@@ -299,7 +299,7 @@ else
   _test "HAProxy (health)" "http://${TEST_HOST}:80/"
 
   # Test endpoints with basic auth
-  _test "Mimir  (/metrics)" "http://${TEST_HOST}:80/metrics"
+  _test "Prometheus  (/metrics)" "http://${TEST_HOST}:80/metrics"
   _test "Loki   (/logs)"    "http://${TEST_HOST}:80/logs"
   _test "Tempo  (/traces)"  "http://${TEST_HOST}:80/traces"
 fi

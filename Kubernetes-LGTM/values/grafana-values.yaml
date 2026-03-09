@@ -1,7 +1,7 @@
 # =============================================================================
 # grafana-values.yaml
 # Helm chart: grafana/grafana 10.5.15
-# Optimized for LGTM stack (Mimir + Loki + Tempo)
+# Optimized for LGTM stack (Prometheus + Loki + Tempo)
 # Single-node Kubernetes cluster
 # =============================================================================
 replicas: 1
@@ -56,14 +56,26 @@ datasources:
 
     datasources:
       # -------------------------------------------------------------------------
-      # Mimir (metrics)
+      # Prometheus (metrics)
+      # -------------------------------------------------------------------------
+      - name: Prometheus
+        type: prometheus
+        uid: prometheus
+        access: proxy
+        url: http://prometheus-kube-prometheus-stack-0.monitoring.svc.cluster.local:9090
+        isDefault: true
+        jsonData:
+          httpMethod: POST
+          timeInterval: 60s
+      # -------------------------------------------------------------------------
+      # Mimir (metrics) - DEPRECATED, use Prometheus instead
       # -------------------------------------------------------------------------
       - name: Mimir
         type: prometheus
         uid: mimir
         access: proxy
         url: http://mimir-gateway.monitoring.svc.cluster.local:80/prometheus
-        isDefault: true
+        isDefault: false
         jsonData:
           httpMethod: POST
           timeInterval: 60s
@@ -91,21 +103,21 @@ datasources:
             filterByTraceID: true
             filterBySpanID: false
           tracesToMetrics:
-            datasourceUid: mimir
+            datasourceUid: prometheus
           serviceMap:
-            datasourceUid: mimir
+            datasourceUid: prometheus
           nodeGraph:
             enabled: true
       # -------------------------------------------------------------------------
-      # Alertmanager (Mimir embedded)
+      # Alertmanager (Prometheus embedded)
       # -------------------------------------------------------------------------
       - name: Alertmanager
         type: alertmanager
         uid: alertmanager
         access: proxy
-        url: http://mimir-gateway.monitoring.svc.cluster.local:80/alertmanager
+        url: http://prometheus-kube-prometheus-stack-0.monitoring.svc.cluster.local:9093
         jsonData:
-          implementation: mimir
+          implementation: prometheus
           handleGrafanaManagedAlerts: false
 # =============================================================================
 # Plugins

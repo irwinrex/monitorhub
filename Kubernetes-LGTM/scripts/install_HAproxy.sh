@@ -246,7 +246,7 @@ info "HAProxy bound to host ports 80 (HTTP) | Stats on :1024"
 if [[ -n "${NODE_IP}" ]]; then
   info "Access via ${NODE_IP}:"
   info "  Grafana  → http://${NODE_IP}/"
-  info "  Mimir    → http://${NODE_IP}/metrics"
+  info "  Prometheus → http://${NODE_IP}/metrics"
   info "  Loki     → http://${NODE_IP}/logs"
   info "  Tempo    → http://${NODE_IP}/traces"
   if [[ -n "${PRIVATE_IP}" && "${NODE_IP}" != "${PRIVATE_IP}" ]]; then

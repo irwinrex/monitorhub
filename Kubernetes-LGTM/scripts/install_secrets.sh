@@ -66,37 +66,5 @@ if kubectl get secret "${BASIC_AUTH_SECRET}" -n "${MONITORING_NS}" &>/dev/null; 
     success "HAProxy basic auth secret already exists — skipping"
     BASIC_AUTH_PASS=$(kubectl get secret "${BASIC_AUTH_SECRET}" \
       -n "${MONITORING_NS}" -o jsonpath='{.data.password}' | base64 -d)
-    export BASIC_AUTH_USER BASIC_AUTH_PASS
-    success "install_secrets.sh complete"
-    exit 0
-  fi
-fi
-
-BASIC_AUTH_PASS="${BASIC_AUTH_PASS:-$(openssl rand -hex 16)}"
-info "Creating HAProxy basic auth secret..."
-
-# ------------------------------------------------------------------------------
-# Generate password hash using openssl (standard MD5)
-# Format: username:hashed_password
-# ------------------------------------------------------------------------------
-HASH=$(openssl passwd -1 "${BASIC_AUTH_PASS}")
-
-# Create secret with admin as key (HAProxy expects this format)
-kubectl create secret generic "${BASIC_AUTH_SECRET}" \
-  --namespace "${MONITORING_NS}" \
-  --from-literal=admin="${HASH}" \
-  --from-literal=username="${BASIC_AUTH_USER}" \
-  --from-literal=password="${BASIC_AUTH_PASS}" \
-  --dry-run=client -o yaml | kubectl apply -f -
-
-echo ""
-echo -e "${YELLOW}┌──────────────────────────────────────────────────────────────────────────────────────────────────┐${NC}"
-echo -e "${YELLOW}│  LGTM BASIC AUTH CREDENTIALS — save now, shown once only                                         │${NC}"
-echo -e "${YELLOW}│                                                                                                  │${NC}"
-echo -e "${YELLOW}│  User    : ${BASIC_AUTH_USER}                                                                    │${NC}"
-echo -e "${YELLOW}│  Password: ${BOLD}${BASIC_AUTH_PASS}${NC}${YELLOW}                                               │${NC}"
-echo -e "${YELLOW}└──────────────────────────────────────────────────────────────────────────────────────────────────┘${NC}"
-echo ""
-
 export BASIC_AUTH_USER BASIC_AUTH_PASS
 success "install_secrets.sh complete"

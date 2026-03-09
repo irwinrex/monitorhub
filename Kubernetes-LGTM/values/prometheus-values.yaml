@@ -1,0 +1,101 @@
+# =============================================================================
+# prometheus-values.yaml — prometheus-community/kube-prometheus-stack v58.0.0
+# Prometheus + Thanos Sidecar with S3 storage for 30-day retention
+# =============================================================================
+
+# --- Disable components we don't need ---
+grafana:
+  enabled: false
+
+# =============================================================================
+# Alertmanager Configuration
+# =============================================================================
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    replicas: 1
+    storage:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi # Alertmanager state (silences, notifications)
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# =============================================================================
+# Prometheus Server Configuration
+# =============================================================================
+prometheus:
+  enabled: true
+  prometheusSpec:
+    replicas: 1
+
+    # --- Retention Configuration ---
+    # 90 days total queryable retention
+    # 30d in local PVC (fast queries), 60d in S3 (via Thanos)
+    retention: 90d
+
+    # --- Thanos Sidecar Configuration ---
+    # Uses IAM role attached to instance (no secret needed)
+    thanos:
+      image: thanosio/thanos:v0.36.1
+      version: v0.36.1
+      objectStorageConfig:
+        existingSecret: ""
+        folders: ""
+        config:
+          type: S3
+          config:
+            bucket: ${S3_BUCKET_PROMETHEUS}
+            endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
+            region: ${S3_REGION}
+            insecure: false
+            signature_version2: false
+
+    # --- Local Storage (Cache) ---
+    # 30 days local storage - Thanos uploads older blocks to S3
+    # This balances query performance (local = fast) vs cost (S3 = cheap)
+    # Local storage is ~30d, S3 holds full 90d retention
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 30Gi
+
+    # --- Resource Allocation ---
+    resources:
+      requests:
+        cpu: 400m
+        memory: 2Gi
+      limits:
+        cpu: 1.5
+        memory: 4Gi
+
+    additionalScrapeConfigs: []
+
+# =============================================================================
+# Other Components
+# =============================================================================
+kube-state-metrics:
+  enabled: true
+
+prometheus-node-exporter:
+  enabled: true
+
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
