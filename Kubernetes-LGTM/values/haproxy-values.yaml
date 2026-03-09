@@ -1,7 +1,6 @@
 # =============================================================================
 # HAProxy Kubernetes Ingress Controller
-# HTTP ONLY (port 80)
-# DaemonSet + HostPort
+# HTTP ONLY (DaemonSet + HostPort 80)
 # =============================================================================
 
 controller:
@@ -9,29 +8,21 @@ controller:
   kind: DaemonSet
 
   daemonset:
-    useHostNetwork: false
     useHostPort: true
-
-    hostPorts:
-      http: 80
-      https: 0
-      stat: 1024
-
-  dnsPolicy: ClusterFirst
 
   ingressClass: haproxy
 
   ingressClassResource:
-    name: haproxy
     enabled: true
+    name: haproxy
     default: true
 
   service:
-    enabled: false
+    type: ClusterIP
 
   config:
 
-    # Timeouts optimized for observability stack
+    # Observability stack tuning
     timeout-connect: "10s"
     timeout-client: "300s"
     timeout-server: "300s"
@@ -43,9 +34,6 @@ controller:
 
     forwarded-for: "true"
     use-forwarded-headers: "true"
-
-    # HTTP only
-    ssl-redirect: "false"
 
     http-connection-mode: "http-keep-alive"
 
@@ -60,28 +48,14 @@ controller:
       cpu: 500m
       memory: 512Mi
 
-  healthCheck:
-    nodePort: 0
-
   stats:
     enabled: true
     port: 1024
-    auth: "admin:admin"
 
   metrics:
     enabled: true
 
-  podAnnotations:
-    cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
-
-  tolerations:
-    - key: "node-role.kubernetes.io/control-plane"
-      operator: Exists
-      effect: NoSchedule
-
-
 defaultBackend:
-
   enabled: true
   replicaCount: 1
 
@@ -92,6 +66,3 @@ defaultBackend:
     limits:
       cpu: 100m
       memory: 128Mi
-
-  podAnnotations:
-    cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
