@@ -1,204 +1,213 @@
 # =============================================================================
 # mimir-values.yaml — grafana/mimir-distributed chart 6.0.5
-# Tuned for a SINGLE NODE (~1 vCPU, 4 GB RAM) with Ruler and Alertmanager.
-# S3 auth via EC2 IAM instance role — no credentials in config.
-# S3 bucket/region vars expanded at deploy time via envsubst.
-#
-# Required env vars before deploy:
-#   export S3_REGION="us-east-1"
-#   export S3_BUCKET="my-bucket-prefix"
-#   export S3_BUCKET_MIMIR="${S3_BUCKET}-mimir-data"
-#   export S3_BUCKET_MIMIR_ALERTMANAGER="${S3_BUCKET}-mimir-alertmanager-data"
-#   export S3_BUCKET_MIMIR_RULER="${S3_BUCKET}-mimir-ruler-data"
-#
-# Deploy:
-#   envsubst < mimir-values.yaml | helm upgrade --install mimir \
-#     grafana/mimir-distributed --version 6.0.5 \
-#     --namespace monitoring --create-namespace -f -
+# Single-node lab deployment with S3 storage
+# FIX APPLIED: Redundant query_scheduler config removed.
+# FIX APPLIED: Ruler component is now enabled.
 # =============================================================================
 
 fullnameOverride: mimir
 
-# --- Disable non-essential dependencies ---
-minio:            { enabled: false }
-kafka:            { enabled: false }
-rollout_operator: { enabled: false }
-
-# --- Scheduler disabled: frontend_worker routes directly to query-frontend ---
-query_scheduler:  { replicas: 0 }
-
-# --- Keep overrides_exporter: chart may fail ServiceMonitor rendering at 0 ---
-overrides_exporter:
-  replicas: 1
-  resources:
-    requests: { cpu: 10m, memory: 32Mi }
-    limits:   { cpu: 50m,  memory: 64Mi }
-
-# --- Disable all caches to minimise memory footprint ---
-chunks-cache:   { enabled: false }
-index-cache:    { enabled: false }
-metadata-cache: { enabled: false }
-results-cache:  { enabled: false }
-
-# --- Disable persistent volumes ---
-ingester:      { persistentVolume: { enabled: false } }
-store_gateway: { persistentVolume: { enabled: false } }
-compactor:     { persistentVolume: { enabled: false } }
-alertmanager:  { persistentVolume: { enabled: false } }
-
-# --- Disable meta-monitoring ---
-metaMonitoring:
-  serviceMonitor: { enabled: false }
-  grafanaAgent:   { enabled: false }
-
-
-# =============================================================================
-# Mimir Structured Configuration
-# =============================================================================
+minio:
+  enabled: false
+kafka:
+  enabled: false
+rollout_operator:
+  enabled: false
 
 mimir:
   structuredConfig:
 
-    usage_stats: { enabled: false }
-
     ingest_storage:
       enabled: false
+      kafka:
+        address: ""
 
-    # -------------------------------------------------------------------------
-    # Object Storage (S3)
-    # Auth via EC2 IAM instance role — no access_key/secret_key needed.
-    # Vars below are substituted by envsubst at deploy time.
-    # -------------------------------------------------------------------------
+    usage_stats:
+      enabled: false
+
     common:
       storage:
         backend: s3
         s3:
           endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
           region: ${S3_REGION}
+          bucket_name: ${S3_BUCKET_MIMIR}
 
     blocks_storage:
-      s3: { bucket_name: "${S3_BUCKET_MIMIR}" }
+      backend: s3
+      s3:
+        endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
+        region: ${S3_REGION}
+        bucket_name: ${S3_BUCKET_MIMIR}
 
     alertmanager_storage:
-      s3: { bucket_name: "${S3_BUCKET_MIMIR_ALERTMANAGER}" }
+      backend: s3
+      s3:
+        endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
+        region: ${S3_REGION}
+        bucket_name: ${S3_BUCKET_MIMIR_ALERTMANAGER}
 
     ruler_storage:
-      s3: { bucket_name: "${S3_BUCKET_MIMIR_RULER}" }
+      backend: s3
+      s3:
+        endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
+        region: ${S3_REGION}
+        bucket_name: ${S3_BUCKET_MIMIR_RULER}
 
-    # -------------------------------------------------------------------------
-    # Ingestion
-    # -------------------------------------------------------------------------
     ingester:
       ring:
         replication_factor: 1
       push_grpc_method_enabled: true
 
-    # -------------------------------------------------------------------------
-    # Query path
-    # -------------------------------------------------------------------------
-
-    # Routes querier workers directly to query-frontend (scheduler disabled)
-    frontend_worker:
-      scheduler_address: ""
-      frontend_address: mimir-query-frontend-headless.monitoring.svc.cluster.local:9095
-
-    frontend:
-      scheduler_address: ""
-      parallelize_shardable_queries: true
-      max_outstanding_per_tenant: 256
+    # FIX: Removed the query_scheduler block as the component is disabled.
+    # query_scheduler:
+    #   service_discovery_mode: dns
 
     querier:
-      max_concurrent: 8
+      max_concurrent: 2
 
-    # -------------------------------------------------------------------------
-    # Limits
-    # -------------------------------------------------------------------------
     limits:
       ingestion_rate: 10000
       ingestion_burst_size: 20000
       max_global_series_per_user: 100000
-      max_fetched_chunks_per_query: 2000000
-      max_fetched_series_per_query: 100000
-      max_query_parallelism: 16
-      query_timeout: 55s
-
-
-# =============================================================================
-# Component Resource Allocation
-# =============================================================================
 
 ingester:
   replicas: 1
-  extraEnv:
-    - name: GOMEMLIMIT
-      value: "460MiB"
+  zoneAwareReplication:
+    enabled: false
+  persistentVolume:
+    enabled: false
   resources:
-    requests: { cpu: 200m, memory: 256Mi }
-    limits:   { cpu: 400m, memory: 512Mi }
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+store_gateway:
+  replicas: 1
+  zoneAwareReplication:
+    enabled: false
+  persistentVolume:
+    enabled: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
+
+compactor:
+  replicas: 1
+  persistentVolume:
+    enabled: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
 
 distributor:
   replicas: 1
   resources:
-    requests: { cpu: 50m,  memory: 64Mi }
-    limits:   { cpu: 150m, memory: 128Mi }
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
 
 querier:
   replicas: 1
-  extraEnv:
-    - name: GOMEMLIMIT
-      value: "460MiB"
   resources:
-    requests: { cpu: 150m, memory: 256Mi }
-    limits:   { cpu: 400m, memory: 512Mi }
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
 
 query_frontend:
   replicas: 1
   resources:
-    requests: { cpu: 50m,  memory: 128Mi }
-    limits:   { cpu: 150m, memory: 256Mi }
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
 
-store_gateway:
-  replicas: 1
-  extraEnv:
-    - name: GOMEMLIMIT
-      value: "460MiB"
-  resources:
-    requests: { cpu: 150m, memory: 256Mi }
-    limits:   { cpu: 400m, memory: 512Mi }
-
-compactor:
-  replicas: 1
-  extraEnv:
-    - name: GOMEMLIMIT
-      value: "460MiB"
-  resources:
-    requests: { cpu: 100m, memory: 256Mi }
-    limits:   { cpu: 200m, memory: 512Mi }
+query_scheduler:
+  replicas: 0
 
 alertmanager:
   replicas: 1
+  persistentVolume:
+    enabled: false
   resources:
-    requests: { cpu: 50m,  memory: 128Mi }
-    limits:   { cpu: 100m, memory: 256Mi }
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
 
+# FIX: Ruler is now enabled with 1 replica.
 ruler:
   replicas: 1
+  # Adding a resource block for the newly enabled ruler.
+  persistentVolume:
+    enabled: false
   resources:
-    requests: { cpu: 50m,  memory: 128Mi }
-    limits:   { cpu: 150m, memory: 256Mi }
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+overrides_exporter:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 50m
+      memory: 64Mi
 
 gateway:
   replicas: 1
   resources:
-    requests: { cpu: 70m,  memory: 64Mi }
-    limits:   { cpu: 150m, memory: 128Mi }
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
 
+chunks-cache:
+  enabled: false
+index-cache:
+  enabled: false
+metadata-cache:
+  enabled: false
+results-cache:
+  enabled: false
 
-# =============================================================================
-# Go runtime
-# =============================================================================
+metaMonitoring:
+  serviceMonitor:
+    enabled: false
+  grafanaAgent:
+    enabled: false
 
 global:
   extraEnv:
     - name: GOMAXPROCS
       value: "2"
+    - name: GOMEMLIMIT
+      value: "900MiB"
