@@ -2,6 +2,7 @@
 # mimir-values.yaml — grafana/mimir-distributed chart 6.0.5
 # Single-node lab deployment with S3 storage
 # =============================================================================
+
 fullnameOverride: mimir
 
 minio:
@@ -13,14 +14,16 @@ kafka:
 rollout_operator:
   enabled: false
 
+
 mimir:
   structuredConfig:
 
     usage_stats:
       enabled: false
 
-    ingest_storage:
-      enabled: false
+    # -------------------------------------------------------------------------
+    # Object Storage
+    # -------------------------------------------------------------------------
 
     common:
       storage:
@@ -51,48 +54,51 @@ mimir:
         region: ${S3_REGION}
         bucket_name: ${S3_BUCKET_MIMIR_RULER}
 
+    # -------------------------------------------------------------------------
+    # Ingestion
+    # -------------------------------------------------------------------------
+
     ingester:
       ring:
         replication_factor: 1
-        zone_awareness_enabled: false
-      push_grpc_method_enabled: true
 
-    store_gateway:
-      sharding_ring:
-        zone_awareness_enabled: false
-
-    alertmanager:
-      sharding_ring:
-        zone_awareness_enabled: false
+    # -------------------------------------------------------------------------
+    # Query configuration
+    # -------------------------------------------------------------------------
 
     querier:
       max_concurrent: 8
-      query_timeout: 2m
 
     frontend:
       parallelize_shardable_queries: true
-      max_outstanding_per_tenant: 256
+
+    # -------------------------------------------------------------------------
+    # Limits
+    # -------------------------------------------------------------------------
 
     limits:
       ingestion_rate: 10000
       ingestion_burst_size: 20000
+
       max_global_series_per_user: 100000
 
-      max_query_parallelism: 8
-      query_sharding_total_shards: 8
-
-      max_fetched_chunks_per_query: 500000
+      max_fetched_chunks_per_query: 200000
       max_fetched_series_per_query: 100000
+
+
+# =============================================================================
+# Component Scaling
+# =============================================================================
 
 ingester:
   replicas: 1
+
   zoneAwareReplication:
     enabled: false
+
   persistentVolume:
     enabled: false
-  extraEnv:
-    - name: GOMEMLIMIT
-      value: "900MiB"
+
   resources:
     requests:
       cpu: 200m
@@ -101,8 +107,10 @@ ingester:
       cpu: 600m
       memory: 1Gi
 
+
 distributor:
   replicas: 1
+
   resources:
     requests:
       cpu: 100m
@@ -111,11 +119,10 @@ distributor:
       cpu: 400m
       memory: 256Mi
 
+
 querier:
   replicas: 1
-  extraEnv:
-    - name: GOMEMLIMIT
-      value: "900MiB"
+
   resources:
     requests:
       cpu: 300m
@@ -124,8 +131,10 @@ querier:
       cpu: 1
       memory: 1Gi
 
+
 query_frontend:
   replicas: 1
+
   resources:
     requests:
       cpu: 200m
@@ -134,18 +143,21 @@ query_frontend:
       cpu: 500m
       memory: 512Mi
 
+
+# query_scheduler intentionally disabled for single-node cluster
 query_scheduler:
-  replicas: 1
+  replicas: 0
+
 
 store_gateway:
   replicas: 1
+
   zoneAwareReplication:
     enabled: false
+
   persistentVolume:
     enabled: false
-  extraEnv:
-    - name: GOMEMLIMIT
-      value: "900MiB"
+
   resources:
     requests:
       cpu: 100m
@@ -154,10 +166,13 @@ store_gateway:
       cpu: 500m
       memory: 1Gi
 
+
 compactor:
   replicas: 1
+
   persistentVolume:
     enabled: false
+
   resources:
     requests:
       cpu: 100m
@@ -166,10 +181,13 @@ compactor:
       cpu: 500m
       memory: 512Mi
 
+
 alertmanager:
   replicas: 1
+
   persistentVolume:
     enabled: false
+
   resources:
     requests:
       cpu: 50m
@@ -178,11 +196,14 @@ alertmanager:
       cpu: 200m
       memory: 256Mi
 
+
 ruler:
   replicas: 0
 
+
 overrides_exporter:
   replicas: 1
+
   resources:
     requests:
       cpu: 20m
@@ -191,8 +212,10 @@ overrides_exporter:
       cpu: 100m
       memory: 128Mi
 
+
 gateway:
   replicas: 1
+
   resources:
     requests:
       cpu: 50m
@@ -200,6 +223,11 @@ gateway:
     limits:
       cpu: 200m
       memory: 128Mi
+
+
+# =============================================================================
+# Cache configuration
+# =============================================================================
 
 chunks-cache:
   enabled: false
@@ -212,7 +240,6 @@ metadata-cache:
 
 results-cache:
   enabled: true
-  default_validity: 10m
   resources:
     requests:
       cpu: 20m
@@ -221,11 +248,21 @@ results-cache:
       cpu: 100m
       memory: 256Mi
 
+
+# =============================================================================
+# Meta monitoring
+# =============================================================================
+
 metaMonitoring:
   serviceMonitor:
     enabled: false
   grafanaAgent:
     enabled: false
+
+
+# =============================================================================
+# Go runtime tuning
+# =============================================================================
 
 global:
   extraEnv:
