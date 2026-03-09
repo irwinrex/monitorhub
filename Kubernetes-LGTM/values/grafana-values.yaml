@@ -10,8 +10,10 @@ replicas: 1
 # =============================================================================
 admin:
   existingSecret: grafana-admin
+  userKey: admin-user
+  passwordKey: admin-password
 # =============================================================================
-# Persistence
+# Persistence - stores dashboards, plugins, and cache
 # =============================================================================
 persistence:
   enabled: true
@@ -19,7 +21,7 @@ persistence:
   storageClassName: local-path
   accessModes:
     - ReadWriteOnce
-  size: 1Gi
+  size: 5Gi
 # =============================================================================
 # Grafana core configuration
 # =============================================================================
@@ -47,6 +49,32 @@ grafana.ini:
     disable_login_form: false
   server:
     enable_gzip: true
+  alerting:
+    enabled: true
+  unified_alerting:
+    enabled: true
+    alertmanager_url: http://prometheus-kube-prometheus-alertmanager.monitoring.svc.cluster.local:9093
+# =============================================================================
+# Sidecar for dashboards - loads dashboards from ConfigMaps
+# =============================================================================
+sidecar:
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    labelValue: "1"
+    folder: /var/lib/grafana/dashboards
+    defaultFolderName: ""
+    searchNamespace: ALL
+    provider:
+      name: default
+      orgId: 1
+      folder: ""
+      type: file
+  datasources:
+    enabled: true
+    label: grafana_datasource
+    labelValue: "1"
+    searchNamespace: ALL
 # =============================================================================
 # Datasources
 # =============================================================================
@@ -103,7 +131,7 @@ datasources:
         type: alertmanager
         uid: alertmanager
         access: proxy
-        url: http://prometheus-kube-prometheus-stack-0.monitoring.svc.cluster.local:9093
+        url: http://prometheus-kube-prometheus-alertmanager.monitoring.svc.cluster.local:9093
         jsonData:
           implementation: prometheus
           handleGrafanaManagedAlerts: false
