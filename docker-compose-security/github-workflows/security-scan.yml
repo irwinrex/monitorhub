@@ -2,146 +2,325 @@ name: "Security & QA"
 
 on:
   push:
-    branches: [ "develop" ]
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main", "develop"]
   workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * 1'
 
 permissions:
   contents: read
   security-events: write
+  actions: read
+  pull-requests: write
+  id-token: write
+  attestations: write
 
 env:
-  # DefectDojo Config
-  DOJO_URL: ${{ secrets.DEFECTDOJO_URL }}          # https://dojo.yourdomain.com/api/v2
-  DOJO_API_KEY: ${{ secrets.DEFECTDOJO_API_KEY }}  # Your PAT from Dojo
-  DOJO_PRODUCT: "Full-Stack-Platform"              # Must exist in Dojo
-  
-  # Scan Scope
-  GITHUB_TOKEN: ${{ secrets.githubtoken }}         # PAT with 'repo' scope
+  REPORTS_DIR: "/tmp/security-reports"
+  DOJO_URL: ${{ secrets.DOJO_URL_NGINX }}
+  # NOTE: DOJO_API_KEY is intentionally NOT set as an env var here — avoids log leaks
+  # ------------------------------------------------------------------ #
+  # Tool Version Pinning (Feb 2026)                                     #
+  # ------------------------------------------------------------------ #
+  COSIGN_VERSION: "v2.4.1"
+  TRIVY_VERSION: "v0.69.2"
+  GRYPE_VERSION: "v0.109.0"
+  SYFT_VERSION: "v1.42.1"
+  TRUFFLEHOG_VERSION: "v3.93.4"
+  CHECKOV_VERSION: "3.2.401"
+  OPENGREP_VERSION: "v1.15.1"
 
 jobs:
-  comprehensive-scan:
-    name: "Analyze and Report"
+  # ======================================================================== #
+  # SCAN JOB — runs once per repo in the matrix                              #
+  # ======================================================================== #
+  security-scan:
+    name: "⚡ Scan: ${{ matrix.repo }}"
     runs-on: [self-hosted, security-scanner]
-    
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        repo:
+          - "test/test-app"
+
     steps:
-      # --- 1. PREPARATION ---
-      - name: "Checkout Main Project"
-        uses: actions/checkout@v4
+      - name: "🏷️ Extract Repo Metadata"
+        run: |
+          SHORT_NAME=$(basename "${{ matrix.repo }}")
+          echo "SHORT_NAME=$SHORT_NAME" >> "$GITHUB_ENV"
 
-      - name: "Checkout Backend API"
-        uses: actions/checkout@v4
-        with:
-          repository: test/backend-app
-          token: ${{ env.GITHUB_TOKEN }}
-          path: backend
-
-      - name: "Checkout Frontend App"
+      - name: "🔐 Checkout ${{ matrix.repo }}"
         uses: actions/checkout@v4
         with:
-          repository: test/frontend-app
-          token: ${{ env.GITHUB_TOKEN }}
-          path: frontend
+          repository: ${{ matrix.repo }}
+          token: ${{ secrets.GITHUBTOKEN }}
+          path: ${{ env.SHORT_NAME }}
 
-      # --- 2. FUNCTIONAL TESTING ---
-      - name: "Run Functional Tests (Pytest)"
+      - name: "⚙️ Setup Workspace"
         run: |
-          python3 -m pip install pytest pytest-cov requests --quiet
-          # Generating JUnit XML for DefectDojo Dashboard
-          python3 -m pytest backend/tests frontend/tests --junitxml=junit_results.xml || true
+          mkdir -p "${{ env.REPORTS_DIR }}"
+          rm -f "${{ env.REPORTS_DIR }}/${{ env.SHORT_NAME }}_"*
 
-      # --- 3. SECURITY SCANNERS ---
-      
-      # SECRETS: Gitleaks
-      - name: "Gitleaks (Secrets Scan)"
+      - name: "💾 Restore CVE DB Cache"
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/trivy
+            ~/.cache/grype
+          key: ${{ runner.os }}-cve-db-${{ env.TRIVY_VERSION }}-${{ env.GRYPE_VERSION }}
+          restore-keys: |
+            ${{ runner.os }}-cve-db-
+
+      - name: "🛠️ Install Security Tools (Pinned & Verified)"
         run: |
-          docker run --rm -v "${{ github.workspace }}:/path" \
-            zricethezav/gitleaks:latest detect \
-            --source="/path" --format=json --report-path="/path/gitleaks_results.json" --exit-code 0
+          set -euo pipefail
 
-      # SAST: Opengrep (Standard for 2026)
-      - name: "Opengrep (SAST Scan)"
+          # ---------------------------------------------------------------- #
+          # Detect architecture — used by cosign (other tools auto-detect)   #
+          # ---------------------------------------------------------------- #
+          ARCH=$(uname -m)
+          case "$ARCH" in
+            x86_64)  COSIGN_ARCH="amd64" ;;
+            aarch64) COSIGN_ARCH="arm64" ;;
+            *)
+              echo "❌ Unsupported architecture: $ARCH"
+              exit 1
+            ;;
+          esac
+          echo "✅ Detected arch: $ARCH → cosign binary suffix: $COSIGN_ARCH"
+
+          # ---------------------------------------------------------------- #
+          # CoSign — direct binary from GitHub releases (no install.sh)      #
+          # ---------------------------------------------------------------- #
+          curl -sSfL \
+            "https://github.com/sigstore/cosign/releases/download/${{ env.COSIGN_VERSION }}/cosign-linux-${COSIGN_ARCH}" \
+            -o /tmp/cosign
+          sudo install -m 0755 /tmp/cosign /usr/local/bin/cosign
+
+          # ---------------------------------------------------------------- #
+          # Trivy — install.sh auto-detects arch internally                  #
+          # ---------------------------------------------------------------- #
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+            | sudo sh -s -- -b /usr/local/bin ${{ env.TRIVY_VERSION }}
+
+          # ---------------------------------------------------------------- #
+          # Syft — install script auto-detects arch internally               #
+          # ---------------------------------------------------------------- #
+          curl -sSfL https://get.anchore.io/syft \
+            | sudo sh -s -- -b /usr/local/bin ${{ env.SYFT_VERSION }}
+
+          # ---------------------------------------------------------------- #
+          # Grype — install script auto-detects arch internally              #
+          # ---------------------------------------------------------------- #
+          curl -sSfL https://get.anchore.io/grype \
+            | sudo sh -s -- -b /usr/local/bin ${{ env.GRYPE_VERSION }}
+
+          # ---------------------------------------------------------------- #
+          # Trufflehog — install script auto-detects arch internally         #
+          # ---------------------------------------------------------------- #
+          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh \
+            | sudo sh -s -- -b /usr/local/bin ${{ env.TRUFFLEHOG_VERSION }}
+
+          # ---------------------------------------------------------------- #
+          # Checkov via pipx — arch-agnostic Python                          #
+          # ---------------------------------------------------------------- #
+          python3 -m pip install --upgrade pip --quiet
+          python3 -m pip install --user pipx --quiet
+          export PATH="$HOME/.local/bin:$PATH"
+          pipx install checkov==${{ env.CHECKOV_VERSION }}
+
+          # ---------------------------------------------------------------- #
+          # Opengrep — install.sh auto-detects arch internally               #
+          # cosign must be correct arch first (above) for sig verify to pass #
+          # ---------------------------------------------------------------- #
+          curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh \
+            | bash -s -- -v ${{ env.OPENGREP_VERSION }}
+          export PATH="$HOME/.local/bin:$PATH"
+          sudo ln -sf "$HOME/.local/bin/opengrep" /usr/local/bin/opengrep
+
+          # ---------------------------------------------------------------- #
+          # Validate                                                          #
+          # ---------------------------------------------------------------- #
+          echo "--- Validating installed tools ---"
+          echo "Runner arch : $(uname -m)"
+          echo "Cosign file : $(file /usr/local/bin/cosign)"
+          cosign version
+          trivy --version
+          syft version
+          grype version
+          trufflehog --version
+          checkov --version
+          opengrep --version
+
+      - name: "SAST - Opengrep"
+        continue-on-error: true
         run: |
-          docker run --rm -v "${{ github.workspace }}:/src" -w /src \
-            opengrep/opengrep:latest opengrep scan \
-            --json --output /src/opengrep_results.json || true
+          export PATH="$HOME/.local/bin:$PATH"
+          opengrep scan \
+            --config auto \
+            --severity ERROR \
+            --sarif-output "${{ env.REPORTS_DIR }}/${{ env.SHORT_NAME }}_sast.sarif" \
+            "${{ env.SHORT_NAME }}"
 
-      # SCA: Trivy
-      - name: "Trivy (Vulnerability Scan)"
+      - name: "SCA - Trivy"
+        continue-on-error: true
         run: |
-          docker run --rm -v "${{ github.workspace }}:/src" \
-            aquasec/trivy:latest fs /src \
-            --format json --output /src/trivy_results.json --severity HIGH,CRITICAL || true
+          trivy fs "${{ env.SHORT_NAME }}" \
+            --severity HIGH,CRITICAL \
+            --format json \
+            --output "${{ env.REPORTS_DIR }}/${{ env.SHORT_NAME }}_sca.json" \
+            --exit-code 0
 
-      # DEEP SCA: OWASP Dependency-Check
-      - name: "OWASP Dependency-Check"
+      - name: "SBOM - Grype"
+        continue-on-error: true
         run: |
-          docker run --rm -v "${{ github.workspace }}:/src" \
-            -v "${{ github.workspace }}/odc-data:/usr/share/dependency-check/data" \
-            owasp/dependency-check:latest \
-            --project "Platform-Scan" --scan /src --format JSON --out /src/owasp_results.json || true
+          syft "${{ env.SHORT_NAME }}" -o spdx-json \
+            > "${{ env.REPORTS_DIR }}/${{ env.SHORT_NAME }}_sbom.json"
+          grype "sbom:${{ env.REPORTS_DIR }}/${{ env.SHORT_NAME }}_sbom.json" \
+            -o json \
+            > "${{ env.REPORTS_DIR }}/${{ env.SHORT_NAME }}_grype.json"
 
-      # --- 4. DASHBOARD INTEGRATION ---
-      
-      - name: "Push All Reports to DefectDojo"
-        shell: python
+      - name: "Secrets - TruffleHog"
+        continue-on-error: true
         run: |
-          import os, requests, datetime
+          trufflehog filesystem "${{ env.SHORT_NAME }}" \
+            --json \
+            --exclude-globs ".git/**" \
+            > "${{ env.REPORTS_DIR }}/${{ env.SHORT_NAME }}_secrets.json" || true
 
-          # Config
-          DOJO_URL = os.getenv('DOJO_URL').rstrip('/')
-          API_KEY  = os.getenv('DOJO_API_KEY')
-          PRODUCT  = os.getenv('DOJO_PRODUCT')
-          RUN_ID   = os.getenv('GITHUB_RUN_ID')
-          
-          # Engagement Name (Groups all scans together)
-          ENGAGEMENT_NAME = f"Pipeline-Run-{RUN_ID}-{datetime.date.today()}"
+      - name: "IaC - Checkov"
+        continue-on-error: true
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          checkov -d "${{ env.SHORT_NAME }}" \
+            --output json \
+            --quiet \
+            > "${{ env.REPORTS_DIR }}/${{ env.SHORT_NAME }}_checkov.json" || true
 
-          def upload(file_name, scan_type, test_title):
-              if not os.path.exists(file_name):
-                  print(f"[-] Skipping {test_title}: File {file_name} not found.")
-                  return
-              
-              print(f"[+] Uploading {test_title}...")
-              
-              headers = {'Authorization': f'Token {API_KEY}'}
-              data = {
-                  'active': True,
-                  'verified': True,
-                  'scan_type': scan_type,
-                  'product_name': PRODUCT,
-                  'engagement_name': ENGAGEMENT_NAME,
-                  'test_title': test_title,
-                  'auto_create_context': True # Auto-creates Engagement if missing
-              }
-              
-              with open(file_name, 'rb') as f:
-                  response = requests.post(
-                      f"{DOJO_URL}/import-scan/",
-                      headers=headers,
-                      data=data,
-                      files={'file': f},
-                      timeout=120
-                  )
-              
-              if response.status_code in [200, 201]:
-                  print(f" [SUCCESS] {test_title} is now in DefectDojo.")
-              else:
-                  print(f" [ERROR] {response.status_code}: {response.text}")
-
-          # Map your scanner outputs to DefectDojo's accepted scan types
-          upload("gitleaks_results.json",  "Gitleaks Scan",         "Secrets Detection")
-          upload("opengrep_results.json",  "Semgrep JSON Report",   "SAST (Opengrep)")
-          upload("trivy_results.json",     "Trivy Scan",            "SCA (Trivy)")
-          upload("owasp_results.json",     "Dependency Check Scan", "SCA (OWASP)")
-          upload("junit_results.xml",      "JUnit XML Report",      "Functional Unit Tests")
-
-      # --- 5. CLEANUP & ARCHIVE ---
-      - name: "Upload Artifacts for Manual Review"
+      - name: "📤 Upload Artifacts"
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: security-reports
-          path: |
-            *_results.json
-            *.xml
-          retention-days: 14
+          name: reports-${{ env.SHORT_NAME }}
+          path: ${{ env.REPORTS_DIR }}/${{ env.SHORT_NAME }}_*
+          retention-days: 7
+
+      # ================================================================== #
+      # DefectDojo Upload — scoped per matrix repo                         #
+      # product_name = SHORT_NAME (e.g. aspyre-backend-app)                #
+      # DOJO_API_KEY scoped to this step only — never in global env        #
+      # ================================================================== #
+      - name: "🚀 DefectDojo - Upload Reports"
+        if: always() && env.DOJO_URL != ''
+        env:
+          DOJO_API_KEY: ${{ secrets.DEFECTDOJO_API_KEY }}
+          DOJO_PRODUCT_TYPE: ${{ secrets.DEFECTDOJO_PRODUCT_TYPE || 'Security' }}
+          DOJO_URL: ${{ env.DOJO_URL }}
+          DOJO_HOST: ${{ secrets.DOJO_HOST }}
+          DOJO_PRODUCT: ${{ env.SHORT_NAME }}
+        run: |
+          set -euo pipefail
+
+          CLEAN_URL=$(echo "${DOJO_URL}" | sed 's:/*$::')
+
+          upload_to_dojo() {
+            local FILE="$1"
+            local SCAN_TYPE="$2"
+
+            if [ ! -f "$FILE" ]; then
+              echo "⚠️  Skipping [$SCAN_TYPE] — file not found: $FILE"
+              return 0
+            fi
+
+            echo "📤 Uploading [$SCAN_TYPE] → $FILE"
+
+            HTTP_STATUS=$(curl -sS -L \
+              -o /tmp/dojo_response.json \
+              -w "%{http_code}" \
+              -X POST "${CLEAN_URL}/api/v2/import-scan/" \
+              -H "Authorization: Token ${DOJO_API_KEY}" \
+              -H "Accept: application/json" \
+              -H "Host:${DOJO_HOST}" \
+              -H "X-Forwarded-Proto: https" \
+              -A "Mozilla/5.0" \
+              -F "scan_type=${SCAN_TYPE}" \
+              -F "product_type_name=${DOJO_PRODUCT_TYPE}" \
+              -F "product_name=${DOJO_PRODUCT}" \
+              -F "engagement_name=Scan-${{ github.run_id }}" \
+              -F "auto_create_context=true" \
+              -F "environment=Development" \
+              -F "active=true" \
+              -F "verified=false" \
+              -F "close_old_findings=true" \
+              -F "file=@${FILE}")
+
+            echo "↩️  HTTP $HTTP_STATUS"
+
+            if [ "$HTTP_STATUS" -eq 201 ] || [ "$HTTP_STATUS" -eq 200 ]; then
+              echo "✅ Uploaded [$SCAN_TYPE] successfully."
+            else
+              echo "❌ Failed [$SCAN_TYPE] — HTTP $HTTP_STATUS"
+              cat /tmp/dojo_response.json
+              echo ""
+              return 1
+            fi
+          }
+
+          # Upload only this repo's reports — SHORT_NAME scopes all filenames
+          upload_to_dojo "${{ env.REPORTS_DIR }}/${{ env.SHORT_NAME }}_sast.sarif"   "SARIF"
+          upload_to_dojo "${{ env.REPORTS_DIR }}/${{ env.SHORT_NAME }}_sca.json"     "Trivy Scan"
+          upload_to_dojo "${{ env.REPORTS_DIR }}/${{ env.SHORT_NAME }}_grype.json"   "Anchore Grype"
+          upload_to_dojo "${{ env.REPORTS_DIR }}/${{ env.SHORT_NAME }}_secrets.json" "Trufflehog Scan"
+          upload_to_dojo "${{ env.REPORTS_DIR }}/${{ env.SHORT_NAME }}_checkov.json" "Checkov Scan"
+
+  # ======================================================================== #
+  # AGGREGATE JOB — gate only                                                #
+  # ======================================================================== #
+  aggregate-and-gate:
+    name: "🛡️ Security Gate"
+    needs: security-scan
+    runs-on: [self-hosted, security-scanner]
+    if: always()
+
+    steps:
+      - name: "📥 Download All Reports"
+        uses: actions/download-artifact@v4
+        with:
+          path: all-reports
+          pattern: reports-*
+          merge-multiple: true
+
+      - name: "🧪 Analyze & Gate"
+        run: |
+          set -euo pipefail
+
+          TOTAL_CRITICAL=0
+          TOTAL_SECRETS=0
+
+          if ls all-reports/*_sca.json 1>/dev/null 2>&1; then
+            TOTAL_CRITICAL=$(jq -s '[
+              .[].Results[]? |
+              .Vulnerabilities[]? |
+              select(.Severity=="CRITICAL")
+            ] | length' all-reports/*_sca.json 2>/dev/null || echo 0)
+          fi
+
+          if ls all-reports/*_secrets.json 1>/dev/null 2>&1; then
+            TOTAL_SECRETS=$(grep -c '"Raw"' all-reports/*_secrets.json 2>/dev/null || echo 0)
+          fi
+
+          echo "### 🛡️ Security Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Metric | Count |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 🔴 Critical Vulnerabilities | $TOTAL_CRITICAL |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 🔑 Potential Exposed Secrets | $TOTAL_SECRETS |" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$TOTAL_CRITICAL" -gt 0 ] || [ "$TOTAL_SECRETS" -gt 0 ]; then
+            echo "⚠️ Security issues found: $TOTAL_CRITICAL critical CVEs, $TOTAL_SECRETS secrets"
+            if [ "${{ github.event_name }}" == "pull_request" ]; then
+              exit 1
+            fi
+          fi
