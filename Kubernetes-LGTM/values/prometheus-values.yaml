@@ -48,8 +48,6 @@ prometheus:
       image: thanosio/thanos:v0.36.1
       version: v0.36.1
       objectStorageConfig:
-        existingSecret: ""
-        folders: ""
         config:
           type: S3
           config:
@@ -77,7 +75,7 @@ prometheus:
         cpu: 400m
         memory: 2Gi
       limits:
-        cpu: 1.5
+        cpu: "1500m"
         memory: 4Gi
 
     additionalScrapeConfigs: []
