@@ -63,6 +63,7 @@ mimir:
     ingester:
       ring:
         replication_factor: 1
+      push_grpc_method_enabled: true
 
     # -------------------------------------------------------------------------
     # Query configuration
