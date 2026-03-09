@@ -14,7 +14,7 @@ require_helm
 
 # Setup Environment
 # ------------------------------------------------------------------------------
-: "${HAPROXY_CHART_VERSION:=1.49.0}"
+: "${HAPROXY_CHART_VERSION:=1.48.0}"
 HAPROXY_VALUES="${SCRIPT_DIR}/../values/haproxy-values.yaml"
 INGRESS_YAML="${SCRIPT_DIR}/../values/ingress.yaml"
 
@@ -248,7 +248,7 @@ if [[ -n "${NODE_IP}" ]]; then
   info "  Grafana  → http://${NODE_IP}/"
   info "  Prometheus → http://${NODE_IP}/prometheus"
   info "  Loki     → http://${NODE_IP}/logs"
-  info "  Tempo    → http://${NODE_IP}/traces"
+  info "  Tempo    → http://${NODE_IP}/tempo"
   if [[ -n "${PRIVATE_IP}" && "${NODE_IP}" != "${PRIVATE_IP}" ]]; then
     info "Also reachable on private network via ${PRIVATE_IP}"
   fi

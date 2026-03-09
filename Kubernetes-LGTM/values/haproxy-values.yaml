@@ -1,10 +1,9 @@
 # =============================================================================
-# HAProxy Ingress Controller Configuration
+# HAProxy Ingress Controller Configuration - Optimized for LGTM Stack
 # Global controller config only — routing lives in ingress.yaml
 # =============================================================================
 controller:
   kind: DaemonSet
-
   daemonset:
     useHostNetwork: false
     useHostPort: true
@@ -12,59 +11,49 @@ controller:
       http:  80
       https: 0
       stat:  1024
-
   dnsPolicy: ClusterFirst
-
   ingressClass: haproxy
   ingressClassResource:
     name:    haproxy
     enabled: true
     default: true
-
   service:
     enabled: false
-
   config:
+    # Timeouts optimized for long-running observability queries
     timeout-connect:       "10s"
-    timeout-client:        "120s"
-    timeout-server:        "120s"
+    timeout-client:        "300s"
+    timeout-server:        "300s"
     timeout-http-request:  "60s"
     timeout-keep-alive:    "60s"
-    timeout-tunnel:        "3600s"
+    timeout-tunnel:        "3600s" # Essential for Loki Live Tail
     forwarded-for:         "true"
-    ssl-redirect:          "false"
+    ssl-redirect:          "false" # Set to true once certificates are configured
     use-forwarded-headers: "true"
-    http-connection-mode:  "http-server-close"
+    http-connection-mode:  "http-keep-alive" # More efficient for modern apps
     dontlognull:           "true"
-    maxconn:               "2000"
-
+    maxconn:               "4000" # Increased for high-concurrency ingestion
   resources:
     requests:
       cpu:    100m
       memory: 128Mi
     limits:
-      cpu:    250m
-      memory: 256Mi
-
+      cpu:    500m # Increased for better processing overhead
+      memory: 512Mi # Increased buffer for high-volume traffic
   healthCheck:
     nodePort: 0
-
   stats:
     enabled: true
     port:    1024
     auth:  "admin:admin"
-
   metrics:
     enabled: true
-
   podAnnotations:
     cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
-
   tolerations:
     - key:      "node-role.kubernetes.io/control-plane"
       operator: "Exists"
       effect:   "NoSchedule"
-
 defaultBackend:
   enabled:      true
   replicaCount: 1
