@@ -104,7 +104,7 @@ metadata:
 
     haproxy.org/auth-type: basic
     haproxy.org/auth-realm: "Loki"
-    haproxy.org/auth-secret: lgtm-basic-auth
+    haproxy.org/auth-secret: monitoring/lgtm-basic-auth
 
     haproxy.org/rate-limit-requests: "200"
     haproxy.org/rate-limit-period: "10s"
@@ -150,7 +150,7 @@ metadata:
 
     haproxy.org/auth-type: basic
     haproxy.org/auth-realm: "Tempo"
-    haproxy.org/auth-secret: lgtm-basic-auth
+    haproxy.org/auth-secret: monitoring/lgtm-basic-auth
 
     haproxy.org/rate-limit-requests: "100"
     haproxy.org/rate-limit-period: "10s"

@@ -231,8 +231,8 @@ fi
 BASIC_AUTH_USER="<unknown>"
 BASIC_AUTH_PASS="<unknown>"
 if kubectl get secret lgtm-basic-auth -n "${MONITORING_NS}" &>/dev/null; then
-  BASIC_AUTH_USER=$(kubectl get secret lgtm-basic-auth -n "${MONITORING_NS}" -o jsonpath='{.data.username}' | base64 -d)
-  BASIC_AUTH_PASS=$(kubectl get secret lgtm-basic-auth -n "${MONITORING_NS}" -o jsonpath='{.data.password}' | base64 -d)
+  BASIC_AUTH_USER=$(kubectl get secret lgtm-basic-auth -n "${MONITORING_NS}" -o jsonpath='{.data.username}' | base64 -d 2>/dev/null || echo "admin")
+  BASIC_AUTH_PASS=$(kubectl get secret lgtm-basic-auth -n "${MONITORING_NS}" -o jsonpath='{.data.password}' | base64 -d 2>/dev/null || echo "")
 fi
 
 echo ""
