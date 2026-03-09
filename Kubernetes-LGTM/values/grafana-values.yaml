@@ -62,20 +62,8 @@ datasources:
         type: prometheus
         uid: prometheus
         access: proxy
-        url: http://prometheus-kube-prometheus-stack-0.monitoring.svc.cluster.local:9090
+        url: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
         isDefault: true
-        jsonData:
-          httpMethod: POST
-          timeInterval: 60s
-      # -------------------------------------------------------------------------
-      # Mimir (metrics) - DEPRECATED, use Prometheus instead
-      # -------------------------------------------------------------------------
-      - name: Mimir
-        type: prometheus
-        uid: mimir
-        access: proxy
-        url: http://mimir-gateway.monitoring.svc.cluster.local:80/prometheus
-        isDefault: false
         jsonData:
           httpMethod: POST
           timeInterval: 60s
