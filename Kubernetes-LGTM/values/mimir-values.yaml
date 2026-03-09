@@ -23,6 +23,10 @@ mimir:
 
     ingest_storage:
           enabled: false
+
+    memberlist:
+      join_members:
+        - mimir-memberlist.monitoring.svc.cluster.local
     # -------------------------------------------------------------------------
     # Object Storage
     # -------------------------------------------------------------------------
