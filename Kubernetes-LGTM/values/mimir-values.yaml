@@ -22,11 +22,8 @@ mimir:
       enabled: false
 
     ingest_storage:
-          enabled: false
+      enabled: false
 
-    memberlist:
-      join_members:
-        - mimir-memberlist.monitoring.svc.cluster.local
     # -------------------------------------------------------------------------
     # Object Storage
     # -------------------------------------------------------------------------
@@ -75,9 +72,15 @@ mimir:
 
     querier:
       max_concurrent: 8
+      # Point directly to the query-frontend since the scheduler is disabled
+      frontend_worker:
+        scheduler_address: ""
+        frontend_address: mimir-query-frontend-headless.monitoring.svc.cluster.local:9095
 
     frontend:
       parallelize_shardable_queries: true
+      # Disable frontend looking for the scheduler
+      scheduler_address: ""
 
     # -------------------------------------------------------------------------
     # Limits
@@ -150,11 +153,8 @@ query_frontend:
       cpu: 500m
       memory: 512Mi
 
-
-# query_scheduler intentionally disabled for single-node cluster
 query_scheduler:
   replicas: 0
-
 
 store_gateway:
   replicas: 1
@@ -268,10 +268,18 @@ metaMonitoring:
 
 
 # =============================================================================
-# Go runtime tuning
+# Go runtime tuning & Environment Variables
 # =============================================================================
 
 global:
   extraEnv:
     - name: GOMAXPROCS
       value: "2"
+    - name: S3_REGION
+      value: "us-east-1" # <-- UPDATE THIS
+    - name: S3_BUCKET_MIMIR
+      value: "my-mimir-bucket" # <-- UPDATE THIS
+    - name: S3_BUCKET_MIMIR_ALERTMANAGER
+      value: "my-mimir-alertmanager-bucket" # <-- UPDATE THIS
+    - name: S3_BUCKET_MIMIR_RULER
+      value: "my-mimir-ruler-bucket" # <-- UPDATE THIS
