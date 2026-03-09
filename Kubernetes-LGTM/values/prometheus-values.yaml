@@ -35,7 +35,7 @@ alertmanager:
 prometheus:
   enabled: true
   prometheusSpec:
-    replicas: 2
+    replicas: 1
 
     # --- Retention Configuration ---
     # 90 days total queryable retention in local PVC

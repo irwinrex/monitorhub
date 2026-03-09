@@ -4,7 +4,9 @@
 # Optimized for LGTM stack (Prometheus + Loki + Tempo)
 # Single-node Kubernetes cluster
 # =============================================================================
+
 replicas: 1
+
 # =============================================================================
 # Admin credentials
 # =============================================================================
@@ -12,8 +14,9 @@ admin:
   existingSecret: grafana-admin
   userKey: admin-user
   passwordKey: admin-password
+
 # =============================================================================
-# Persistence - stores dashboards, plugins, and cache
+# Persistence (dashboards, plugins, cache)
 # =============================================================================
 persistence:
   enabled: true
@@ -22,133 +25,174 @@ persistence:
   accessModes:
     - ReadWriteOnce
   size: 5Gi
+  finalizers:
+    - kubernetes.io/pvc-protection
+
 # =============================================================================
 # Grafana core configuration
 # =============================================================================
 grafana.ini:
+
   analytics:
     reporting_enabled: false
     check_for_updates: false
     check_for_plugin_updates: false
+
   news:
     news_feed_enabled: false
-  feature_toggles:
-    disable_news_panel: true
+
   log:
     mode: console
+
   users:
     auto_assign_org: true
     auto_assign_org_role: Viewer
+
   security:
     disable_gravatar: true
+    allow_embedding: false
     cookie_secure: false
     cookie_samesite: lax
+
   dashboards:
     default_home_dashboard_path: ""
+
   auth:
     disable_login_form: false
+
   server:
     enable_gzip: true
-  alerting:
-    enabled: true
+    router_logging: false
+
   unified_alerting:
     enabled: true
-    alertmanager_url: http://prometheus-kube-prometheus-alertmanager.monitoring.svc.cluster.local:9093
+    ha_peers: ""
+
 # =============================================================================
-# Sidecar for dashboards - loads dashboards from ConfigMaps
+# Environment
+# =============================================================================
+env:
+  GF_SECURITY_ALLOW_EMBEDDING: "false"
+  GF_INSTALL_PLUGINS: ""
+
+# =============================================================================
+# Sidecar (auto-import dashboards & datasources)
 # =============================================================================
 sidecar:
+
   dashboards:
     enabled: true
     label: grafana_dashboard
     labelValue: "1"
     folder: /var/lib/grafana/dashboards
     defaultFolderName: ""
-    searchNamespace: ALL
+    searchNamespace: monitoring
+
     provider:
       name: default
       orgId: 1
       folder: ""
       type: file
+
   datasources:
     enabled: true
     label: grafana_datasource
     labelValue: "1"
-    searchNamespace: ALL
+    searchNamespace: monitoring
+
 # =============================================================================
 # Datasources
 # =============================================================================
 datasources:
+
   datasources.yaml:
     apiVersion: 1
 
     datasources:
-      # -------------------------------------------------------------------------
+
+      # -----------------------------------------------------------------------
       # Prometheus (metrics)
-      # -------------------------------------------------------------------------
+      # -----------------------------------------------------------------------
       - name: Prometheus
         type: prometheus
         uid: prometheus
         access: proxy
         url: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
         isDefault: true
+
         jsonData:
           httpMethod: POST
           timeInterval: 60s
-      # -------------------------------------------------------------------------
+          manageAlerts: false
+          prometheusType: Prometheus
+
+      # -----------------------------------------------------------------------
       # Loki (logs)
-      # -------------------------------------------------------------------------
+      # -----------------------------------------------------------------------
       - name: Loki
         type: loki
         uid: loki
         access: proxy
         url: http://loki.monitoring.svc.cluster.local:3100
+
         jsonData:
           maxLines: 1000
-      # -------------------------------------------------------------------------
+
+      # -----------------------------------------------------------------------
       # Tempo (traces)
-      # -------------------------------------------------------------------------
+      # -----------------------------------------------------------------------
       - name: Tempo
         type: tempo
         uid: tempo
         access: proxy
         url: http://tempo.monitoring.svc.cluster.local:3200
+
         jsonData:
           tracesToLogsV2:
             datasourceUid: loki
             filterByTraceID: true
             filterBySpanID: false
+
           tracesToMetrics:
             datasourceUid: prometheus
+
           serviceMap:
             datasourceUid: prometheus
+
           nodeGraph:
             enabled: true
-      # -------------------------------------------------------------------------
-      # Alertmanager (Prometheus embedded)
-      # -------------------------------------------------------------------------
+
+      # -----------------------------------------------------------------------
+      # Alertmanager
+      # -----------------------------------------------------------------------
       - name: Alertmanager
         type: alertmanager
         uid: alertmanager
         access: proxy
         url: http://prometheus-kube-prometheus-alertmanager.monitoring.svc.cluster.local:9093
+
         jsonData:
           implementation: prometheus
           handleGrafanaManagedAlerts: false
+
 # =============================================================================
 # Plugins
 # =============================================================================
 plugins: []
+
 # =============================================================================
-# Resource limits (single node cluster)
+# Resources (single-node cluster safe)
 # =============================================================================
 resources:
+
   requests:
-    cpu: 100m
-    memory: 256Mi
-  limits:
-    cpu: 250m
+    cpu: 150m
     memory: 512Mi
+
+  limits:
+    cpu: 500m
+    memory: 1Gi
+
 # =============================================================================
 # Security context
 # =============================================================================
@@ -156,6 +200,7 @@ securityContext:
   runAsUser: 472
   runAsGroup: 472
   fsGroup: 472
+
 # =============================================================================
 # Service
 # =============================================================================
@@ -163,8 +208,9 @@ service:
   type: ClusterIP
   port: 80
   targetPort: 3000
+
 # =============================================================================
-# ServiceMonitor (disable unless using Prometheus Operator)
+# ServiceMonitor
 # =============================================================================
 serviceMonitor:
   enabled: false
