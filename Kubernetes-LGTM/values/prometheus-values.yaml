@@ -38,10 +38,26 @@ prometheus:
     replicas: 1
 
     # --- Retention Configuration ---
-    # 90 days total queryable retention in local PVC
+    # 90 days total queryable retention
+    # 30d local PVC + S3 for long-term
     retention: 90d
 
-    # --- Local Storage ---
+    # --- Thanos Sidecar for S3 Upload ---
+    # Uploads TSDB blocks to S3 for long-term storage
+    thanos:
+      image: thanosio/thanos:v0.36.1
+      version: v0.36.1
+      objectStorageConfig:
+        config:
+          type: S3
+          config:
+            bucket: ${S3_BUCKET_PROMETHEUS}
+            endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
+            region: ${S3_REGION}
+            insecure: false
+            signature_version2: false
+
+    # --- Local Storage (smaller - just for recent data) ---
     storageSpec:
       volumeClaimTemplate:
         spec:

@@ -34,7 +34,7 @@ prometheus.relabel "add_labels" {
 
 prometheus.remote_write "lgtm" {
   endpoint {
-    url = sys.env("ALLOY_MIMIR_URL")
+    url = sys.env("ALLOY_PROMETHEUS_URL")
     tls_config {
       insecure_skip_verify = false
     }
