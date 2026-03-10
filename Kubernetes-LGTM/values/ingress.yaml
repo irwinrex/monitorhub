@@ -1,6 +1,15 @@
 # =============================================================================
 # LGTM Stack Ingress - HAProxy (Security Hardened)
+# chart: haproxytech/kubernetes-ingress >= 1.49.0
 # =============================================================================
+
+# -----------------------------------------------------------------------------
+# Prerequisites — create htpasswd secret once:
+#   htpasswd -cb auth admin yourpassword
+#   kubectl create secret generic lgtm-basic-auth \
+#     --from-file=auth \
+#     -n monitoring
+# -----------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
 # 1. Grafana (UI ONLY — no ingress auth)
@@ -11,16 +20,12 @@ metadata:
   name: grafana-ingress
   namespace: monitoring
   annotations:
-
-    # Rate limit
     haproxy.org/rate-limit-requests: "200"
     haproxy.org/rate-limit-period: "10s"
     haproxy.org/rate-limit-status-code: "429"
 
-    # Request protection
     haproxy.org/client-max-body-size: "10m"
 
-    # Security headers
     haproxy.org/response-set-header: |
       X-Frame-Options "SAMEORIGIN"
       X-Content-Type-Options "nosniff"
@@ -28,7 +33,6 @@ metadata:
       X-Robots-Tag "noindex, nofollow"
       Cross-Origin-Opener-Policy "same-origin"
 
-    # Compression
     haproxy.org/backend-config-snippet: |
       compression algo gzip
       compression type text/html text/plain text/css text/javascript application/javascript application/json
@@ -57,12 +61,6 @@ metadata:
   name: prometheus-ingress
   namespace: monitoring
   annotations:
-
-    haproxy.org/auth-type: basic
-    haproxy.org/auth-realm: "Prometheus"
-    haproxy.org/auth-secret: monitoring/lgtm-basic-auth
-
-    # Rate limit
     haproxy.org/rate-limit-requests: "100"
     haproxy.org/rate-limit-period: "10s"
     haproxy.org/rate-limit-status-code: "429"
@@ -77,6 +75,12 @@ metadata:
       X-Robots-Tag "noindex"
 
     haproxy.org/path-rewrite: "^/prom_metrics/(.*) /\\1"
+
+    # HAProxy IC native basic auth (1.49+)
+    # Secret must contain an 'auth' key in htpasswd format
+    haproxy.org/auth-type: "basic-auth"
+    haproxy.org/auth-secret: "lgtm-basic-auth"
+    haproxy.org/auth-realm: "Prometheus"
 
 spec:
   ingressClassName: haproxy
@@ -101,18 +105,11 @@ metadata:
   name: loki-ingress
   namespace: monitoring
   annotations:
-
-    haproxy.org/auth-type: basic
-    haproxy.org/auth-realm: "Loki"
-    haproxy.org/auth-secret: monitoring/lgtm-basic-auth
-
     haproxy.org/rate-limit-requests: "200"
     haproxy.org/rate-limit-period: "10s"
     haproxy.org/rate-limit-status-code: "429"
 
     haproxy.org/client-max-body-size: "50m"
-
-    # Required for log tail streaming
     haproxy.org/timeout-tunnel: "3600s"
 
     haproxy.org/response-set-header: |
@@ -123,6 +120,10 @@ metadata:
       X-Robots-Tag "noindex"
 
     haproxy.org/path-rewrite: "^/loki_logs/(.*) /\\1"
+
+    haproxy.org/auth-type: "basic-auth"
+    haproxy.org/auth-secret: "lgtm-basic-auth"
+    haproxy.org/auth-realm: "Loki"
 
 spec:
   ingressClassName: haproxy
@@ -147,11 +148,6 @@ metadata:
   name: tempo-ingress
   namespace: monitoring
   annotations:
-
-    haproxy.org/auth-type: basic
-    haproxy.org/auth-realm: "Tempo"
-    haproxy.org/auth-secret: monitoring/lgtm-basic-auth
-
     haproxy.org/rate-limit-requests: "100"
     haproxy.org/rate-limit-period: "10s"
     haproxy.org/rate-limit-status-code: "429"
@@ -166,6 +162,10 @@ metadata:
       X-Robots-Tag "noindex"
 
     haproxy.org/path-rewrite: "^/tempo_traces/(.*) /\\1"
+
+    haproxy.org/auth-type: "basic-auth"
+    haproxy.org/auth-secret: "lgtm-basic-auth"
+    haproxy.org/auth-realm: "Tempo"
 
 spec:
   ingressClassName: haproxy
