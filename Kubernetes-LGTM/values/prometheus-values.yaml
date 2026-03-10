@@ -57,6 +57,10 @@ prometheus:
             insecure: false
             signature_version2: false
 
+    # --- Enable Remote Write Receiver ---
+    # Allows Prometheus to receive metrics from other Prometheus/agents
+    enableRemoteWriteReceiver: true
+
     # --- Local Storage (smaller - just for recent data) ---
     storageSpec:
       volumeClaimTemplate:
@@ -75,6 +79,11 @@ prometheus:
         cpu: "1500m"
         memory: 4Gi
 
+    # --- Disable default Kubernetes scrapes (Alloy handles external metrics) ---
+    # Uncomment below to disable default scrapes
+    # serviceMonitorSelector: {}
+    # podMonitorSelector: {}
+    
     additionalScrapeConfigs: []
 
 # =============================================================================
