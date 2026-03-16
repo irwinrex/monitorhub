@@ -11,38 +11,54 @@ discovery.docker "containers" {
 discovery.relabel "app_containers" {
   targets = discovery.docker.containers.targets
 
+  // Set environment from docker compose project name
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    target_label  = "environment"
+    action        = "replace"
+  }
+
+  // Keep only whitelisted service names (pipe-separated regex)
   rule {
     source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
-    regex         = sys.env("ALLOY_SERVICE_NAME")
+    regex         = sys.env("ALLOY_SERVICE_NAMES")
     action        = "keep"
+  }
+
+  // Promote service name as a label
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+    action        = "replace"
   }
 }
 
 loki.source.docker "containers" {
   host          = "unix:///var/run/docker.sock"
-  targets       = discovery.docker.containers.targets
+  targets       = discovery.relabel.app_containers.output
   relabel_rules = discovery.relabel.app_containers.rules
-
-  labels = {
-    service     = sys.env("ALLOY_SERVICE_NAME"),
-    environment = sys.env("ALLOY_ENVIRONMENT"),
-  }
 
   forward_to = [loki.process.logs.receiver]
 }
 
 loki.process "logs" {
+  stage.labels {
+    values = {
+      service   = "service",
+      container = "container_name",
+      stream    = "stream",
+    }
+  }
+
+  stage.match {
+    selector = `{service=""}`
+    action   = "drop"
+  }
+
   stage.timestamp {
     source            = "time"
     format            = "RFC3339"
     action_on_failure = "skip"
-  }
-
-  stage.labels {
-    values = {
-      container = "container_name",
-      stream    = "stream",
-    }
   }
 
   forward_to = [loki.write.loki.receiver]
