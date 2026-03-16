@@ -132,6 +132,6 @@ USE_TZ = True
 STATIC_URL = "static/"
 
 # ---------------------------------------------------------
-# Prometheus Metrics Configuration
+# Logging Configuration
 # ---------------------------------------------------------
-PROMETHEUS_METRICS_ENDPOINT = os.getenv("PROMETHEUS_METRICS_ENDPOINT", "/metrics")
+LOGGING = {}

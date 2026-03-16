@@ -16,20 +16,13 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
 from django.http import HttpResponse
 from . import api_views
 
 
-def metrics(request):
-    from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
-
-    return HttpResponse(generate_latest(), content_type=CONTENT_TYPE_LATEST)
-
-
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("metrics/", metrics, name="metrics"),
     path("api/db/", api_views.db_write_read, name="db_write_read"),
     path("api/503/", api_views.service_unavailable, name="service_unavailable"),
     path("api/200/", api_views.success_response, name="success_response"),

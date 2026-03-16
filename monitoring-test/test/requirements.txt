@@ -5,36 +5,28 @@ Django==5.1.8
 djangorestframework==3.15.2
 django-cors-headers==4.6.0
 mysqlclient==2.2.4
+psutil==7.2.2
 #---------------------------------------------------------
-# Prometheus Metrics
+# Prometheus Client for /metrics endpoint
 #---------------------------------------------------------
-prometheus-client
+prometheus-client==0.21.1
 #---------------------------------------------------------
 # OpenTelemetry Core & SDK
 #---------------------------------------------------------
 opentelemetry-api==1.29.0
 opentelemetry-sdk==1.29.0
-opentelemetry-distro==0.50b0
 #---------------------------------------------------------
 # OpenTelemetry OTLP Exporter with gRPC
 # (Sends Traces, Metrics, and Logs to Grafana Alloy)
 #---------------------------------------------------------
-# gRPC exporter for efficient binary protocol
-opentelemetry-exporter-otlp-proto-grpc==1.29.0
-# HTTP/protobuf exporter as fallback
 opentelemetry-exporter-otlp-proto-http==1.29.0
-# gRPC runtime dependency
-grpcio==1.68.1
 #---------------------------------------------------------
 # OpenTelemetry Instrumentation Packages
 #---------------------------------------------------------
 # Instruments Django requests, responses, and middlewares
 opentelemetry-instrumentation-django==0.50b0
-# Hooks into Python's standard logging module to route logs via OTLP
 opentelemetry-instrumentation-logging==0.50b0
-# Instruments WSGI (Useful if deploying via Gunicorn/uWSGI)
 opentelemetry-instrumentation-wsgi==0.50b0
-# Instruments external HTTP calls (if your Django app calls other APIs)
 opentelemetry-instrumentation-requests==0.50b0
 #---------------------------------------------------------
 # Database Instrumentation (Uncomment your database type)
@@ -43,5 +35,6 @@ opentelemetry-instrumentation-requests==0.50b0
 # opentelemetry-instrumentation-psycopg2==0.50b0
 # For MySQL
 # opentelemetry-instrumentation-pymysql==0.50b0
+opentelemetry-instrumentation-mysqlclient==0.50b0
 # For SQLite
-opentelemetry-instrumentation-sqlite3==0.50b0
+# opentelemetry-instrumentation-sqlite3==0.50b0
