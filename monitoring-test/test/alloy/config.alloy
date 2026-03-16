@@ -1,0 +1,64 @@
+logging {
+  level  = coalesce(sys.env("ALLOY_LOG_LEVEL"), "info")
+  format = "json"
+}
+
+discovery.docker "containers" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "10s"
+}
+
+discovery.relabel "app_containers" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    regex         = sys.env("ALLOY_SERVICE_NAME")
+    action        = "keep"
+  }
+}
+
+loki.source.docker "containers" {
+  host          = "unix:///var/run/docker.sock"
+  targets       = discovery.docker.containers.targets
+  relabel_rules = discovery.relabel.app_containers.rules
+
+  labels = {
+    service     = sys.env("ALLOY_SERVICE_NAME"),
+    environment = sys.env("ALLOY_ENVIRONMENT"),
+  }
+
+  forward_to = [loki.process.logs.receiver]
+}
+
+loki.process "logs" {
+  stage.timestamp {
+    source            = "time"
+    format            = "RFC3339"
+    action_on_failure = "skip"
+  }
+
+  stage.labels {
+    values = {
+      container = "container_name",
+      stream    = "stream",
+    }
+  }
+
+  forward_to = [loki.write.loki.receiver]
+}
+
+loki.write "loki" {
+  endpoint {
+    url = sys.env("ALLOY_LOKI_URL")
+
+    basic_auth {
+      username = sys.env("ALLOY_AUTH_USERNAME")
+      password = sys.env("ALLOY_AUTH_PASSWORD")
+    }
+
+    tls_config {
+      insecure_skip_verify = false
+    }
+  }
+}

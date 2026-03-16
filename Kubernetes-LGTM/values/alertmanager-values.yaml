@@ -1,0 +1,67 @@
+# =============================================================================
+# Alertmanager Configuration
+# Alertmanager handles alerts from Prometheus and routes them to receivers
+# Currently using basic webhook configuration
+# Note: Prometheus (kube-prometheus-stack) includes its own Alertmanager
+# This standalone alertmanager is optional and can be disabled
+# =============================================================================
+
+alertmanager:
+  enabled: true  # Enable Alertmanager
+  clusterDomain: cluster.local  # Kubernetes cluster domain
+  
+  # Persistent storage for alert data
+  persistentVolume:
+    enabled: true
+    size: 1Gi      # 1 GB storage
+    storageClass: local-path  # Use local storage
+  
+  # Resource limits
+  resources:
+    requests:
+      cpu: 100m    # Request 100 millicpus
+      memory: 128Mi  # Request 128 MB RAM
+    limits:
+      cpu: 250m    # Max 250 millicpus
+      memory: 256Mi  # Max 256 MB RAM
+  
+  # Number of replicas (1 for single node)
+  replicaCount: 1
+  
+  # Security settings
+  securityContext:
+    runAsUser: 10001       # Run as non-root user
+    runAsNonRoot: true
+    fsGroup: 10001         # Group for file access
+
+# Alertmanager configuration
+config:
+  # Global settings
+  global:
+    resolve_timeout: 5m  # Time to wait before resolving alert
+  
+  # Routing configuration - how to route alerts
+  route:
+    group_by: ['alertname']           # Group by alert name
+    group_wait: 10s                   # Wait 10s before sending first alert
+    group_interval: 10s                # Send new alerts every 10s
+    repeat_interval: 12h              # Repeat alert every 12 hours
+    receiver: 'default'                # Default receiver
+    routes:
+      - match:
+          namespace: monitoring        # Match alerts from monitoring namespace
+        receiver: 'default'
+  
+  # Receiver configurations
+  receivers:
+    - name: 'default'
+      webhook_configs:
+        - send_resolved: true  # Send notification when alert resolves
+
+# Disable ingress - only internal access needed
+ingress:
+  enabled: false
+
+# Disable Prometheus - not needed, Prometheus handles metrics
+prometheus:
+  enabled: false

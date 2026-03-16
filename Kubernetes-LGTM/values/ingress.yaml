@@ -1,0 +1,181 @@
+# =============================================================================
+# LGTM Stack Ingress - HAProxy (Security Hardened)
+# chart: haproxytech/kubernetes-ingress >= 1.49.0
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Prerequisites — create htpasswd secret once:
+#   htpasswd -cb auth admin yourpassword
+#   kubectl create secret generic lgtm-basic-auth \
+#     --from-file=auth \
+#     -n monitoring
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# 1. Grafana (UI ONLY — no ingress auth)
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana-ingress
+  namespace: monitoring
+  annotations:
+    haproxy.org/rate-limit-requests: "200"
+    haproxy.org/rate-limit-period: "10s"
+    haproxy.org/rate-limit-status-code: "429"
+
+    haproxy.org/client-max-body-size: "10m"
+
+    haproxy.org/response-set-header: |
+      X-Frame-Options "SAMEORIGIN"
+      X-Content-Type-Options "nosniff"
+      Referrer-Policy "strict-origin-when-cross-origin"
+      X-Robots-Tag "noindex, nofollow"
+      Cross-Origin-Opener-Policy "same-origin"
+
+    haproxy.org/backend-config-snippet: |
+      compression algo gzip
+      compression type text/html text/plain text/css text/javascript application/javascript application/json
+      compression minsize 256
+
+spec:
+  ingressClassName: haproxy
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 80
+
+---
+# -----------------------------------------------------------------------------
+# 2. Prometheus
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: prometheus-ingress
+  namespace: monitoring
+  annotations:
+    haproxy.org/rate-limit-requests: "100"
+    haproxy.org/rate-limit-period: "10s"
+    haproxy.org/rate-limit-status-code: "429"
+
+    haproxy.org/client-max-body-size: "20m"
+
+    haproxy.org/response-set-header: |
+      X-Frame-Options "DENY"
+      X-Content-Type-Options "nosniff"
+      Referrer-Policy "no-referrer"
+      Cache-Control "no-store"
+      X-Robots-Tag "noindex"
+
+    haproxy.org/path-rewrite: "^/prom_metrics/(.*) /\\1"
+
+    # HAProxy IC native basic auth (1.49+)
+    # Secret must contain an 'auth' key in htpasswd format
+    haproxy.org/auth-type: "basic-auth"
+    haproxy.org/auth-secret: "lgtm-basic-auth"
+    haproxy.org/auth-realm: "Prometheus"
+
+spec:
+  ingressClassName: haproxy
+  rules:
+  - http:
+      paths:
+      - path: /prom_metrics
+        pathType: Prefix
+        backend:
+          service:
+            name: prometheus-kube-prometheus-prometheus
+            port:
+              number: 9090
+
+---
+# -----------------------------------------------------------------------------
+# 3. Loki
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: loki-ingress
+  namespace: monitoring
+  annotations:
+    haproxy.org/rate-limit-requests: "200"
+    haproxy.org/rate-limit-period: "10s"
+    haproxy.org/rate-limit-status-code: "429"
+
+    haproxy.org/client-max-body-size: "50m"
+    haproxy.org/timeout-tunnel: "3600s"
+
+    haproxy.org/response-set-header: |
+      X-Frame-Options "DENY"
+      X-Content-Type-Options "nosniff"
+      Referrer-Policy "no-referrer"
+      Cache-Control "no-store"
+      X-Robots-Tag "noindex"
+
+    haproxy.org/path-rewrite: "^/loki_logs/(.*) /\\1"
+
+    haproxy.org/auth-type: "basic-auth"
+    haproxy.org/auth-secret: "lgtm-basic-auth"
+    haproxy.org/auth-realm: "Loki"
+
+spec:
+  ingressClassName: haproxy
+  rules:
+  - http:
+      paths:
+      - path: /loki_logs
+        pathType: Prefix
+        backend:
+          service:
+            name: loki
+            port:
+              number: 3100
+
+---
+# -----------------------------------------------------------------------------
+# 4. Tempo
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tempo-ingress
+  namespace: monitoring
+  annotations:
+    haproxy.org/rate-limit-requests: "100"
+    haproxy.org/rate-limit-period: "10s"
+    haproxy.org/rate-limit-status-code: "429"
+
+    haproxy.org/client-max-body-size: "20m"
+
+    haproxy.org/response-set-header: |
+      X-Frame-Options "DENY"
+      X-Content-Type-Options "nosniff"
+      Referrer-Policy "no-referrer"
+      Cache-Control "no-store"
+      X-Robots-Tag "noindex"
+
+    haproxy.org/path-rewrite: "^/tempo_traces/(.*) /\\1"
+
+    haproxy.org/auth-type: "basic-auth"
+    haproxy.org/auth-secret: "lgtm-basic-auth"
+    haproxy.org/auth-realm: "Tempo"
+
+spec:
+  ingressClassName: haproxy
+  rules:
+  - http:
+      paths:
+      - path: /tempo_traces
+        pathType: Prefix
+        backend:
+          service:
+            name: tempo
+            port:
+              number: 3200

@@ -1,0 +1,109 @@
+# =============================================================================
+# prometheus-values.yaml — prometheus-community/kube-prometheus-stack v58.0.0
+# Prometheus with 90-day retention in local PVC
+# =============================================================================
+
+# --- Disable components we don't need ---
+grafana:
+  enabled: false
+
+# =============================================================================
+# Alertmanager Configuration
+# =============================================================================
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    replicas: 1
+    storage:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi # Alertmanager state (silences, notifications)
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# =============================================================================
+# Prometheus Server Configuration
+# =============================================================================
+prometheus:
+  enabled: true
+  prometheusSpec:
+    replicas: 1
+
+    # --- Retention Configuration ---
+    # 90 days total queryable retention
+    # 30d local PVC + S3 for long-term
+    retention: 90d
+
+    # --- Thanos Sidecar for S3 Upload ---
+    # Uploads TSDB blocks to S3 for long-term storage
+    thanos:
+      image: thanosio/thanos:v0.36.1
+      version: v0.36.1
+      objectStorageConfig:
+        config:
+          type: S3
+          config:
+            bucket: ${S3_BUCKET_PROMETHEUS}
+            endpoint: s3.dualstack.${S3_REGION}.amazonaws.com
+            region: ${S3_REGION}
+            insecure: false
+            signature_version2: false
+
+    # --- Enable Remote Write Receiver ---
+    # Allows Prometheus to receive metrics from other Prometheus/agents
+    enableRemoteWriteReceiver: true
+
+    # --- Local Storage (smaller - just for recent data) ---
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 30Gi
+
+    # --- Resource Allocation ---
+    resources:
+      requests:
+        cpu: 400m
+        memory: 2Gi
+      limits:
+        cpu: "1500m"
+        memory: 4Gi
+
+    # --- Disable default Kubernetes scrapes (Alloy handles external metrics) ---
+    # Uncomment below to disable default scrapes
+    # serviceMonitorSelector: {}
+    # podMonitorSelector: {}
+    
+    additionalScrapeConfigs: []
+
+# =============================================================================
+# Other Components
+# =============================================================================
+kube-state-metrics:
+  enabled: true
+  replicas: 1
+
+prometheus-node-exporter:
+  enabled: true
+  daemonset:
+    replicas: 1
+
+prometheusOperator:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi

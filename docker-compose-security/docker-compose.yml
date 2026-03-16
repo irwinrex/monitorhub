@@ -152,8 +152,8 @@ services:
     environment:
       - REPO_URL=${REPO_URL}
       - ACCESS_TOKEN=${ACCESS_TOKEN}
-      - RUNNER_NAME=${RUNNER_NAME:-security-scanner-runner}
-      - RUNNER_LABELS=${RUNNER_LABELS:-self-hosted,security-scanner}
+      - RUNNER_NAME=${RUNNER_NAME}
+      - RUNNER_LABELS=${RUNNER_LABELS}
       - DISABLE_RUNNER_UPDATE_CHECK=true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

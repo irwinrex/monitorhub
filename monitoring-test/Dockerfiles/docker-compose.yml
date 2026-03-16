@@ -1,0 +1,77 @@
+services:
+  app:
+    build:
+      context: ../test
+      dockerfile: ../Dockerfiles/Dockerfile
+    container_name: ${APP_NAME}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - OTEL_LOG_LEVEL=${OTEL_LOG_LEVEL}
+      - LOG_LEVEL=${LOG_LEVEL}
+    volumes:
+      - ../test:/app
+      - app_logs:/app/logs
+    ports:
+      - "${APP_PORT}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - monitoring
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  db:
+    image: mysql:8.4.7
+    container_name: mysql_db
+    restart: unless-stopped
+    command: >
+      mysqld 
+      --mysql-native-password=ON 
+      --authentication-policy=mysql_native_password,,
+    env_file:
+      - .env
+    ports:
+      - "${DB_PORT}:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - monitoring
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  alloy:
+    image: grafana/alloy:latest
+    container_name: grafana_alloy
+    restart: unless-stopped
+    command: ["run", "--server.http.listen-addr=0.0.0.0:${ALLOY_PORT}", "/etc/alloy/config.alloy"]
+    env_file:
+      - .env
+    environment:
+      - ALLOY_SERVICE_NAME=${ALLOY_SERVICE_NAME}
+      - ALLOY_ENVIRONMENT=${ALLOY_ENVIRONMENT}
+    volumes:
+      - ../test/alloy:/etc/alloy
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "${ALLOY_PORT}:${ALLOY_PORT}"
+    networks:
+      - monitoring
+    privileged: true
+
+volumes:
+  db_data:
+  app_logs:
+
+networks:
+  monitoring:
+    driver: bridge

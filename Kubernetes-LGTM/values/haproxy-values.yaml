@@ -1,0 +1,68 @@
+# =============================================================================
+# HAProxy Kubernetes Ingress Controller
+# HTTP ONLY (DaemonSet + HostPort 80)
+# =============================================================================
+
+controller:
+
+  kind: DaemonSet
+
+  daemonset:
+    useHostPort: true
+
+  ingressClass: haproxy
+
+  ingressClassResource:
+    enabled: true
+    name: haproxy
+    default: true
+
+  service:
+    type: ClusterIP
+
+  config:
+
+    # Observability stack tuning
+    timeout-connect: "10s"
+    timeout-client: "300s"
+    timeout-server: "300s"
+    timeout-http-request: "60s"
+    timeout-keep-alive: "60s"
+
+    # Loki live tail
+    timeout-tunnel: "3600s"
+
+    forwarded-for: "true"
+    use-forwarded-headers: "true"
+
+    http-connection-mode: "http-keep-alive"
+
+    dontlognull: "true"
+    maxconn: "4000"
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  stats:
+    enabled: true
+    port: 1024
+
+  metrics:
+    enabled: true
+
+defaultBackend:
+  enabled: true
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi

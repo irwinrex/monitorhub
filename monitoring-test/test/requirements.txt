@@ -1,0 +1,40 @@
+#---------------------------------------------------------
+# Web Framework
+#---------------------------------------------------------
+Django==5.1.8
+djangorestframework==3.15.2
+django-cors-headers==4.6.0
+mysqlclient==2.2.4
+psutil==7.2.2
+#---------------------------------------------------------
+# Prometheus Client for /metrics endpoint
+#---------------------------------------------------------
+prometheus-client==0.21.1
+#---------------------------------------------------------
+# OpenTelemetry Core & SDK
+#---------------------------------------------------------
+opentelemetry-api==1.29.0
+opentelemetry-sdk==1.29.0
+#---------------------------------------------------------
+# OpenTelemetry OTLP Exporter with gRPC
+# (Sends Traces, Metrics, and Logs to Grafana Alloy)
+#---------------------------------------------------------
+opentelemetry-exporter-otlp-proto-http==1.29.0
+#---------------------------------------------------------
+# OpenTelemetry Instrumentation Packages
+#---------------------------------------------------------
+# Instruments Django requests, responses, and middlewares
+opentelemetry-instrumentation-django==0.50b0
+opentelemetry-instrumentation-logging==0.50b0
+opentelemetry-instrumentation-wsgi==0.50b0
+opentelemetry-instrumentation-requests==0.50b0
+#---------------------------------------------------------
+# Database Instrumentation (Uncomment your database type)
+#---------------------------------------------------------
+# For PostgreSQL
+# opentelemetry-instrumentation-psycopg2==0.50b0
+# For MySQL
+# opentelemetry-instrumentation-pymysql==0.50b0
+opentelemetry-instrumentation-mysqlclient==0.50b0
+# For SQLite
+# opentelemetry-instrumentation-sqlite3==0.50b0
