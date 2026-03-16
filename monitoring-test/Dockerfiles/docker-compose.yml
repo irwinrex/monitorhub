@@ -55,6 +55,7 @@ services:
     environment:
       - ALLOY_SERVICE_NAMES=${ALLOY_SERVICE_NAMES}
       - ALLOY_ENVIRONMENT=${ALLOY_ENVIRONMENT}
+      - ALLOY_DOCKER_PROJECT=${ALLOY_DOCKER_PROJECT}
     volumes:
       - ../test/alloy:/etc/alloy
       - /var/run/docker.sock:/var/run/docker.sock

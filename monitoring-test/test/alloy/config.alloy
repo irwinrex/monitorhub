@@ -11,11 +11,11 @@ discovery.docker "containers" {
 discovery.relabel "app_containers" {
   targets = discovery.docker.containers.targets
 
-  // Set environment from docker compose project name
+  // Filter by docker compose project name
   rule {
     source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
-    target_label  = "environment"
-    action        = "replace"
+    regex         = sys.env("ALLOY_DOCKER_PROJECT")
+    action        = "keep"
   }
 
   // Keep only whitelisted service names (pipe-separated regex)
@@ -29,6 +29,13 @@ discovery.relabel "app_containers" {
   rule {
     source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
     target_label  = "service"
+    action        = "replace"
+  }
+
+  // Set environment label from ALLOY_ENVIRONMENT
+  rule {
+    target_label  = "environment"
+    replacement   = sys.env("ALLOY_ENVIRONMENT")
     action        = "replace"
   }
 }
