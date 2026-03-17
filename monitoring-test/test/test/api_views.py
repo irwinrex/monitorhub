@@ -45,3 +45,27 @@ def traceback_error(request):
             },
             status=500,
         )
+
+
+def healthcheck(request):
+    return JsonResponse({"status": "healthy"}, status=200)
+
+
+def healthcheck_503(request):
+    return JsonResponse({"status": "unhealthy"}, status=503)
+
+
+def healthcheck_201(request):
+    return JsonResponse({"status": "created"}, status=201)
+
+
+def healthcheck_202(request):
+    return JsonResponse({"status": "accepted"}, status=202)
+
+
+def healthcheck_404(request):
+    return JsonResponse({"status": "not found"}, status=404)
+
+
+def healthcheck_403(request):
+    return JsonResponse({"status": "forbidden"}, status=403)

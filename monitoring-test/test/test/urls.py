@@ -27,4 +27,8 @@ urlpatterns = [
     path("api/503/", api_views.service_unavailable, name="service_unavailable"),
     path("api/200/", api_views.success_response, name="success_response"),
     path("api/traceback/", api_views.traceback_error, name="traceback_error"),
+    path("api/health/", api_views.healthcheck, name="healthcheck"),
+    path("api/201/", api_views.healthcheck_201, name="healthcheck_201"),
+    path("api/202/", api_views.healthcheck_202, name="healthcheck_202"),
+    path("api/403/", api_views.healthcheck_403, name="healthcheck_403"),
 ]

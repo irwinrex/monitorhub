@@ -65,6 +65,10 @@ loki.process "logs" {
     action_on_failure = "skip"
   }
 
+  stage.drop {
+    expression = ".*(/health|/ping|/ready).*"
+  }
+
   forward_to = [loki.write.loki.receiver]
 }
 
