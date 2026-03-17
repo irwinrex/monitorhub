@@ -50,6 +50,7 @@ The Alloy config (`test/alloy/config.alloy`) automatically:
 - Filters logs using `ALLOY_SERVICE_NAMES` (supports pipe-separated values, e.g., `app|db|worker`)
 - Adds `service` and `environment` labels to all logs
 - Ships logs to Loki
+- **Both `ALLOY_SERVICE_NAMES` and `ALLOY_ENVIRONMENT` are required**
 
 ### Dashboard
 
