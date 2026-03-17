@@ -17,7 +17,7 @@ cp .env.sample .env
 ```
 
 2. Update the following variables in `.env`:
-   - `ALLOY_SERVICE_NAME` - Your service name (used for filtering logs)
+   - `ALLOY_SERVICE_NAMES` - Your service name(s) for filtering logs (pipe-separated for multiple)
    - `ALLOY_ENVIRONMENT` - Environment (e.g., local, staging, prod)
    - `ALLOY_LOKI_URL` - Your Loki push endpoint
    - `ALLOY_AUTH_USERNAME` - Loki username
@@ -37,7 +37,7 @@ docker compose up -d
 |----------|-------------|---------|
 | `APP_PORT` | Application port | 8000 |
 | `APP_NAME` | Container name | python-app |
-| `ALLOY_SERVICE_NAME` | Service name for logs | app |
+| `ALLOY_SERVICE_NAMES` | Service name(s) for logs (pipe-separated) | app |
 | `ALLOY_ENVIRONMENT` | Environment label | local |
 | `ALLOY_LOKI_URL` | Loki push endpoint | - |
 | `ALLOY_LOG_LEVEL` | Alloy log level | info |
@@ -47,9 +47,10 @@ docker compose up -d
 
 The Alloy config (`test/alloy/config.alloy`) automatically:
 - Discovers Docker containers by compose service name
-- Filters logs using `ALLOY_SERVICE_NAME`
+- Filters logs using `ALLOY_SERVICE_NAMES` (supports pipe-separated values, e.g., `app|db|worker`)
 - Adds `service` and `environment` labels to all logs
 - Ships logs to Loki
+- **Both `ALLOY_SERVICE_NAMES` and `ALLOY_ENVIRONMENT` are required**
 
 ### Dashboard
 

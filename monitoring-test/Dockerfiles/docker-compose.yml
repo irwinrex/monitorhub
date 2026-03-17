@@ -3,12 +3,10 @@ services:
     build:
       context: ../test
       dockerfile: ../Dockerfiles/Dockerfile
-    container_name: ${APP_NAME}
     restart: unless-stopped
     env_file:
       - .env
     environment:
-      - OTEL_LOG_LEVEL=${OTEL_LOG_LEVEL}
       - LOG_LEVEL=${LOG_LEVEL}
     volumes:
       - ../test:/app
@@ -28,7 +26,6 @@ services:
 
   db:
     image: mysql:8.4.7
-    container_name: mysql_db
     restart: unless-stopped
     command: >
       mysqld 
@@ -51,13 +48,12 @@ services:
 
   alloy:
     image: grafana/alloy:latest
-    container_name: grafana_alloy
     restart: unless-stopped
     command: ["run", "--server.http.listen-addr=0.0.0.0:${ALLOY_PORT}", "/etc/alloy/config.alloy"]
     env_file:
       - .env
     environment:
-      - ALLOY_SERVICE_NAME=${ALLOY_SERVICE_NAME}
+      - ALLOY_SERVICE_NAMES=${ALLOY_SERVICE_NAMES}
       - ALLOY_ENVIRONMENT=${ALLOY_ENVIRONMENT}
     volumes:
       - ../test/alloy:/etc/alloy

@@ -13,36 +13,56 @@ discovery.relabel "app_containers" {
 
   rule {
     source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
-    regex         = sys.env("ALLOY_SERVICE_NAME")
+    regex         = sys.env("ALLOY_SERVICE_NAMES")
     action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+    action        = "replace"
+  }
+
+  rule {
+    target_label = "environment"
+    replacement  = sys.env("ALLOY_ENVIRONMENT")
+    action       = "replace"
+  }
+
+  rule {
+    source_labels = ["environment", "service"]
+    separator     = "-"
+    target_label  = "service"
+    action        = "replace"
   }
 }
 
 loki.source.docker "containers" {
   host          = "unix:///var/run/docker.sock"
-  targets       = discovery.docker.containers.targets
+  targets       = discovery.relabel.app_containers.output
   relabel_rules = discovery.relabel.app_containers.rules
-
-  labels = {
-    service     = sys.env("ALLOY_SERVICE_NAME"),
-    environment = sys.env("ALLOY_ENVIRONMENT"),
-  }
 
   forward_to = [loki.process.logs.receiver]
 }
 
 loki.process "logs" {
+  stage.labels {
+    values = {
+      service   = "service",
+      container = "container_name",
+      stream    = "stream",
+    }
+  }
+
+  stage.match {
+    selector = `{service=""}`
+    action   = "drop"
+  }
+
   stage.timestamp {
     source            = "time"
     format            = "RFC3339"
     action_on_failure = "skip"
-  }
-
-  stage.labels {
-    values = {
-      container = "container_name",
-      stream    = "stream",
-    }
   }
 
   forward_to = [loki.write.loki.receiver]
