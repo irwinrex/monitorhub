@@ -3,32 +3,42 @@ logging {
   format = "json"
 }
 
+// --------------------------------------------------------
+// Container Discovery
+// --------------------------------------------------------
+
+// Discovers running Docker containers via Docker socket
 discovery.docker "containers" {
   host             = "unix:///var/run/docker.sock"
   refresh_interval = "10s"
 }
 
+// Filters and labels app containers for Loki log shipping
 discovery.relabel "app_containers" {
   targets = discovery.docker.containers.targets
 
+  // Keep only containers matching ALLOY_SERVICE_NAMES (e.g., "app|db")
   rule {
     source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
     regex         = sys.env("ALLOY_SERVICE_NAMES")
     action        = "keep"
   }
 
+  // Extract service name from container label
   rule {
     source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
     target_label  = "service"
     action        = "replace"
   }
 
+  // Add environment label (e.g., "ai-local", "prod")
   rule {
     target_label = "environment"
     replacement  = sys.env("ALLOY_ENVIRONMENT")
     action       = "replace"
   }
 
+  // Combine: environment-service (e.g., "ai-local-app")
   rule {
     source_labels = ["environment", "service"]
     separator     = "-"
@@ -37,6 +47,11 @@ discovery.relabel "app_containers" {
   }
 }
 
+// --------------------------------------------------------
+// Log Shipping to Loki
+// --------------------------------------------------------
+
+// Collects container stdout/stderr logs
 loki.source.docker "containers" {
   host          = "unix:///var/run/docker.sock"
   targets       = discovery.relabel.app_containers.output
@@ -45,7 +60,9 @@ loki.source.docker "containers" {
   forward_to = [loki.process.logs.receiver]
 }
 
+// Processes and transforms log entries
 loki.process "logs" {
+  // Extract labels from log stream
   stage.labels {
     values = {
       service   = "service",
@@ -54,17 +71,20 @@ loki.process "logs" {
     }
   }
 
+  // Drop logs with empty service label
   stage.match {
     selector = `{service=""}`
     action   = "drop"
   }
 
+  // Parse timestamp from container log "time" field
   stage.timestamp {
     source            = "time"
     format            = "RFC3339"
     action_on_failure = "skip"
   }
 
+  // Drop health check endpoints from logs
   stage.drop {
     expression = ".*(/health|/ping|/ready).*"
   }
@@ -72,9 +92,74 @@ loki.process "logs" {
   forward_to = [loki.write.loki.receiver]
 }
 
+// Ships processed logs to Grafana Loki
 loki.write "loki" {
   endpoint {
     url = sys.env("ALLOY_LOKI_URL")
+
+    basic_auth {
+      username = sys.env("ALLOY_AUTH_USERNAME")
+      password = sys.env("ALLOY_AUTH_PASSWORD")
+    }
+
+    tls_config {
+      insecure_skip_verify = false
+    }
+  }
+}
+
+// --------------------------------------------------------
+// Metrics Scraping (Prometheus Node Exporter)
+// --------------------------------------------------------
+
+// Bundled node exporter - collects CPU, memory, disk, network metrics
+prometheus.exporter.unix "local" {
+  enable_collectors = ["cpu", "meminfo", "diskstats", "filesystem", "loadavg", "netdev", "stat", "time", "uname"]
+}
+
+// Adds labels to node metrics for dashboard compatibility
+discovery.relabel "unix_metrics" {
+  targets = prometheus.exporter.unix.local.targets
+
+  // instance must be host:port format for dashboard 1860 variable
+  rule {
+    target_label = "instance"
+    replacement  = sys.env("ALLOY_HOSTNAME") + ":9100"
+  }
+
+  // job label — required by dashboard 1860 variable query
+  rule {
+    target_label = "job"
+    replacement  = "node-exporter"
+  }
+
+  // nodename for identifying the server (ALLOY_HOSTNAME > ALLOY_HOST_IP > container hostname)
+  rule {
+    target_label = "nodename"
+    replacement  = coalesce(sys.env("ALLOY_HOSTNAME"), sys.env("ALLOY_HOST_IP"), constants.hostname)
+  }
+}
+
+// Scrapes node exporter metrics every 30 seconds
+prometheus.scrape "node_metrics" {
+  scrape_interval = "30s"
+  targets         = discovery.relabel.unix_metrics.output
+
+  // Use legacy metric naming to avoid Prometheus mangling colons
+  metric_name_validation_scheme = "legacy"
+  metric_name_escaping_scheme   = "underscores"
+
+  forward_to = [prometheus.remote_write.metrics.receiver]
+}
+
+// --------------------------------------------------------
+// Remote Write to Prometheus / Mimir
+// --------------------------------------------------------
+
+// Ships collected metrics to Grafana Mimir (remote write endpoint)
+prometheus.remote_write "metrics" {
+  endpoint {
+    url = sys.env("ALLOY_PROMETHEUS_URL")
 
     basic_auth {
       username = sys.env("ALLOY_AUTH_USERNAME")

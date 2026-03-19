@@ -3,7 +3,10 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
@@ -15,46 +18,78 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 8,
+  "id": 0,
   "links": [],
   "panels": [
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "id": 100,
       "panels": [],
       "title": "Overview",
       "type": "row"
     },
     {
-      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "datasource": {
+        "type": "loki",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "color": "green", "value": null }]
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
           },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
       "id": 1,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "textMode": "value"
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
       },
       "pluginVersion": "12.3.1",
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "${datasource}" },
-          "expr": "sum(count_over_time({service=~\"$service\", environment=~\"$environment\"}[$__interval]))",
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(count_over_time({service_name=~\"$service\"}[5m]) or vector(0))",
           "legendFormat": "Total",
           "refId": "A"
         }
@@ -63,38 +98,69 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "datasource": {
+        "type": "loki",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "yellow", "value": null },
-              { "color": "orange", "value": 1 },
-              { "color": "red", "value": 10 }
+              {
+                "color": "yellow",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
             ]
           },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
       "id": 2,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "textMode": "value"
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
       },
       "pluginVersion": "12.3.1",
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "${datasource}" },
-          "expr": "sum(count_over_time({service=~\"$service\", environment=~\"$environment\"} |~ `\" [45][0-9]{2} ` | pattern `<_> \"<method> <path> <_>\" <status> <size>` | status =~ `4..` [$__interval]))",
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(count_over_time({service_name=~\"$service\"} |~ `\" 4[0-9]{2}` [5m]) or vector(0))",
           "legendFormat": "4XX",
           "refId": "A"
         }
@@ -103,38 +169,69 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "datasource": {
+        "type": "loki",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "orange", "value": 1 },
-              { "color": "red", "value": 5 }
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
             ]
           },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 1
+      },
       "id": 3,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "textMode": "value"
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
       },
       "pluginVersion": "12.3.1",
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "${datasource}" },
-          "expr": "sum(count_over_time({service=~\"$service\", environment=~\"$environment\"} |~ `\" [5][0-9]{2} ` | pattern `<_> \"<method> <path> <_>\" <status> <size>` | status =~ `5..` [$__interval]))",
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(count_over_time({service_name=~\"$service\"} |~ `\" 5[0-9]{2}` [5m]) or vector(0))",
           "legendFormat": "5XX",
           "refId": "A"
         }
@@ -143,34 +240,61 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "datasource": {
+        "type": "loki",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "color": "green", "value": null }]
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
           },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 1
+      },
       "id": 4,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "textMode": "value"
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
       },
       "pluginVersion": "12.3.1",
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "${datasource}" },
-          "expr": "sum(count_over_time({service=~\"$service\", environment=~\"$environment\"} |~ `\" [2][0-9]{2} ` | pattern `<_> \"<method> <path> <_>\" <status> <size>` | status =~ `2..` [$__interval]))",
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(count_over_time({service_name=~\"$service\"} |~ `\" 2[0-9]{2}` [5m]) or vector(0))",
           "legendFormat": "2XX",
           "refId": "A"
         }
@@ -180,17 +304,27 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
       "id": 101,
       "panels": [],
       "title": "Log Volume",
       "type": "row"
     },
     {
-      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "datasource": {
+        "type": "loki",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "axisBorderShow": false,
             "axisCenteredZero": false,
@@ -202,45 +336,75 @@
             "drawStyle": "bars",
             "fillOpacity": 80,
             "gradientMode": "none",
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
             "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
-            "scaleDistribution": { "type": "linear" },
+            "scaleDistribution": {
+              "type": "linear"
+            },
             "showPoints": "never",
             "showValues": false,
             "spanNulls": false,
-            "stacking": { "group": "A", "mode": "normal" },
-            "thresholdsStyle": { "mode": "off" }
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "color": "green", "value": null }]
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
           },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 6 },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
       "id": 5,
       "options": {
         "legend": {
-          "calcs": ["count"],
+          "calcs": [
+            "count"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true,
           "sortBy": "Count",
           "sortDesc": true
         },
-        "tooltip": { "hideZeros": false, "mode": "multi", "sort": "none" }
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
       },
       "pluginVersion": "12.3.1",
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "${datasource}" },
-          "expr": "sum by (status) (count_over_time({service=~\"$service\", environment=~\"$environment\"} | pattern `<ts> \"<method> <path> <protocol>\" <status> <size>` | status != `` [$__interval]))",
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (status) (count_over_time({service_name=~\"$service\"} | pattern `<_> \"<method> <path> <protocol>\" <status>` | status != `` [$__interval]))",
           "legendFormat": "HTTP {{status}}",
           "refId": "A"
         }
@@ -250,16 +414,32 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
       "id": 102,
       "panels": [],
       "title": "Recent Errors",
       "type": "row"
     },
     {
-      "datasource": { "type": "loki", "uid": "${datasource}" },
-      "fieldConfig": { "defaults": {}, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "datasource": {
+        "type": "loki",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 15
+      },
       "id": 7,
       "options": {
         "dedupStrategy": "none",
@@ -274,8 +454,11 @@
       "pluginVersion": "12.3.1",
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "${datasource}" },
-          "expr": "{service=~\"$service\", environment=~\"$environment\"} | pattern `<ts> \"<method> <path> <protocol>\" <status> <size>` | status =~ `4..`",
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource}"
+          },
+          "expr": "{service_name=~\"$service\"} | pattern `<_> \"<method> <path> <protocol>\" <status>` | status =~ `4..`",
           "maxLines": 5,
           "refId": "A"
         }
@@ -284,9 +467,20 @@
       "type": "logs"
     },
     {
-      "datasource": { "type": "loki", "uid": "${datasource}" },
-      "fieldConfig": { "defaults": {}, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+      "datasource": {
+        "type": "loki",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 15
+      },
       "id": 8,
       "options": {
         "dedupStrategy": "none",
@@ -301,8 +495,11 @@
       "pluginVersion": "12.3.1",
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "${datasource}" },
-          "expr": "{service=~\"$service\", environment=~\"$environment\"} | pattern `<ts> \"<method> <path> <protocol>\" <status> <size>` | status =~ `5..`",
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource}"
+          },
+          "expr": "{service_name=~\"$service\"} | pattern `<_> \"<method> <path> <protocol>\" <status>` | status =~ `5..`",
           "maxLines": 5,
           "refId": "A"
         }
@@ -312,16 +509,32 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
       "id": 103,
       "panels": [],
       "title": "All Logs",
       "type": "row"
     },
     {
-      "datasource": { "type": "loki", "uid": "${datasource}" },
-      "fieldConfig": { "defaults": {}, "overrides": [] },
-      "gridPos": { "h": 15, "w": 24, "x": 0, "y": 24 },
+      "datasource": {
+        "type": "loki",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 15,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
       "id": 6,
       "options": {
         "dedupStrategy": "none",
@@ -336,8 +549,11 @@
       "pluginVersion": "12.3.1",
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "${datasource}" },
-          "expr": "{service=~\"$service\", environment=~\"$environment\"}",
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource}"
+          },
+          "expr": "{service_name=~\"$service\"}",
           "refId": "A"
         }
       ],
@@ -348,11 +564,18 @@
   "preload": false,
   "refresh": "10s",
   "schemaVersion": 42,
-  "tags": ["loki", "logs", "alloy"],
+  "tags": [
+    "loki",
+    "logs",
+    "alloy"
+  ],
   "templating": {
     "list": [
       {
-        "current": { "text": "Loki", "value": "loki" },
+        "current": {
+          "text": "Loki",
+          "value": "loki"
+        },
         "includeAll": false,
         "label": "Data Source",
         "name": "datasource",
@@ -363,53 +586,39 @@
         "type": "datasource"
       },
       {
-        "allValue": ".*",
-        "current": { "text": ["app"], "value": ["app"] },
-        "datasource": { "type": "loki", "uid": "loki" },
+        "current": {
+          "text": "ai-alpha-non-clinical-agent",
+          "value": "ai-alpha-non-clinical-agent"
+        },
+        "datasource": {
+          "type": "loki",
+          "uid": "${datasource}"
+        },
         "definition": "",
-        "includeAll": true,
+        "includeAll": false,
         "label": "Service",
-        "multi": true,
         "name": "service",
         "options": [],
         "query": {
           "label": "service_name",
           "refId": "LokiVariableQueryEditor-VariableQuery",
-          "stream": "",
+          "stream": "{service_name=~\"ai-alpha.*\"}",
           "type": 1
         },
         "refresh": 2,
-        "regex": "",
-        "sort": 1,
-        "type": "query"
-      },
-      {
-        "allValue": ".*",
-        "current": { "text": ["local"], "value": ["local"] },
-        "datasource": { "type": "loki", "uid": "loki" },
-        "definition": "",
-        "includeAll": true,
-        "label": "Environment",
-        "multi": true,
-        "name": "environment",
-        "options": [],
-        "query": {
-          "label": "environment",
-          "refId": "LokiVariableQueryEditor-VariableQuery",
-          "stream": "",
-          "type": 1
-        },
-        "refresh": 2,
-        "regex": "",
+        "regex": "ai-alpha.*",
         "sort": 1,
         "type": "query"
       }
     ]
   },
-  "time": { "from": "now-15m", "to": "now" },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Application Logs",
+  "title": "[ ALPHA ] AI Application Logs",
   "uid": "app-logs-v1",
-  "version": 10
+  "version": 50
 }

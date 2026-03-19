@@ -35,5 +35,8 @@ COPY --chown=1001:1001 . /app
 # Using the numeric ID (1001) is often preferred by Kubernetes/Security policies
 USER 1001
 
+# Expose ports
+EXPOSE 8000
+
 # Default Run Server
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["uwsgi", "--ini", "uwsgi.ini"]
