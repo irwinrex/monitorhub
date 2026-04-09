@@ -130,19 +130,7 @@ info "  - ${TEMPO_REPO}/tempo:${TEMPO_CHART_VERSION}"
 info "  - ${PROMETHEUS_REPO}/kube-prometheus-stack:${PROMETHEUS_CHART_VERSION}"
 info "  - ${GRAFANA_REPO}/grafana:${GRAFANA_CHART_VERSION}"
 
-# ── 5. Local Path Provisioner ─────────────────────────────────────────────────
-info "Installing Local Path Provisioner..."
-if ! kubectl get sc local-path &>/dev/null; then
-  kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
-  kubectl -n local-path-storage rollout status deployment/local-path-provisioner --timeout=2m
-  kubectl patch storageclass local-path \
-    -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
-  success "Local Path Provisioner installed"
-else
-  info "Local Path Provisioner already installed"
-fi
-
-# ── 6. Helm Deploy ────────────────────────────────────────────────────────────
+# ── 5. Helm Deploy ────────────────────────────────────────────────────────────
 
 # Loki
 if ! check_version_drift "loki" "${MONITORING_NS}" "${LOKI_CHART_VERSION}"; then

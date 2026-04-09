@@ -15,8 +15,9 @@ require_helm
 # Setup Environment
 # ------------------------------------------------------------------------------
 : "${HAPROXY_CHART_VERSION:=1.48.0}"
-HAPROXY_VALUES="${SCRIPT_DIR}/../values/haproxy-values.yaml"
-INGRESS_YAML="${SCRIPT_DIR}/../values/ingress.yaml"
+VALUES_DIR="$(resolve_values_dir)"
+HAPROXY_VALUES="${VALUES_DIR}/haproxy-values.yaml"
+INGRESS_YAML="${VALUES_DIR}/ingress.yaml"
 
 if [[ ! -f "${HAPROXY_VALUES}" ]]; then
   die "Values file not found: ${HAPROXY_VALUES}"

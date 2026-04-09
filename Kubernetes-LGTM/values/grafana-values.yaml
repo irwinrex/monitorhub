@@ -2,10 +2,15 @@
 # grafana-values.yaml
 # Helm chart: grafana/grafana 10.5.15
 # Optimized for LGTM stack (Prometheus + Loki + Tempo)
-# Single-node Kubernetes cluster
+# Expandable Controller Kubernetes cluster
 # =============================================================================
 
 replicas: 1
+
+tolerations:
+  - key: "node-role.kubernetes.io/control-plane"
+    operator: "Exists"
+    effect: "NoSchedule"
 
 # =============================================================================
 # Admin credentials
@@ -32,7 +37,6 @@ persistence:
 # Grafana core configuration
 # =============================================================================
 grafana.ini:
-
   analytics:
     reporting_enabled: false
     check_for_updates: false
@@ -79,7 +83,6 @@ env:
 # Sidecar (auto-import dashboards & datasources)
 # =============================================================================
 sidecar:
-
   dashboards:
     enabled: true
     label: grafana_dashboard
@@ -104,12 +107,10 @@ sidecar:
 # Datasources
 # =============================================================================
 datasources:
-
   datasources.yaml:
     apiVersion: 1
 
     datasources:
-
       # -----------------------------------------------------------------------
       # Prometheus (metrics)
       # -----------------------------------------------------------------------
@@ -184,7 +185,6 @@ plugins: []
 # Resources (single-node cluster safe)
 # =============================================================================
 resources:
-
   requests:
     cpu: 150m
     memory: 512Mi

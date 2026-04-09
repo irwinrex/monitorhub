@@ -14,8 +14,10 @@ require_kubeconfig
 : "${MONITORING_NS:=monitoring}"
 : "${FORCE_RECREATE:=false}"
 
+# Create monitoring namespace if not exists
 if ! kubectl get namespace "${MONITORING_NS}" &>/dev/null; then
-  die "Namespace '${MONITORING_NS}' does not exist. Run install_k0s.sh first."
+  info "Creating namespace ${MONITORING_NS}..."
+  kubectl create namespace "${MONITORING_NS}"
 fi
 
 # Ensure openssl is available

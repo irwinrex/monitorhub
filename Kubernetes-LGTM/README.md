@@ -1,5 +1,5 @@
 # LGTM Stack — Deployment Guide
-## k0s · Single Node · HAProxy Ingress · DaemonSet
+## k0s · Expandable Controller · HAProxy Ingress · DaemonSet
 
 ---
 
@@ -12,7 +12,7 @@
 ├── scripts/
 │   ├── lib/
 │   │   └── common.sh           ← Shared: versions, colours, helpers
-│   ├── install_k0s.sh          ← Phase 1: k0s + Helm
+│   ├── install_k0s.sh          ← Phase 1: k0s Controller + Helm
 │   ├── install_secrets.sh      ← Phase 2: Grafana admin secret
 │   ├── install_LGTM.sh         ← Phase 3: Loki + Tempo + Prometheus + Grafana
 │   └── install_HAproxy.sh      ← Phase 4: HAProxy Ingress + Ingress routes
@@ -36,7 +36,29 @@
 | Instance | t4g.xlarge · 4 vCPU / 16 GB · Debian 12 ARM64 · fresh |
 | IAM role | EC2 instance role with S3 access |
 | S3 bucket | Base name you provide (e.g., `lgtm-observability`) |
-| Security group | Ports 22, 80 open inbound |
+| Security group | Ports 22, 80, 6443 (API), 10250 (Kubelet) open inbound |
+
+**Note:** For multi-node expansion, ensure ports 6443 and 10250 are open between nodes.
+
+---
+
+## Expansion (Adding Nodes)
+
+This setup installs k0s as a controller with the worker role enabled on the primary node. To add more worker nodes to the cluster:
+
+1. **Generate a join token on the primary node:**
+   ```bash
+   sudo k0s token create --role worker
+   ```
+
+2. **On the new node, install k0s as a worker:**
+   ```bash
+   curl -sSLf https://get.k0s.sh | sudo sh
+   sudo k0s install worker <TOKEN>
+   sudo k0s start
+   ```
+
+---
 
 **S3 Buckets Created:**
 - `lgtm-observability-loki-data` - Loki logs

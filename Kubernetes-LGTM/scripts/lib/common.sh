@@ -7,8 +7,13 @@
 
 # ── Pinned versions ────────────────────────────────────────────────────────────
 # All version bumps happen here. Check release pages in README.md.
-export K0S_VERSION="v1.34.3+k0s.0" # https://github.com/k0sproject/k0s/releases
+export K0S_VERSION="v1.35.2+k0s.0" # https://github.com/k0sproject/k0s/releases
 export HELM_VERSION="v3.17.1"      # https://github.com/helm/helm/releases
+export YQ_VERSION="v4.52.5"       # https://github.com/mikefarah/yq/releases
+
+# ── Component YAML paths ───────────────────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COMPONENTS_DIR="${SCRIPT_DIR}/../components"
 
 export HAPROXY_CHART_VERSION="1.49.0" # https://artifacthub.io/packages/helm/haproxy-ingress/haproxy-ingress
 
@@ -83,8 +88,14 @@ require_root() {
 }
 
 require_kubeconfig() {
-  export KUBECONFIG="${KUBECONFIG:-/root/.kube/config}"
-  [[ -f "$KUBECONFIG" ]] || die "kubeconfig not found at ${KUBECONFIG}\n  Run: sudo bash scripts/install_k0s.sh first"
+  if [[ -n "${SUDO_USER:-}" ]]; then
+    USER_HOME="$(getent passwd "${SUDO_USER}" | cut -d: -f6)"
+    KUBECONFIG_DEFAULT="${USER_HOME}/.kube/config"
+  else
+    KUBECONFIG_DEFAULT="/root/.kube/config"
+  fi
+  export KUBECONFIG="${KUBECONFIG:-$KUBECONFIG_DEFAULT}"
+  [[ -f "$KUBECONFIG" ]] || die "kubeconfig not found at ${KUBECONFIG}\n  Run: install_k0s.sh first"
 }
 
 require_helm() {
